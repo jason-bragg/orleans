@@ -100,7 +100,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override bool GetSendingSocket(Message msg, out Socket socket, out SiloAddress targetSilo, out string error)
+        protected override bool GetSendingSocket(Message msg, out SocketSender socket, out SiloAddress targetSilo, out string error)
         {
             socket = null;
             targetSilo = msg.TargetSilo;
@@ -108,7 +108,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 socket = messageCenter.SocketManager.GetSendingSocket(targetSilo.Endpoint);
-                if (socket.Connected) return true;
+                if (socket.MySocket.Connected) return true;
 
                 messageCenter.SocketManager.InvalidateEntry(targetSilo.Endpoint);
                 socket = messageCenter.SocketManager.GetSendingSocket(targetSilo.Endpoint);

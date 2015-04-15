@@ -220,7 +220,7 @@ namespace Orleans.Messaging
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        protected override bool GetSendingSocket(Message msg, out Socket socketCapture, out SiloAddress targetSilo, out string error)
+        protected override bool GetSendingSocket(Message msg, out SocketSender socketCapture, out SiloAddress targetSilo, out string error)
         {
             error = null;
             targetSilo = Silo;
@@ -231,12 +231,12 @@ namespace Orleans.Messaging
                 {
                     Connect();
                 }
-                socketCapture = Socket;
-                if (socketCapture == null || !socketCapture.Connected)
+                if (Socket == null || !Socket.Connected)
                 {
                     // Failed to connect -- Connect will have already declared this connection dead, so recycle the message
                     return false;
                 }
+                socketCapture = new SocketSender(Socket);
             }
             catch (Exception)
             {

@@ -52,7 +52,7 @@ namespace Orleans.Messaging
             bool continueSend = PrepareMessageForSend(msg);
             if (!continueSend) return;
 
-            Socket sock;
+            SocketSender sock;
             string error;
             SiloAddress targetSilo;
             continueSend = GetSendingSocket(msg, out sock, out targetSilo, out error);
@@ -75,20 +75,11 @@ namespace Orleans.Messaging
             }
 
             int length = data.Sum(x => x.Count);
-            int bytesSent = 0;
             bool exceptionSending = false;
-            bool countMismatchSending = false;
             string sendErrorStr = null;
             try
             {
-                bytesSent = sock.Send(data);
-                if (bytesSent != length)
-                {
-                    // The complete message wasn't sent, even though no error was reported; treat this as an error
-                    countMismatchSending = true;
-                    sendErrorStr = String.Format("Byte count mismatch on sending to {0}: sent {1}, expected {2}", targetSilo, bytesSent, length);
-                    Log.Warn(ErrorCode.Messaging_CountMismatchSending, sendErrorStr);
-                }
+                sock.Send(data);
             }
             catch (Exception exc)
             {
@@ -99,10 +90,10 @@ namespace Orleans.Messaging
                     Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
                 }
             }
-            MessagingStatisticsGroup.OnMessageSend(targetSilo, msg.Direction, bytesSent, headerLength, GetSocketDirection());
-            bool sendError = exceptionSending || countMismatchSending;
+            MessagingStatisticsGroup.OnMessageSend(targetSilo, msg.Direction, length, headerLength, GetSocketDirection());
+            bool sendError = exceptionSending;
             if (sendError)
-                OnSendFailure(sock, targetSilo);
+                OnSendFailure(sock.MySocket, targetSilo);
 
             ProcessMessageAfterSend(msg, sendError, sendErrorStr);
         }
@@ -122,7 +113,7 @@ namespace Orleans.Messaging
 
             if (msgs.Count <= 0) return;
 
-            Socket sock;
+            SocketSender sock;
             string error;
             SiloAddress targetSilo;
             bool continueSend = GetSendingSocket(msgs[0], out sock, out targetSilo, out error);
@@ -140,20 +131,11 @@ namespace Orleans.Messaging
             if (!continueSend) return;
 
             int length = data.Sum(x => x.Count);
-            int bytesSent = 0;
             bool exceptionSending = false;
-            bool countMismatchSending = false;
             string sendErrorStr = null;
             try
             {
-                bytesSent = sock.Send(data);
-                if (bytesSent != length)
-                {
-                    // The complete message wasn't sent, even though no error was reported; treat this as an error
-                    countMismatchSending = true;
-                    sendErrorStr = String.Format("Byte count mismatch on sending to {0}: sent {1}, expected {2}", targetSilo, bytesSent, length);
-                    Log.Warn(ErrorCode.Messaging_CountMismatchSending, sendErrorStr);
-                }
+                sock.Send(data);
             }
             catch (Exception exc)
             {
@@ -164,10 +146,10 @@ namespace Orleans.Messaging
                     Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
                 }
             }
-            MessagingStatisticsGroup.OnMessageBatchSend(targetSilo, msgs[0].Direction, bytesSent, headerLength, GetSocketDirection(), msgs.Count);
-            bool sendError = exceptionSending || countMismatchSending;
+            MessagingStatisticsGroup.OnMessageBatchSend(targetSilo, msgs[0].Direction, length, headerLength, GetSocketDirection(), msgs.Count);
+            bool sendError = exceptionSending;
             if (sendError)
-                OnSendFailure(sock, targetSilo);
+                OnSendFailure(sock.MySocket, targetSilo);
 
             foreach (Message msg in msgs)
                 ProcessMessageAfterSend(msg, sendError, sendErrorStr);
@@ -220,7 +202,7 @@ namespace Orleans.Messaging
 
         protected abstract SocketDirection GetSocketDirection();
         protected abstract bool PrepareMessageForSend(Message msg);
-        protected abstract bool GetSendingSocket(Message msg, out Socket socket, out SiloAddress targetSilo, out string error);
+        protected abstract bool GetSendingSocket(Message msg, out SocketSender socket, out SiloAddress targetSilo, out string error);
         protected abstract void OnGetSendingSocketFailure(Message msg, string error);
         protected abstract void OnMessageSerializationFailure(Message msg, Exception exc);
         protected abstract void OnSendFailure(Socket socket, SiloAddress targetSilo);

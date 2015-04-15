@@ -123,6 +123,7 @@
     <Compile Include="Messaging\GatewayManager.cs" />
     <Compile Include="Messaging\RequestInvocationHistory.cs" />
     <Compile Include="Messaging\Response.cs" />
+    <Compile Include="Messaging\SocketSender.cs" />
     <Compile Include="Providers\StorageProviderUtils.cs" />
     <Compile Include="Runtime\IAddressable.cs" />
     <Compile Include="Placement\PreferLocalPlacement.cs" />

@@ -30,13 +30,13 @@ namespace Orleans.Runtime
 {
     internal class SocketManager
     {
-        private readonly LRU<IPEndPoint, Socket> cache;
+        private readonly LRU<IPEndPoint, SocketSender> cache;
 
         private const int MAX_SOCKETS = 200;
 
         internal SocketManager(IMessagingConfiguration config)
         {
-            cache = new LRU<IPEndPoint, Socket>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
+            cache = new LRU<IPEndPoint, SocketSender>(MAX_SOCKETS, config.MaxSocketAge, SendingSocketCreator);
             cache.RaiseFlushEvent += FlushHandler;
         }
 
@@ -71,13 +71,13 @@ namespace Orleans.Runtime
             return cache.ContainsKey(target);
         }
 
-        internal Socket GetSendingSocket(IPEndPoint target)
+        internal SocketSender GetSendingSocket(IPEndPoint target)
         {
             return cache.Get(target);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
-        private Socket SendingSocketCreator(IPEndPoint target)
+        private SocketSender SendingSocketCreator(IPEndPoint target)
         {
             var s = new Socket(target.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
             try
@@ -105,7 +105,7 @@ namespace Orleans.Runtime
                 }
                 throw;
             }
-            return s;
+            return new SocketSender(s);
         }
 
         internal static void WriteConnectionPreemble(Socket socket, GrainId grainId)
@@ -170,21 +170,21 @@ namespace Orleans.Runtime
             // Do nothing -- the socket will get cleaned up when it gets flushed from the cache
         }
 
-        private static void FlushHandler(Object sender, LRU<IPEndPoint, Socket>.FlushEventArgs args)
+        private static void FlushHandler(Object sender, LRU<IPEndPoint, SocketSender>.FlushEventArgs args)
         {
             if (args.Value == null) return;
 
-            CloseSocket(args.Value);
+            CloseSocket(args.Value.MySocket);
             NetworkingStatisticsGroup.OnClosedSendingSocket();
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         internal void InvalidateEntry(IPEndPoint target)
         {
-            Socket socket;
-            if (!cache.RemoveKey(target, out socket)) return;
+            SocketSender sender;
+            if (!cache.RemoveKey(target, out sender)) return;
 
-            CloseSocket(socket);
+            CloseSocket(sender.MySocket);
             NetworkingStatisticsGroup.OnClosedSendingSocket();
         }
 

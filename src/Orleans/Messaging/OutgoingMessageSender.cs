@@ -94,8 +94,6 @@ namespace Orleans.Messaging
             bool sendError = exceptionSending;
             if (sendError)
                 OnSendFailure(sock.MySocket, targetSilo);
-
-            ProcessMessageAfterSend(msg, sendError, sendErrorStr);
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
@@ -150,9 +148,6 @@ namespace Orleans.Messaging
             bool sendError = exceptionSending;
             if (sendError)
                 OnSendFailure(sock.MySocket, targetSilo);
-
-            foreach (Message msg in msgs)
-                ProcessMessageAfterSend(msg, sendError, sendErrorStr);
         }
 
         public static bool SerializeMessages(List<Message> msgs, out List<ArraySegment<byte>> data, out int headerLengthOut, Action<Message, Exception> msgSerializationFailureHandler)

@@ -12,7 +12,6 @@ namespace Orleans.Runtime
         private const int DefaultBufferSize = 1 << 18; // 256k
         private readonly SocketAsyncEventArgs sendSocketEvent;
         private readonly ConcurrentQueue<List<ArraySegment<byte>>> pendingMessages;
-        private readonly byte[] buffer;
         private int active;
 
         public Socket MySocket { get; private set; }
@@ -25,9 +24,7 @@ namespace Orleans.Runtime
                 throw new ArgumentNullException("socket");
             }
             MySocket = socket;
-            buffer = new byte[bufferSize];
             sendSocketEvent = new SocketAsyncEventArgs();
-            sendSocketEvent.SetBuffer(buffer, 0, 0);
             sendSocketEvent.Completed += OnSendCompleted;
             pendingMessages = new ConcurrentQueue<List<ArraySegment<byte>>>();
             Batching = true;
@@ -50,47 +47,43 @@ namespace Orleans.Runtime
                 return;
             }
 
-            int size = FillBuffer();
-            WriteBuffer(size);
+            FillBuffer();
+            WriteBuffer();
         }
 
-        private void WriteBuffer(int size)
+        private void WriteBuffer()
         {
-            sendSocketEvent.SetBuffer(0, size);
-            bool willRaiseEvent = MySocket.SendAsync(sendSocketEvent);
-
-            if (!willRaiseEvent)
+            if (!MySocket.SendAsync(sendSocketEvent))
             {
-                Send();
+                OnSendCompleted(MySocket, sendSocketEvent);
             }
         }
 
-        private int FillBuffer()
+        private void FillBuffer()
         {
-            int writeOffset = 0;
+            int sendSize = 0;
+            var messageList = new List<ArraySegment<byte>>();
             while (!pendingMessages.IsEmpty)
             {
                 List<ArraySegment<byte>> message;
                 if (!pendingMessages.TryPeek(out message))
                     break;
-                if (message.Sum(seg => seg.Count) + writeOffset >= DefaultBufferSize)
+                sendSize += message.Sum(seg => seg.Count);
+                if (sendSize >= DefaultBufferSize)
                     break;
                 if (!pendingMessages.TryDequeue(out message))
                     break;
-                foreach (ArraySegment<byte> segment in message)
-                {
-                    Buffer.BlockCopy(segment.Array, segment.Offset, buffer, writeOffset, segment.Count);
-                    writeOffset += segment.Count;
-                }
-                BufferPool.GlobalPool.Release(message);
+                messageList.AddRange(message);
                 if (!Batching)
                     break;
             }
-            return writeOffset;
+            sendSocketEvent.BufferList = messageList;
         }
 
         private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
         {
+            BufferPool.GlobalPool.Release(e.BufferList);
+
             Send();
         }
 

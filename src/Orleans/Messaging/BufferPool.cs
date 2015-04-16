@@ -139,7 +139,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public void Release(List<ArraySegment<byte>> list)
+        public void Release(IList<ArraySegment<byte>> list)
         {
             if (list == null) return;
 

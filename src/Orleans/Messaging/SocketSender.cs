@@ -12,6 +12,8 @@ namespace Orleans.Runtime
         private const int DefaultBufferSize = 1 << 18; // 256k
         private readonly SocketAsyncEventArgs sendSocketEvent;
         private readonly ConcurrentQueue<List<ArraySegment<byte>>> pendingMessages;
+        private readonly List<ArraySegment<byte>> messageList;
+        private readonly int bufferSize;
         private int active;
 
         public Socket MySocket { get; private set; }
@@ -24,7 +26,10 @@ namespace Orleans.Runtime
                 throw new ArgumentNullException("socket");
             }
             MySocket = socket;
+            this.bufferSize = bufferSize;
             sendSocketEvent = new SocketAsyncEventArgs();
+            sendSocketEvent.BufferList = messageList;
+            messageList = new List<ArraySegment<byte>>();
             sendSocketEvent.Completed += OnSendCompleted;
             pendingMessages = new ConcurrentQueue<List<ArraySegment<byte>>>();
             Batching = true;
@@ -62,14 +67,14 @@ namespace Orleans.Runtime
         private void FillBuffer()
         {
             int sendSize = 0;
-            var messageList = new List<ArraySegment<byte>>();
+            messageList.Clear();
             while (!pendingMessages.IsEmpty)
             {
                 List<ArraySegment<byte>> message;
                 if (!pendingMessages.TryPeek(out message))
                     break;
                 sendSize += message.Sum(seg => seg.Count);
-                if (sendSize >= DefaultBufferSize)
+                if (sendSize >= bufferSize)
                     break;
                 if (!pendingMessages.TryDequeue(out message))
                     break;
@@ -77,7 +82,6 @@ namespace Orleans.Runtime
                 if (!Batching)
                     break;
             }
-            sendSocketEvent.BufferList = messageList;
         }
 
         private void OnSendCompleted(object sender, SocketAsyncEventArgs e)

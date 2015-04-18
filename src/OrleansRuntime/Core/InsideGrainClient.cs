@@ -103,13 +103,14 @@ namespace Orleans.Runtime
         public void SendRequest(
             GrainReference target,
             InvokeMethodRequest request,
+            List<ArraySegment<byte>> body, 
             TaskCompletionSource<object> context,
             Action<Message, TaskCompletionSource<object>> callback,
             string debugContext,
             InvokeMethodOptions options,
             string genericArguments = null)
         {
-            var message = RuntimeClient.CreateMessage(request, options);
+            var message = RuntimeClient.CreateMessage(request, body, options);
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 

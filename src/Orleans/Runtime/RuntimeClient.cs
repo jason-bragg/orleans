@@ -21,7 +21,9 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using Orleans.CodeGeneration;
+using System;
+using System.Collections.Generic;
+using Orleans.CodeGeneration;
 
 namespace Orleans.Runtime
 {
@@ -39,7 +41,7 @@ namespace Orleans.Runtime
         /// </summary>
         internal static IRuntimeClient Current { get; set; }
 
-        internal static Message CreateMessage(InvokeMethodRequest request, InvokeMethodOptions options)
+        internal static Message CreateMessage(InvokeMethodRequest request, List<ArraySegment<byte>> bodyBytes, InvokeMethodOptions options)
         {
             var message = new Message(
                 Message.Categories.Application,
@@ -50,7 +52,8 @@ namespace Orleans.Runtime
                 MethodId = request.MethodId,
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                BodyObject = request
+                BodyObject = request,
+                bodyBytes = bodyBytes
             };
             
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)

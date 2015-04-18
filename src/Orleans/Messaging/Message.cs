@@ -91,7 +91,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// NOTE: The contents of bodyBytes should never be modified
         /// </summary>
-        private List<ArraySegment<byte>> bodyBytes;
+        public List<ArraySegment<byte>> bodyBytes;
 
         private List<ArraySegment<byte>> headerBytes;
 

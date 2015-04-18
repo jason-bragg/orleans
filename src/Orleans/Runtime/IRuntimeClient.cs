@@ -59,7 +59,7 @@ namespace Orleans.Runtime
         /// <param name="timeout">New response timeout value</param>
         void SetResponseTimeout(TimeSpan timeout);
 
-        void SendRequest(GrainReference target, InvokeMethodRequest request, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
+        void SendRequest(GrainReference target, InvokeMethodRequest request, List<ArraySegment<byte>> body, TaskCompletionSource<object> context, Action<Message, TaskCompletionSource<object>> callback, string debugContext = null, InvokeMethodOptions options = InvokeMethodOptions.None, string genericArguments = null);
 
         void ReceiveResponse(Message message);
 

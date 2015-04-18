@@ -322,13 +322,15 @@ namespace Orleans.Runtime
         {
             CheckForGrainArguments(arguments);
 
-            var argsDeepCopy = (object[])SerializationManager.DeepCopy(arguments);
-            var request = new InvokeMethodRequest(this.InterfaceId, methodId, argsDeepCopy);
+            var request = new InvokeMethodRequest(this.InterfaceId, methodId, arguments);
+            var bodyStream = new BinaryTokenStreamWriter();
+            SerializationManager.Serialize(request, bodyStream);
+            var bodyBytes = bodyStream.ToBytes() as List<ArraySegment<byte>>;
 
             if (IsUnordered)
                 options |= InvokeMethodOptions.Unordered;
 
-            Task<object> resultTask = InvokeMethod_Impl(request, null, options);
+            Task<object> resultTask = InvokeMethod_Impl(request, bodyBytes, null, options);
 
             if (resultTask == null)
             {
@@ -343,7 +345,7 @@ namespace Orleans.Runtime
 
         #region Private members
 
-        private Task<object> InvokeMethod_Impl(InvokeMethodRequest request, string debugContext, InvokeMethodOptions options)
+        private Task<object> InvokeMethod_Impl(InvokeMethodRequest request, List<ArraySegment<byte>> body, string debugContext, InvokeMethodOptions options)
         {
             if (debugContext == null && USE_DEBUG_CONTEXT)
             {
@@ -356,7 +358,7 @@ namespace Orleans.Runtime
             bool isOneWayCall = ((options & InvokeMethodOptions.OneWay) != 0);
 
             var resolver = isOneWayCall ? null : new TaskCompletionSource<object>();
-            RuntimeClient.Current.SendRequest(this, request, resolver, ResponseCallback, debugContext, options, genericArguments);
+            RuntimeClient.Current.SendRequest(this, request, body, resolver, ResponseCallback, debugContext, options, genericArguments);
             return isOneWayCall ? null : resolver.Task;
         }
 

@@ -29,6 +29,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Orleans.CodeGeneration;
+using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
@@ -56,19 +57,21 @@ namespace UnitTests.OrleansRuntime
         public void SpeedRun()
         {
             SerializationManager.InitializeForTesting();
-            var args = new object[] { new blarg(), new blarg() };
+            var mutableargs = new object[] { new blarg(), new blarg() };
+            var imutableargs = new object[] { (new blarg()).AsImmutable(), (new blarg()).AsImmutable() };
+            var args = mutableargs;
 
             for (int k = 0; k < 20; k++)
             {
                 Stopwatch sw = Stopwatch.StartNew();
                 for (int i = 0; i < 2000; i++)
                 {
-                    int headerSize;
+//                    int headerSize;
                     var argsDeepCopy = (object[])SerializationManager.DeepCopy(args);
                     var request = new InvokeMethodRequest(1, 2, argsDeepCopy);
-                    var message = RuntimeClient.CreateMessage(request, null, InvokeMethodOptions.None);
-                    var buffers = message.Serialize(out headerSize);
-                    BufferPool.GlobalPool.Release(buffers);
+//                    var message = RuntimeClient.CreateMessage(request, null, InvokeMethodOptions.None);
+//                    var buffers = message.Serialize(out headerSize);
+//                    BufferPool.GlobalPool.Release(buffers);
                 }
                 Console.WriteLine(sw.ElapsedTicks);
                 Console.WriteLine(sw.ElapsedMilliseconds);
@@ -90,10 +93,10 @@ namespace UnitTests.OrleansRuntime
                     // pretty high (an array allocation plus a bunch of copying).
                     var bodyBytes = bodyStream.ToBytes() as List<ArraySegment<byte>>;
 
-                    var message = RuntimeClient.CreateMessage(request, bodyBytes, InvokeMethodOptions.None);
+  //                  var message = RuntimeClient.CreateMessage(request, bodyBytes, InvokeMethodOptions.None);
 
-                    var buffers = message.Serialize(out headerSize);
-                    BufferPool.GlobalPool.Release(buffers);
+ //                   var buffers = message.Serialize(out headerSize);
+ //                   BufferPool.GlobalPool.Release(buffers);
                 }
                 Console.WriteLine(sw.ElapsedTicks);
                 Console.WriteLine(sw.ElapsedMilliseconds);

@@ -66,14 +66,14 @@ namespace UnitTests.OrleansRuntime
                 Stopwatch sw = Stopwatch.StartNew();
                 for (int i = 0; i < 5000; i++)
                 {
-//                    int headerSize;
+                    int headerSize;
                     var argsDeepCopy = (object[])SerializationManager.DeepCopy(args);
                     var request = new InvokeMethodRequest(1, 2, argsDeepCopy);
-//                    var message = RuntimeClient.CreateMessage(request, null, InvokeMethodOptions.None);
-//                    var buffers = message.Serialize(out headerSize);
-//                    BufferPool.GlobalPool.Release(buffers);
+                    var message = RuntimeClient.CreateMessage(request, null, InvokeMethodOptions.None);
+                    var buffers = message.Serialize(out headerSize);
+                    BufferPool.GlobalPool.Release(buffers);
                 }
-                Console.WriteLine(sw.ElapsedTicks);
+//                Console.WriteLine(sw.ElapsedTicks);
                 Console.WriteLine(sw.ElapsedMilliseconds);
             }
             Console.WriteLine("---------------------");
@@ -93,12 +93,12 @@ namespace UnitTests.OrleansRuntime
                     // pretty high (an array allocation plus a bunch of copying).
                     var bodyBytes = bodyStream.ToBytes() as List<ArraySegment<byte>>;
 
-  //                  var message = RuntimeClient.CreateMessage(request, bodyBytes, InvokeMethodOptions.None);
+                    var message = RuntimeClient.CreateMessage(request, bodyBytes, InvokeMethodOptions.None);
 
- //                   var buffers = message.Serialize(out headerSize);
- //                   BufferPool.GlobalPool.Release(buffers);
+                    var buffers = message.Serialize(out headerSize);
+                    BufferPool.GlobalPool.Release(buffers);
                 }
-                Console.WriteLine(sw.ElapsedTicks);
+//                Console.WriteLine(sw.ElapsedTicks);
                 Console.WriteLine(sw.ElapsedMilliseconds);
             }
 

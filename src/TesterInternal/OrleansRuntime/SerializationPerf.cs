@@ -64,7 +64,7 @@ namespace UnitTests.OrleansRuntime
             for (int k = 0; k < 20; k++)
             {
                 Stopwatch sw = Stopwatch.StartNew();
-                for (int i = 0; i < 2000; i++)
+                for (int i = 0; i < 5000; i++)
                 {
 //                    int headerSize;
                     var argsDeepCopy = (object[])SerializationManager.DeepCopy(args);
@@ -82,7 +82,7 @@ namespace UnitTests.OrleansRuntime
             {
                 Stopwatch sw = Stopwatch.StartNew();
                 int headerSize;
-                for (int i = 0; i < 2000; i++)
+                for (int i = 0; i < 5000; i++)
                 {
                     var request = new InvokeMethodRequest(1, 2, args);
                     var bodyStream = new BinaryTokenStreamWriter();

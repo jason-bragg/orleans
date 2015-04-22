@@ -52,7 +52,6 @@ namespace Orleans.Runtime
                 MethodId = request.MethodId,
                 IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
                 IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                BodyObject = request,
                 bodyBytes = bodyBytes
             };
             

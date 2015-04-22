@@ -26,6 +26,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using Orleans.Runtime;
+﻿using Orleans.Storage;
 
 namespace Orleans.Messaging
 {
@@ -82,6 +83,7 @@ namespace Orleans.Messaging
                         continue;
                     }
                     var msg = new Message(header, body);
+                    msg.ReleaseBodyAndHeaderBuffers();
                     MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
                     if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);

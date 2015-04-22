@@ -433,7 +433,7 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    BufferPool.GlobalPool.Release(bodyBytes);
+                    //BufferPool.GlobalPool.Release(bodyBytes);
                     bodyBytes = null;
                 }
                 return bodyObject;
@@ -476,10 +476,11 @@ namespace Orleans.Runtime
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-            BufferPool.GlobalPool.Release(header);
+//            BufferPool.GlobalPool.Release(header);
 
             bodyBytes = body;
-            bodyObject = null;
+            var b = BodyObject;
+            bodyBytes = null;
             headerBytes = null;
         }
 

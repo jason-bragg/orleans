@@ -97,8 +97,8 @@ namespace Orleans.Runtime.Messaging
             if (targetAddress == null)
             {
                 // reroute via Dispatcher
-                msg.RemoveHeader(Message.Header.TARGET_SILO);
-                msg.RemoveHeader(Message.Header.TARGET_ACTIVATION);
+                msg.RemoveHeader(MsgHeader.TARGET_SILO);
+                msg.RemoveHeader(MsgHeader.TARGET_ACTIVATION);
 
                 if (msg.TargetGrain.IsSystemTarget)
                 {

@@ -31,45 +31,51 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
+    public enum MsgHeader : byte
+    {
+        ALWAYS_INTERLEAVE = 1,
+        CACHE_INVALIDATION_HEADER,
+        CATEGORY,
+        CORRELATION_ID,
+        DEBUG_CONTEXT,
+        DIRECTION,
+        EXPIRATION,
+        FORWARD_COUNT,
+        INTERFACE_ID,
+        METHOD_ID,
+        NEW_GRAIN_TYPE,
+        GENERIC_GRAIN_TYPE,
+        RESULT,
+        REJECTION_INFO,
+        REJECTION_TYPE,
+        READ_ONLY,
+        RESEND_COUNT,
+        SENDING_ACTIVATION,
+        SENDING_GRAIN,
+        SENDING_SILO,
+        IS_NEW_PLACEMENT,
+
+        TARGET_ACTIVATION,
+        TARGET_GRAIN,
+        TARGET_SILO,
+        TARGET_OBSERVER,
+        TIMESTAMPS,
+        IS_UNORDERED,
+
+        PING_APPLICATION_HEADER,
+        PRIOR_MESSAGE_ID,
+        PRIOR_MESSAGE_TIMES,
+
+        CALL_CHAIN_REQUEST_CONTEXT_HEADER,
+        E2_E_TRACING_ACTIVITY_ID_HEADER,
+        
+        // must always be last
+        APPLICATION_HEADER_FLAG,
+    }
+
     [Serializable]
     internal class Message : IOutgoingMessage
     {
-        public static class Header
-        {
-            public const string ALWAYS_INTERLEAVE = "#AI";
-            public const string CACHE_INVALIDATION_HEADER = "#CIH";
-            public const string CATEGORY = "#MT";
-            public const string CORRELATION_ID = "#ID";
-            public const string DEBUG_CONTEXT = "#CTX";
-            public const string DIRECTION = "#ST";
-            public const string EXPIRATION = "#EX";
-            public const string FORWARD_COUNT = "#FC";
-            public const string INTERFACE_ID = "#IID";
-            public const string METHOD_ID = "#MID";
-            public const string NEW_GRAIN_TYPE = "#NT";
-            public const string GENERIC_GRAIN_TYPE = "#GGT";
-            public const string RESULT = "#R";
-            public const string REJECTION_INFO = "#RJI";
-            public const string REJECTION_TYPE = "#RJT";
-            public const string READ_ONLY = "#RO";
-            public const string RESEND_COUNT = "#RS";
-            public const string SENDING_ACTIVATION = "#SA";
-            public const string SENDING_GRAIN = "#SG";
-            public const string SENDING_SILO = "#SS";
-            public const string IS_NEW_PLACEMENT = "#NP";
-
-            public const string TARGET_ACTIVATION = "#TA";
-            public const string TARGET_GRAIN = "#TG";
-            public const string TARGET_SILO = "#TS";
-            public const string TARGET_OBSERVER = "#TO";
-            public const string TIMESTAMPS = "Times";
-            public const string IS_UNORDERED = "#UO";
-
-            public const char APPLICATION_HEADER_FLAG = '!';
-            public const string PING_APPLICATION_HEADER = "Ping";
-            public const string PRIOR_MESSAGE_ID = "#PMI";
-            public const string PRIOR_MESSAGE_TIMES = "#PMT";
-        }
 
         public static class Metadata
         {
@@ -84,7 +90,7 @@ namespace Orleans.Runtime
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
 
-        private readonly Dictionary<string, object> headers;
+        private readonly Dictionary<byte, object> headers;
         [NonSerialized]
         private Dictionary<string, object> metadata;
 
@@ -113,28 +119,28 @@ namespace Orleans.Runtime
 
         public enum Categories
         {
-            Ping,
+            Ping = 1,
             System,
             Application,
         }
 
         public enum Directions
         {
-            Request,
+            Request = 1,
             Response,
             OneWay
         }
 
         public enum ResponseTypes
         {
-            Success,
+            Success = 1,
             Error,
             Rejection
         }
 
         public enum RejectionTypes
         {
-            Transient,
+            Transient = 1,
             Overloaded,
             DuplicateRequest,
             Unrecoverable,
@@ -143,82 +149,82 @@ namespace Orleans.Runtime
 
         public Categories Category
         {
-            get { return GetScalarHeader<Categories>(Header.CATEGORY); }
-            set { SetHeader(Header.CATEGORY, value); }
+            get { return GetScalarHeader<Categories>(MsgHeader.CATEGORY); }
+            set { SetHeader(MsgHeader.CATEGORY, value); }
         }
 
         public Directions Direction
         {
-            get { return GetScalarHeader<Directions>(Header.DIRECTION); }
-            set { SetHeader(Header.DIRECTION, value); }
+            get { return GetScalarHeader<Directions>(MsgHeader.DIRECTION); }
+            set { SetHeader(MsgHeader.DIRECTION, value); }
         }
 
         public bool IsReadOnly
         {
-            get { return GetScalarHeader<bool>(Header.READ_ONLY); }
-            set { SetHeader(Header.READ_ONLY, value); }
+            get { return GetScalarHeader<bool>(MsgHeader.READ_ONLY); }
+            set { SetHeader(MsgHeader.READ_ONLY, value); }
         }
 
         public bool IsAlwaysInterleave
         {
-            get { return GetScalarHeader<bool>(Header.ALWAYS_INTERLEAVE); }
-            set { SetHeader(Header.ALWAYS_INTERLEAVE, value); }
+            get { return GetScalarHeader<bool>(MsgHeader.ALWAYS_INTERLEAVE); }
+            set { SetHeader(MsgHeader.ALWAYS_INTERLEAVE, value); }
         }
 
         public bool IsUnordered
         {
-            get { return GetScalarHeader<bool>(Header.IS_UNORDERED); }
+            get { return GetScalarHeader<bool>(MsgHeader.IS_UNORDERED); }
             set
             {
-                if (value || ContainsHeader(Header.IS_UNORDERED))
-                    SetHeader(Header.IS_UNORDERED, value);
+                if (value || ContainsHeader(MsgHeader.IS_UNORDERED))
+                    SetHeader(MsgHeader.IS_UNORDERED, value);
             }
         }
 
         public CorrelationId Id
         {
-            get { return GetSimpleHeader<CorrelationId>(Header.CORRELATION_ID); }
-            set { SetHeader(Header.CORRELATION_ID, value); }
+            get { return GetSimpleHeader<CorrelationId>(MsgHeader.CORRELATION_ID); }
+            set { SetHeader(MsgHeader.CORRELATION_ID, value); }
         }
 
         public int ResendCount
         {
-            get { return GetScalarHeader<int>(Header.RESEND_COUNT); }
-            set { SetHeader(Header.RESEND_COUNT, value); }
+            get { return GetScalarHeader<int>(MsgHeader.RESEND_COUNT); }
+            set { SetHeader(MsgHeader.RESEND_COUNT, value); }
         }
 
         public int ForwardCount
         {
-            get { return GetScalarHeader<int>(Header.FORWARD_COUNT); }
-            set { SetHeader(Header.FORWARD_COUNT, value); }
+            get { return GetScalarHeader<int>(MsgHeader.FORWARD_COUNT); }
+            set { SetHeader(MsgHeader.FORWARD_COUNT, value); }
         }
 
         public SiloAddress TargetSilo
         {
-            get { return (SiloAddress)GetHeader(Header.TARGET_SILO); }
+            get { return (SiloAddress)GetHeader(MsgHeader.TARGET_SILO); }
             set
             {
-                SetHeader(Header.TARGET_SILO, value);
+                SetHeader(MsgHeader.TARGET_SILO, value);
                 targetAddress = null;
             }
         }
 
         public GrainId TargetGrain
         {
-            get { return GetSimpleHeader<GrainId>(Header.TARGET_GRAIN); }
+            get { return GetSimpleHeader<GrainId>(MsgHeader.TARGET_GRAIN); }
             set
             {
-                SetHeader(Header.TARGET_GRAIN, value);
+                SetHeader(MsgHeader.TARGET_GRAIN, value);
                 targetAddress = null;
             }
         }
 
         public ActivationId TargetActivation
         {
-            get { return GetSimpleHeader<ActivationId>(Header.TARGET_ACTIVATION); }
+            get { return GetSimpleHeader<ActivationId>(MsgHeader.TARGET_ACTIVATION); }
             set
             {
-                SetHeader(Header.TARGET_ACTIVATION, value);
+                SetHeader(MsgHeader.TARGET_ACTIVATION, value);
                 targetAddress = null;
             }
         }
@@ -237,40 +243,40 @@ namespace Orleans.Runtime
 
         public GuidId TargetObserverId
         {
-            get { return GetSimpleHeader<GuidId>(Header.TARGET_OBSERVER); }
+            get { return GetSimpleHeader<GuidId>(MsgHeader.TARGET_OBSERVER); }
             set
             {
-                SetHeader(Header.TARGET_OBSERVER, value);
+                SetHeader(MsgHeader.TARGET_OBSERVER, value);
                 targetAddress = null;
             }
         }
 
         public SiloAddress SendingSilo
         {
-            get { return (SiloAddress)GetHeader(Header.SENDING_SILO); }
+            get { return (SiloAddress)GetHeader(MsgHeader.SENDING_SILO); }
             set
             {
-                SetHeader(Header.SENDING_SILO, value);
+                SetHeader(MsgHeader.SENDING_SILO, value);
                 sendingAddress = null;
             }
         }
 
         public GrainId SendingGrain
         {
-            get { return GetSimpleHeader<GrainId>(Header.SENDING_GRAIN); }
+            get { return GetSimpleHeader<GrainId>(MsgHeader.SENDING_GRAIN); }
             set
             {
-                SetHeader(Header.SENDING_GRAIN, value);
+                SetHeader(MsgHeader.SENDING_GRAIN, value);
                 sendingAddress = null;
             }
         }
 
         public ActivationId SendingActivation
         {
-            get { return GetSimpleHeader<ActivationId>(Header.SENDING_ACTIVATION); }
+            get { return GetSimpleHeader<ActivationId>(MsgHeader.SENDING_ACTIVATION); }
             set
             {
-                SetHeader(Header.SENDING_ACTIVATION, value);
+                SetHeader(MsgHeader.SENDING_ACTIVATION, value);
                 sendingAddress = null;
             }
         }
@@ -289,29 +295,29 @@ namespace Orleans.Runtime
 
         public bool IsNewPlacement
         {
-            get { return GetScalarHeader<bool>(Header.IS_NEW_PLACEMENT); }
+            get { return GetScalarHeader<bool>(MsgHeader.IS_NEW_PLACEMENT); }
             set
             {
-                if (value || ContainsHeader(Header.IS_NEW_PLACEMENT))
-                    SetHeader(Header.IS_NEW_PLACEMENT, value);
+                if (value || ContainsHeader(MsgHeader.IS_NEW_PLACEMENT))
+                    SetHeader(MsgHeader.IS_NEW_PLACEMENT, value);
             }
         }
 
         public ResponseTypes Result
         {
-            get { return GetScalarHeader<ResponseTypes>(Header.RESULT); }
-            set { SetHeader(Header.RESULT, value); }
+            get { return GetScalarHeader<ResponseTypes>(MsgHeader.RESULT); }
+            set { SetHeader(MsgHeader.RESULT, value); }
         }
 
         public DateTime Expiration
         {
-            get { return GetScalarHeader<DateTime>(Header.EXPIRATION); }
-            set { SetHeader(Header.EXPIRATION, value); }
+            get { return GetScalarHeader<DateTime>(MsgHeader.EXPIRATION); }
+            set { SetHeader(MsgHeader.EXPIRATION, value); }
         }
 
         public bool IsExpired
         {
-            get { return (ContainsHeader(Header.EXPIRATION)) && DateTime.UtcNow > Expiration; }
+            get { return (ContainsHeader(MsgHeader.EXPIRATION)) && DateTime.UtcNow > Expiration; }
         }
 
         public bool IsExpirableMessage(IMessagingConfiguration config)
@@ -327,15 +333,15 @@ namespace Orleans.Runtime
         
         public string DebugContext
         {
-            get { return GetStringHeader(Header.DEBUG_CONTEXT); }
-            set { SetHeader(Header.DEBUG_CONTEXT, value); }
+            get { return GetStringHeader(MsgHeader.DEBUG_CONTEXT); }
+            set { SetHeader(MsgHeader.DEBUG_CONTEXT, value); }
         }
 
         public IEnumerable<ActivationAddress> CacheInvalidationHeader
         {
             get
             {
-                object obj = GetHeader(Header.CACHE_INVALIDATION_HEADER);
+                object obj = GetHeader(MsgHeader.CACHE_INVALIDATION_HEADER);
                 return obj == null ? null : ((IEnumerable)obj).Cast<ActivationAddress>();
             }
         }
@@ -343,13 +349,13 @@ namespace Orleans.Runtime
         internal void AddToCacheInvalidationHeader(ActivationAddress address)
         {
             var list = new List<ActivationAddress>();
-            if (ContainsHeader(Header.CACHE_INVALIDATION_HEADER))
+            if (ContainsHeader(MsgHeader.CACHE_INVALIDATION_HEADER))
             {
-                var prevList = ((IEnumerable)GetHeader(Header.CACHE_INVALIDATION_HEADER)).Cast<ActivationAddress>();
+                var prevList = ((IEnumerable)GetHeader(MsgHeader.CACHE_INVALIDATION_HEADER)).Cast<ActivationAddress>();
                 list.AddRange(prevList);
             }
             list.Add(address);
-            SetHeader(Header.CACHE_INVALIDATION_HEADER, list);
+            SetHeader(MsgHeader.CACHE_INVALIDATION_HEADER, list);
         }
 
         // Resends are used by the sender, usualy due to en error to send or due to a transient rejection.
@@ -367,14 +373,14 @@ namespace Orleans.Runtime
 
         public int MethodId
         {
-            get { return GetScalarHeader<int>(Header.METHOD_ID); }
-            set { SetHeader(Header.METHOD_ID, value); }
+            get { return GetScalarHeader<int>(MsgHeader.METHOD_ID); }
+            set { SetHeader(MsgHeader.METHOD_ID, value); }
         }
 
         public int InterfaceId
         {
-            get { return GetScalarHeader<int>(Header.INTERFACE_ID); }
-            set { SetHeader(Header.INTERFACE_ID, value); }
+            get { return GetScalarHeader<int>(MsgHeader.INTERFACE_ID); }
+            set { SetHeader(MsgHeader.INTERFACE_ID, value); }
         }
 
         /// <summary>
@@ -383,8 +389,8 @@ namespace Orleans.Runtime
         /// </summary>
         public string NewGrainType
         {
-            get { return GetStringHeader(Header.NEW_GRAIN_TYPE); }
-            set { SetHeader(Header.NEW_GRAIN_TYPE, value); }
+            get { return GetStringHeader(MsgHeader.NEW_GRAIN_TYPE); }
+            set { SetHeader(MsgHeader.NEW_GRAIN_TYPE, value); }
         }
 
         /// <summary>
@@ -392,20 +398,20 @@ namespace Orleans.Runtime
         /// </summary>
         public string GenericGrainType
         {
-            get { return GetStringHeader(Header.GENERIC_GRAIN_TYPE); }
-            set { SetHeader(Header.GENERIC_GRAIN_TYPE, value); }
+            get { return GetStringHeader(MsgHeader.GENERIC_GRAIN_TYPE); }
+            set { SetHeader(MsgHeader.GENERIC_GRAIN_TYPE, value); }
         }
 
         public RejectionTypes RejectionType
         {
-            get { return GetScalarHeader<RejectionTypes>(Header.REJECTION_TYPE); }
-            set { SetHeader(Header.REJECTION_TYPE, value); }
+            get { return GetScalarHeader<RejectionTypes>(MsgHeader.REJECTION_TYPE); }
+            set { SetHeader(MsgHeader.REJECTION_TYPE, value); }
         }
 
         public string RejectionInfo
         {
-            get { return GetStringHeader(Header.REJECTION_INFO); }
-            set { SetHeader(Header.REJECTION_INFO, value); }
+            get { return GetStringHeader(MsgHeader.REJECTION_INFO); }
+            set { SetHeader(MsgHeader.REJECTION_INFO, value); }
         }
 
 
@@ -450,7 +456,7 @@ namespace Orleans.Runtime
 
         public Message()
         {
-            headers = new Dictionary<string, object>();
+            headers = new Dictionary<byte, object>();
             metadata = new Dictionary<string, object>();
             bodyObject = null;
             bodyBytes = null;
@@ -493,44 +499,44 @@ namespace Orleans.Runtime
                 TargetSilo = this.SendingSilo
             };
 
-            if (this.ContainsHeader(Header.SENDING_GRAIN))
+            if (this.ContainsHeader(MsgHeader.SENDING_GRAIN))
             {
-                response.SetHeader(Header.TARGET_GRAIN, this.GetHeader(Header.SENDING_GRAIN));
-                if (this.ContainsHeader(Header.SENDING_ACTIVATION))
+                response.SetHeader(MsgHeader.TARGET_GRAIN, this.GetHeader(MsgHeader.SENDING_GRAIN));
+                if (this.ContainsHeader(MsgHeader.SENDING_ACTIVATION))
                 {
-                    response.SetHeader(Header.TARGET_ACTIVATION, this.GetHeader(Header.SENDING_ACTIVATION));
+                    response.SetHeader(MsgHeader.TARGET_ACTIVATION, this.GetHeader(MsgHeader.SENDING_ACTIVATION));
                 }
             }
 
             response.SendingSilo = this.TargetSilo;
-            if (this.ContainsHeader(Header.TARGET_GRAIN))
+            if (this.ContainsHeader(MsgHeader.TARGET_GRAIN))
             {
-                response.SetHeader(Header.SENDING_GRAIN, this.GetHeader(Header.TARGET_GRAIN));
-                if (this.ContainsHeader(Header.TARGET_ACTIVATION))
+                response.SetHeader(MsgHeader.SENDING_GRAIN, this.GetHeader(MsgHeader.TARGET_GRAIN));
+                if (this.ContainsHeader(MsgHeader.TARGET_ACTIVATION))
                 {
-                    response.SetHeader(Header.SENDING_ACTIVATION, this.GetHeader(Header.TARGET_ACTIVATION));
+                    response.SetHeader(MsgHeader.SENDING_ACTIVATION, this.GetHeader(MsgHeader.TARGET_ACTIVATION));
                 }
                 else if (this.TargetGrain.IsSystemTarget)
                 {
-                    response.SetHeader(Header.SENDING_ACTIVATION, ActivationId.GetSystemActivation(TargetGrain, TargetSilo));
+                    response.SetHeader(MsgHeader.SENDING_ACTIVATION, ActivationId.GetSystemActivation(TargetGrain, TargetSilo));
                 }
             }
 
-            if (this.ContainsHeader(Header.TIMESTAMPS))
+            if (this.ContainsHeader(MsgHeader.TIMESTAMPS))
             {
-                response.SetHeader(Header.TIMESTAMPS, this.GetHeader(Header.TIMESTAMPS));
+                response.SetHeader(MsgHeader.TIMESTAMPS, this.GetHeader(MsgHeader.TIMESTAMPS));
             }
-            if (this.ContainsHeader(Header.DEBUG_CONTEXT))
+            if (this.ContainsHeader(MsgHeader.DEBUG_CONTEXT))
             {
-                response.SetHeader(Header.DEBUG_CONTEXT, this.GetHeader(Header.DEBUG_CONTEXT));
+                response.SetHeader(MsgHeader.DEBUG_CONTEXT, this.GetHeader(MsgHeader.DEBUG_CONTEXT));
             }
-            if (this.ContainsHeader(Header.CACHE_INVALIDATION_HEADER))
+            if (this.ContainsHeader(MsgHeader.CACHE_INVALIDATION_HEADER))
             {
-                response.SetHeader(Header.CACHE_INVALIDATION_HEADER, this.GetHeader(Header.CACHE_INVALIDATION_HEADER));
+                response.SetHeader(MsgHeader.CACHE_INVALIDATION_HEADER, this.GetHeader(MsgHeader.CACHE_INVALIDATION_HEADER));
             }
-            if (this.ContainsHeader(Header.EXPIRATION))
+            if (this.ContainsHeader(MsgHeader.EXPIRATION))
             {
-                response.SetHeader(Header.EXPIRATION, this.GetHeader(Header.EXPIRATION));
+                response.SetHeader(MsgHeader.EXPIRATION, this.GetHeader(MsgHeader.EXPIRATION));
             }
             if (Message.WriteMessagingTraces) response.AddTimestamp(LifecycleTag.CreateResponse);
 
@@ -549,50 +555,55 @@ namespace Orleans.Runtime
             return response;
         }
 
-        public bool ContainsHeader(string tag)
+        public bool ContainsHeader(MsgHeader tag)
         {
-            return headers.ContainsKey(tag);
+            return headers.ContainsKey((byte)tag);
         }
 
-        public void RemoveHeader(string tag)
+        public void RemoveHeader(MsgHeader tag)
         {
             lock (headers)
             {
-                headers.Remove(tag);
-                if (tag == Header.TARGET_ACTIVATION || tag == Header.TARGET_GRAIN | tag == Header.TARGET_SILO)
+                headers.Remove((byte)tag);
+                if (tag == MsgHeader.TARGET_ACTIVATION || tag == MsgHeader.TARGET_GRAIN | tag == MsgHeader.TARGET_SILO)
                     targetAddress = null;
             }
         }
 
-        public void SetHeader(string tag, object value)
+        public void SetHeader(MsgHeader tag, object value)
         {
             lock (headers)
             {
-                headers[tag] = value;
+                headers[(byte)tag] = value;
             }
         }
 
-        public object GetHeader(string tag)
+        public object GetHeader(MsgHeader tag)
         {
             object val;
             bool flag;
             lock (headers)
             {
-                flag = headers.TryGetValue(tag, out val);
+                flag = headers.TryGetValue((byte)tag, out val);
             }
             return flag ? val : null;
         }
 
-        public string GetStringHeader(string tag)
+        public string GetStringHeader(MsgHeader tag)
         {
             object val;
-            if (!headers.TryGetValue(tag, out val)) return String.Empty;
+            if (!headers.TryGetValue((byte)tag, out val)) return String.Empty;
 
             var s = val as string;
             return s ?? String.Empty;
         }
 
-        public T GetScalarHeader<T>(string tag)
+        public T GetScalarHeader<T>(MsgHeader tag)
+        {
+            return GetScalarHeader<T>((byte)tag);
+        }
+
+        public T GetScalarHeader<T>(byte tag)
         {
             object val;
             if (headers.TryGetValue(tag, out val))
@@ -602,54 +613,54 @@ namespace Orleans.Runtime
             return default(T);
         }
 
-        public T GetSimpleHeader<T>(string tag)
+        public T GetSimpleHeader<T>(MsgHeader tag)
         {
             object val;
-            if (!headers.TryGetValue(tag, out val) || val == null) return default(T);
+            if (!headers.TryGetValue((byte)tag, out val) || val == null) return default(T);
 
             return val is T ? (T) val : default(T);
         }
 
-        internal void SetApplicationHeaders(Dictionary<string, object> data)
+        internal void SetApplicationHeaders(Dictionary<byte, object> data)
         {
             lock (headers)
             {
                 foreach (var item in data)
                 {
-                    string key = Header.APPLICATION_HEADER_FLAG + item.Key;
+                    byte key = (byte)(MsgHeader.APPLICATION_HEADER_FLAG + item.Key);
                     headers[key] = SerializationManager.DeepCopy(item.Value);
                 }
             }
         }
 
-        internal void GetApplicationHeaders(Dictionary<string, object> dict)
+        internal void GetApplicationHeaders(Dictionary<byte, object> dict)
         {
             TryGetApplicationHeaders(ref dict);
         }
 
-        private void TryGetApplicationHeaders(ref Dictionary<string, object> dict)
+        private void TryGetApplicationHeaders(ref Dictionary<byte, object> dict)
         {
             lock (headers)
             {
                 foreach (var pair in headers)
                 {
-                    if (pair.Key[0] != Header.APPLICATION_HEADER_FLAG) continue;
+                    if (pair.Key > (byte)MsgHeader.APPLICATION_HEADER_FLAG) continue;
 
                     if (dict == null)
                     {
-                        dict = new Dictionary<string, object>();
+                        dict = new Dictionary<byte, object>();
                     }
-                    dict[pair.Key.Substring(1)] = pair.Value;
+                    dict[(byte)(pair.Key - MsgHeader.APPLICATION_HEADER_FLAG)] = pair.Value;
                 }
             }
         }
 
-        public object GetApplicationHeader(string headerName)
+        public object GetApplicationHeader(MsgHeader tag)
         {
             lock (headers)
             {
                 object obj;
-                return headers.TryGetValue(Header.APPLICATION_HEADER_FLAG + headerName, out obj) ? obj : null;
+                return headers.TryGetValue((byte)(MsgHeader.APPLICATION_HEADER_FLAG + (byte)tag), out obj) ? obj : null;
             }
         }
 
@@ -750,7 +761,7 @@ namespace Orleans.Runtime
 
                 object val;
                 List<object> list = null;
-                if (headers.TryGetValue(Header.TIMESTAMPS, out val))
+                if (headers.TryGetValue((byte)MsgHeader.TIMESTAMPS, out val))
                 {
                     list = val as List<object>;
                 }
@@ -759,7 +770,7 @@ namespace Orleans.Runtime
                     list = new List<object>();
                     lock (headers)
                     {
-                        headers[Header.TIMESTAMPS] = list;
+                        headers[(byte)MsgHeader.TIMESTAMPS] = list;
                     }
                 }
                 else if (list.Count > 0)
@@ -816,7 +827,7 @@ namespace Orleans.Runtime
 
             object val;
             List<object> list = null;
-            if (headers.TryGetValue(Header.TIMESTAMPS, out val))
+            if (headers.TryGetValue((byte)MsgHeader.TIMESTAMPS, out val))
             {
                 list = val as List<object>;
             }
@@ -839,7 +850,7 @@ namespace Orleans.Runtime
 
             object val;
             List<object> list = null;
-            if (headers.TryGetValue(Header.TIMESTAMPS, out val))
+            if (headers.TryGetValue((byte)MsgHeader.TIMESTAMPS, out val))
             {
                 list = val as List<object>;
             }
@@ -988,7 +999,7 @@ namespace Orleans.Runtime
             {
                 foreach (var pair in headers)
                 {
-                    if (pair.Key != Header.DEBUG_CONTEXT)
+                    if (pair.Key != (byte)MsgHeader.DEBUG_CONTEXT)
                     {
                         sb.AppendFormat("{0}={1};", pair.Key, pair.Value);
                     }
@@ -1014,7 +1025,7 @@ namespace Orleans.Runtime
                         break;
                 }
             }
-            string times = this.GetStringHeader(Header.TIMESTAMPS);
+            string times = this.GetStringHeader(MsgHeader.TIMESTAMPS);
             return String.Format("{0}{1}{2}{3}{4} {5}->{6} #{7}{8}{9}{10}: {11}",
                 IsReadOnly ? "ReadOnly " : "", //0
                 IsAlwaysInterleave ? "IsAlwaysInterleave " : "", //1
@@ -1067,11 +1078,11 @@ namespace Orleans.Runtime
         internal void SetTargetPlacement(PlacementResult value)
         {
             if ((value.IsNewPlacement ||
-                     (ContainsHeader(Header.TARGET_ACTIVATION) &&
+                     (ContainsHeader(MsgHeader.TARGET_ACTIVATION) &&
                      !TargetActivation.Equals(value.Activation))))
             {
-                RemoveHeader(Header.PRIOR_MESSAGE_ID);
-                RemoveHeader(Header.PRIOR_MESSAGE_TIMES);
+                RemoveHeader(MsgHeader.PRIOR_MESSAGE_ID);
+                RemoveHeader(MsgHeader.PRIOR_MESSAGE_TIMES);
             }
             TargetActivation = value.Activation;
             TargetSilo = value.Silo;
@@ -1088,15 +1099,15 @@ namespace Orleans.Runtime
         {
             var history = new StringBuilder();
             history.Append("<");
-            if (ContainsHeader(Message.Header.TARGET_SILO))
+            if (ContainsHeader(MsgHeader.TARGET_SILO))
             {
                 history.Append(TargetSilo).Append(":");
             }
-            if (ContainsHeader(Message.Header.TARGET_GRAIN))
+            if (ContainsHeader(MsgHeader.TARGET_GRAIN))
             {
                 history.Append(TargetGrain).Append(":");
             }
-            if (ContainsHeader(Message.Header.TARGET_ACTIVATION))
+            if (ContainsHeader(MsgHeader.TARGET_ACTIVATION))
             {
                 history.Append(TargetActivation);
             }

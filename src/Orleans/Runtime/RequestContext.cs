@@ -24,7 +24,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Runtime.Remoting.Messaging;
+﻿using System.Linq;
+﻿using System.Runtime.Remoting.Messaging;
 
 
 namespace Orleans.Runtime
@@ -55,8 +56,6 @@ namespace Orleans.Runtime
         /// </summary>
         public static bool PropagateActivityId { get; set; }
 
-        internal const string CALL_CHAIN_REQUEST_CONTEXT_HEADER = "#RC_CCH";
-        internal const string E2_E_TRACING_ACTIVITY_ID_HEADER = "#RC_AI";
         internal const string ORLEANS_REQUEST_CONTEXT_KEY = "#ORL_RC";
 
         /// <summary>
@@ -65,11 +64,11 @@ namespace Orleans.Runtime
         /// <param name="key">The key for the value to be retrieved.</param>
         /// <returns>The value currently in the RequestContext for the specified key, 
         /// otherwise returns <c>null</c> if no data is present for that key.</returns>
-        public static object Get(string key)
+        public static object Get(MsgHeader key)
         {
-            Dictionary<string, object> values = GetContextData();
+            Dictionary<byte, object> values = GetContextData();
             object result;
-            if ((values != null) && values.TryGetValue(key, out result))
+            if ((values != null) && values.TryGetValue((byte)key, out result))
             {
                 return result;
             }
@@ -81,22 +80,22 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="key">The key for the value to be updated / added.</param>
         /// <param name="value">The value to be stored into RequestContext.</param>
-        public static void Set(string key, object value)
+        public static void Set(MsgHeader key, object value)
         {
-            Dictionary<string, object> values = GetContextData();
+            Dictionary<byte, object> values = GetContextData();
 
             if (values == null)
             {
-                values = new Dictionary<string, object>();
+                values = new Dictionary<byte, object>();
             }
             else
             {
                 // Have to copy the actual Dictionary value, mutate it and set it back.
                 // http://blog.stephencleary.com/2013/04/implicit-async-context-asynclocal.html
                 // This is since LLC is only copy-on-write copied only upon LogicalSetData.
-                values = new Dictionary<string, object>(values);
+                values = new Dictionary<byte, object>(values);
             }
-            values[key] = value;
+            values[(byte)key] = value;
             SetContextData(values);
         }
 
@@ -105,30 +104,30 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="key">The key for the value to be removed.</param>
         /// <returns>Boolean <c>True</c> if the value was previously in the RequestContext key-value bag and has now been removed, otherwise returns <c>False</c>.</returns>
-        public static bool Remove(string key)
+        public static bool Remove(MsgHeader key)
         {
-            Dictionary<string, object> values = GetContextData();
+            Dictionary<byte, object> values = GetContextData();
 
-            if (values == null || values.Count == 0 || !values.ContainsKey(key))
+            if (values == null || values.Count == 0 || !values.ContainsKey((byte)key))
             {
                 return false;
             }
-            var newValues = new Dictionary<string, object>(values);
-            bool retValue = newValues.Remove(key);
+            var newValues = new Dictionary<byte, object>(values);
+            bool retValue = newValues.Remove((byte)key);
             SetContextData(newValues);
             return retValue;
         }
 
         internal static void ImportFromMessage(Message msg)
         {
-            var values = new Dictionary<string, object>();
+            var values = new Dictionary<byte, object>();
 
             msg.GetApplicationHeaders(values);
 
             if (PropagateActivityId)
             {
                 object activityIdObj;
-                if (!values.TryGetValue(E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
+                if (!values.TryGetValue((byte)MsgHeader.E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
                 {
                     activityIdObj = Guid.Empty;
                 }
@@ -149,15 +148,15 @@ namespace Orleans.Runtime
 
         internal static void ExportToMessage(Message msg)
         {
-            Dictionary<string, object> values = GetContextData();
+            Dictionary<byte, object> values = GetContextData();
 
             if (PropagateActivityId)
             {
                 Guid activityId = Trace.CorrelationManager.ActivityId;
                 if (activityId != Guid.Empty)
                 {
-                    values = values == null ? new Dictionary<string, object>() : new Dictionary<string, object>(values); // Create new copy before mutating data
-                    values[E2_E_TRACING_ACTIVITY_ID_HEADER] = activityId;
+                    values = values == null ? new Dictionary<byte, object>() : new Dictionary<byte, object>(values); // Create new copy before mutating data
+                    values[(byte)MsgHeader.E2_E_TRACING_ACTIVITY_ID_HEADER] = activityId;
                     // We have some changed data, so write RC data back into LogicalCallContext
                     SetContextData(values);
                 }
@@ -172,14 +171,14 @@ namespace Orleans.Runtime
             CallContext.FreeNamedDataSlot(ORLEANS_REQUEST_CONTEXT_KEY);
         }
 
-        private static void SetContextData(Dictionary<string, object> values)
+        private static void SetContextData(Dictionary<byte, object> values)
         {
             CallContext.LogicalSetData(ORLEANS_REQUEST_CONTEXT_KEY, values);
         }
 
-        private static Dictionary<string, object> GetContextData()
+        private static Dictionary<byte, object> GetContextData()
         {
-            return (Dictionary<string, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
+            return (Dictionary<byte, object>) CallContext.LogicalGetData(ORLEANS_REQUEST_CONTEXT_KEY);
         }
     }
 }

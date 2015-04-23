@@ -417,7 +417,15 @@ namespace Orleans.Runtime
                 {
                     return bodyObject;
                 }
-                DeserializeBody();
+                try
+                {
+                    bodyObject = DeserializeBody(bodyBytes);
+                }
+                finally
+                {
+                    BufferPool.GlobalPool.Release(bodyBytes);
+                    bodyBytes = null;
+                }
                 return bodyObject;
             }
             set
@@ -430,29 +438,21 @@ namespace Orleans.Runtime
             }
         }
 
-        private void DeserializeBody(bool releaseBytes = true)
+        private object DeserializeBody(List<ArraySegment<byte>> bytes)
         {
             if (bodyBytes == null)
             {
-                bodyObject = null;
+                return null;
             }
             try
             {
                 var stream = new BinaryTokenStreamReader(bodyBytes);
-                bodyObject = SerializationManager.Deserialize(stream);
+                return SerializationManager.Deserialize(stream);
             }
             catch (Exception ex)
             {
                 logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
                 throw;
-            }
-            finally
-            {
-                if (releaseBytes)
-                {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                }
-                bodyBytes = null;
             }
         }
 
@@ -478,14 +478,15 @@ namespace Orleans.Runtime
         {
         }
 
+        // Initializes body and header but does not take ownership of byte.
+        // Caller must clean up bytes
         public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body)
         {
             metadata = new Dictionary<string, object>();
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-            bodyBytes = body;
-            DeserializeBody(false);
+            bodyObject = DeserializeBody(body);
         }
 
         public Message CreateResponseMessage()

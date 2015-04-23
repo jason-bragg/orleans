@@ -520,7 +520,7 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
-            private const int ReadBufferSize = 1 << 15; // 32k
+            private const int ReadBufferSize = 1 << 17; // 128k
             private readonly byte[] lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
             private int headerLength;
             private int bodyLength;
@@ -622,6 +622,8 @@ namespace Orleans.Runtime.Messaging
                     throw new ApplicationException("body size off");
                 }
 
+                var msg = new Message(header, body);
+
                 // update parse readOffset and clear lengths
                 parseOffset = bodyOffset + bodyLength;
                 headerLength = 0;
@@ -651,7 +653,7 @@ namespace Orleans.Runtime.Messaging
                 if(consumedBytes!=0)
                     readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
 
-                return new Message(header, body);
+                return msg;
             }
 
 

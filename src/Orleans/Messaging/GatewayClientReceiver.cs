@@ -83,7 +83,8 @@ namespace Orleans.Messaging
                         continue;
                     }
                     var msg = new Message(header, body);
-                    msg.ReleaseBodyAndHeaderBuffers();
+                    BufferPool.GlobalPool.Release(header);
+                    BufferPool.GlobalPool.Release(body);
                     MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
 
                     if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
@@ -150,6 +151,7 @@ namespace Orleans.Messaging
                         lengthSoFar += (headerLengths[i] + bodyLengths[i]);
 
                         var msg = new Message(header, body);
+
                         MessagingStatisticsGroup.OnMessageReceive(msg, headerLengths[i], bodyLengths[i]);
 
                         if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);

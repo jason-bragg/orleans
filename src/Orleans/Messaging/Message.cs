@@ -417,25 +417,7 @@ namespace Orleans.Runtime
                 {
                     return bodyObject;
                 }
-                if (bodyBytes == null)
-                {
-                    return null;
-                }
-                try
-                {
-                    var stream = new BinaryTokenStreamReader(bodyBytes);
-                    bodyObject = SerializationManager.Deserialize(stream);
-                }
-                catch (Exception ex)
-                {
-                    logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
-                    throw;
-                }
-                finally
-                {
-                    //BufferPool.GlobalPool.Release(bodyBytes);
-                    bodyBytes = null;
-                }
+                DeserializeBody();
                 return bodyObject;
             }
             set
@@ -444,6 +426,32 @@ namespace Orleans.Runtime
                 if (bodyBytes == null) return;
 
                 BufferPool.GlobalPool.Release(bodyBytes);
+                bodyBytes = null;
+            }
+        }
+
+        private void DeserializeBody(bool releaseBytes = true)
+        {
+            if (bodyBytes == null)
+            {
+                bodyObject = null;
+            }
+            try
+            {
+                var stream = new BinaryTokenStreamReader(bodyBytes);
+                bodyObject = SerializationManager.Deserialize(stream);
+            }
+            catch (Exception ex)
+            {
+                logger.Error(ErrorCode.Messaging_UnableToDeserializeBody, "Exception deserializing message body", ex);
+                throw;
+            }
+            finally
+            {
+                if (releaseBytes)
+                {
+                    BufferPool.GlobalPool.Release(bodyBytes);
+                }
                 bodyBytes = null;
             }
         }
@@ -476,12 +484,8 @@ namespace Orleans.Runtime
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-//            BufferPool.GlobalPool.Release(header);
-
             bodyBytes = body;
-            var b = BodyObject;
-            bodyBytes = null;
-            headerBytes = null;
+            DeserializeBody(false);
         }
 
         public Message CreateResponseMessage()

@@ -440,13 +440,13 @@ namespace Orleans.Runtime
 
         private object DeserializeBody(List<ArraySegment<byte>> bytes)
         {
-            if (bodyBytes == null)
+            if (bytes == null)
             {
                 return null;
             }
             try
             {
-                var stream = new BinaryTokenStreamReader(bodyBytes);
+                var stream = new BinaryTokenStreamReader(bytes);
                 return SerializationManager.Deserialize(stream);
             }
             catch (Exception ex)

@@ -23,7 +23,8 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
+﻿using System.Data.Services.Client;
+﻿using System.IO;
 using System.Net.Sockets;
 using Orleans.Runtime;
 ﻿using Orleans.Storage;
@@ -36,11 +37,13 @@ namespace Orleans.Messaging
     internal class GatewayClientReceiver : AsynchAgent
     {
         private readonly GatewayConnection gatewayConnection;
+        private readonly MessageReader reader;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
+            reader = new MessageReader(); 
         }
 
         protected override void Run()
@@ -59,36 +62,22 @@ namespace Orleans.Messaging
         {
             try
             {
-                var lengths = new byte[Message.LENGTH_HEADER_SIZE];
-                var lengthSegments = new List<ArraySegment<byte>> { new ArraySegment<byte>(lengths) };
-
                 while (!Cts.IsCancellationRequested)
                 {
-                    if (!FillBuffer(lengthSegments, Message.LENGTH_HEADER_SIZE))
+                    int bytesRead = FillBuffer(reader.RecieveBuffer);
+                    if (bytesRead == 0)
                     {
                         continue;
                     }
 
-                    var headerLength = BitConverter.ToInt32(lengths, 0);
-                    var header = BufferPool.GlobalPool.GetMultiBuffer(headerLength);
-                    var bodyLength = BitConverter.ToInt32(lengths, 4);
-                    var body = BufferPool.GlobalPool.GetMultiBuffer(bodyLength);
+                    reader.UpdateDataRead(bytesRead);
 
-                    if (!FillBuffer(header, headerLength))
+                    Message msg;
+                    while (reader.TryReadMessage(out msg))
                     {
-                        continue;
+                        gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
+                        if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
                     }
-                    if (!FillBuffer(body, bodyLength))
-                    {
-                        continue;
-                    }
-                    var msg = new Message(header, body);
-                    BufferPool.GlobalPool.Release(header);
-                    BufferPool.GlobalPool.Release(body);
-                    MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
-
-                    if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
-                    gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
                 }
             }
             catch (Exception ex)
@@ -212,6 +201,41 @@ namespace Orleans.Messaging
                 }
             }
             return true;
+        }
+
+        private int FillBuffer(List<ArraySegment<byte>> buffer)
+        {
+            Socket socketCapture = null;
+            try
+            {
+                if (gatewayConnection.Socket == null || !gatewayConnection.Socket.Connected)
+                {
+                    gatewayConnection.Connect();
+                }
+                socketCapture = gatewayConnection.Socket;
+                if (socketCapture != null && socketCapture.Connected)
+                {
+                    var bytesRead = socketCapture.Receive(buffer);
+                    if (bytesRead == 0)
+                    {
+                        throw new EndOfStreamException("Socket closed");
+                    }
+                    return bytesRead;
+                }
+            }
+            catch (Exception ex)
+            {
+                // Only try to reconnect if we're not shutting down
+                if (Cts.IsCancellationRequested) return 0;
+
+                if (ex is SocketException)
+                {
+                    Log.Warn(ErrorCode.Runtime_Error_100158, "Exception receiving from gateway " + gatewayConnection.Address);
+                }
+                gatewayConnection.MarkAsDisconnected(socketCapture);
+                return 0;
+            }
+            return 0;
         }
     }
 }

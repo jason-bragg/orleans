@@ -23,12 +23,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-
 using Orleans.Messaging;
-using Orleans.Streams;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -520,34 +517,17 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
-            private const int ReadBufferSize = 1 << 17; // 128k
-            private readonly byte[] lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
-            private int headerLength;
-            private int bodyLength;
-
-            private List<ArraySegment<byte>> readBuffer = BufferPool.GlobalPool.GetMultiBuffer(ReadBufferSize);
-            private int readOffset;
-            private int parseOffset;
-
             public Socket Sock { get; private set; }
             public EndPoint RemoteEndPoint { get; private set; }
             public IncomingMessageAcceptor IMA { get; private set; }
 
-            private List<ArraySegment<byte>> ReadBuffer
-            {
-                get { return readBuffer; }
-            }
+            private MessageReader reader = new MessageReader();
 
             public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima)
             {
                 Sock = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
-            }
-
-            private void Reset()
-            {
-                readOffset = 0;
             }
 
             // Builds the list of buffer segments to pass to Socket.BeginReceive, based on the total list (CurrentBuffer)
@@ -557,7 +537,7 @@ namespace Orleans.Runtime.Messaging
             // add the partial segment for whatever's left in the first unfilled buffer, and then add any remaining buffers.
             private List<ArraySegment<byte>> BuildSegmentList()
             {
-                return ByteArrayBuilder.BuildSegmentList(ReadBuffer, readOffset);
+                return reader.RecieveBuffer;
             }
 
             public void BeginReceive(AsyncCallback callback)
@@ -577,85 +557,6 @@ namespace Orleans.Runtime.Messaging
             // Global collection of ThreadTrackingStatistic for thread pool and IO completion threads.
             public static readonly System.Collections.Concurrent.ConcurrentDictionary<int, ThreadTrackingStatistic> trackers = new System.Collections.Concurrent.ConcurrentDictionary<int, ThreadTrackingStatistic>();
 #endif
-
-            private Message ReadMessage()
-            {
-                if (readOffset < headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset)
-                    return null;
-
-                // read lengths if needed
-                if (headerLength == 0 || bodyLength == 0)
-                {
-                    // get length segments
-                    List<ArraySegment<byte>> lenghts = ByteArrayBuilder.GetSubSegments(ReadBuffer, parseOffset, Message.LENGTH_HEADER_SIZE);
-
-                    // copy length segment to buffer
-                    int lengthBufferoffset = 0;
-                    foreach (ArraySegment<byte> seg in lenghts)
-                    {
-                        Buffer.BlockCopy(seg.Array, seg.Offset, lengthBuffer, lengthBufferoffset, seg.Count);
-                        lengthBufferoffset += seg.Count;
-                    }
-                    
-                    // read lengths
-                    headerLength = BitConverter.ToInt32(lengthBuffer, 0);
-                    bodyLength = BitConverter.ToInt32(lengthBuffer, 4);
-                }
-
-                // have we read full message
-                if (readOffset < headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset)
-                    return null;
-
-                // read header
-                int headerOffset = parseOffset + Message.LENGTH_HEADER_SIZE;
-                List<ArraySegment<byte>> header = ByteArrayBuilder.GetSubSegments(ReadBuffer, headerOffset, headerLength);
-                if (header.Sum(s => s.Count) != headerLength)
-                {
-                    throw new ApplicationException("header size off");
-                }
-
-                // read body
-                int bodyOffset = headerOffset + headerLength;
-                List<ArraySegment<byte>> body = ByteArrayBuilder.GetSubSegments(ReadBuffer, bodyOffset, bodyLength);
-                if (body.Sum(s => s.Count) != bodyLength)
-                {
-                    throw new ApplicationException("body size off");
-                }
-
-                var msg = new Message(header, body);
-
-                // update parse readOffset and clear lengths
-                parseOffset = bodyOffset + bodyLength;
-                headerLength = 0;
-                bodyLength = 0;
-
-                // drop buffers consumed in message and adjust parse readOffset
-                int consumedBytes = 0;
-                while(readBuffer.Count!=0)
-                {
-                    ArraySegment<byte> seg = readBuffer.First();
-                    if (seg.Count <= parseOffset - consumedBytes)
-                    {
-                        consumedBytes += seg.Count;
-                        readBuffer.Remove(seg);
-                        BufferPool.GlobalPool.Release(seg.Array);
-                    }
-                    break;
-                }
-                parseOffset -= consumedBytes;
-                readOffset -= consumedBytes;
-                if (parseOffset > readOffset)
-                {
-                    throw new ApplicationException("parse ahead of read, not possible");
-                }
-
-                // back fill buffer
-                if(consumedBytes!=0)
-                    readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
-
-                return msg;
-            }
-
 
             public void ProcessReceivedBuffer(int bytes)
             {
@@ -681,12 +582,12 @@ namespace Orleans.Runtime.Messaging
 #endif
                 try
                 {
-                    readOffset += bytes;
-                    Message msg = ReadMessage();
-                    while (msg != null)
+                    reader.UpdateDataRead(bytes);
+
+                    Message msg;
+                    while (reader.TryReadMessage(out msg))
                     {
                         IMA.HandleMessage(msg, Sock);
-                        msg = ReadMessage();
                     }
                 }
                 catch (Exception exc)
@@ -696,13 +597,12 @@ namespace Orleans.Runtime.Messaging
                         // Log details of receive state machine
                         IMA.Log.Error(ErrorCode.MessagingProcessReceiveBufferException,
                             string.Format(
-                            "Exception trying to process {0} bytes from endpoint {1} at readOffset {2} HeaderLength={3} BodyLength={4}",
-                                bytes, RemoteEndPoint, readOffset, headerLength, bodyLength
-                            ),
+                            "Exception trying to process {0} bytes from endpoint {1}",
+                                bytes, RemoteEndPoint),
                             exc);
                     }
                     catch (Exception) { }
-                    Reset(); // Reset back to a hopefully good base state
+                    reader.Reset(); // Reset back to a hopefully good base state
 
                     throw;
                 }

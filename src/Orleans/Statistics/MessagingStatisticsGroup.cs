@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+ using System;
 using Orleans.Messaging;
 using System.Collections.Concurrent;
 
@@ -269,7 +269,7 @@ namespace Orleans.Runtime
 
         internal static void OnFailedSentMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(MsgHeader.DIRECTION)) return;
+            if (msg == null || !msg.ContainsHeader(MsgHeaderTag.DIRECTION)) return;
             int direction = (int)msg.Direction;
             if (FailedSentMessages[direction] == null)
             {
@@ -281,7 +281,7 @@ namespace Orleans.Runtime
 
         internal static void OnDroppedSentMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(MsgHeader.DIRECTION)) return;
+            if (msg == null || !msg.ContainsHeader(MsgHeaderTag.DIRECTION)) return;
             int direction = (int)msg.Direction;
             if (DroppedSentMessages[direction] == null)
             {
@@ -293,7 +293,7 @@ namespace Orleans.Runtime
 
         internal static void OnRejectedMessage(Message msg)
         {
-            if (msg == null || !msg.ContainsHeader(MsgHeader.DIRECTION)) return;
+            if (msg == null || !msg.ContainsHeader(MsgHeaderTag.DIRECTION)) return;
             int direction = (int)msg.Direction;
             if (RejectedMessages[direction] == null)
             {

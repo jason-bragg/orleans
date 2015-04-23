@@ -263,13 +263,13 @@ namespace Orleans.Runtime
             else if (forwardingAddress != null)
             {
                 message.TargetAddress = forwardingAddress;
-                message.RemoveHeader(MsgHeader.IS_NEW_PLACEMENT);
+                message.RemoveHeader(MsgHeaderTag.IS_NEW_PLACEMENT);
                 dispatcher.Transport.SendMessage(message);
             }
             else
             {
-                message.RemoveHeader(MsgHeader.TARGET_ACTIVATION);
-                message.RemoveHeader(MsgHeader.TARGET_SILO);
+                message.RemoveHeader(MsgHeaderTag.TARGET_ACTIVATION);
+                message.RemoveHeader(MsgHeaderTag.TARGET_SILO);
                 dispatcher.SendMessage(message);
             }
         }
@@ -288,7 +288,7 @@ namespace Orleans.Runtime
         {
             try
             {
-                if (message.ContainsHeader(MsgHeader.CACHE_INVALIDATION_HEADER))
+                if (message.ContainsHeader(MsgHeaderTag.CACHE_INVALIDATION_HEADER))
                 {
                     foreach (ActivationAddress address in message.CacheInvalidationHeader)
                     {
@@ -441,7 +441,7 @@ namespace Orleans.Runtime
         private static void UpdateDeadlockInfoInRequestContext(RequestInvocationHistory thisInvocation)
         {
             IList prevChain;
-            object obj = RequestContext.Get(MsgHeader.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
+            object obj = RequestContext.Get(MsgHeaderTag.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
             if (obj != null)
             {
                 prevChain = ((IList)obj);
@@ -449,7 +449,7 @@ namespace Orleans.Runtime
             else
             {
                 prevChain = new List<RequestInvocationHistory>();
-                RequestContext.Set(MsgHeader.CALL_CHAIN_REQUEST_CONTEXT_HEADER, prevChain);
+                RequestContext.Set(MsgHeaderTag.CALL_CHAIN_REQUEST_CONTEXT_HEADER, prevChain);
             }
             // append this call to the end of the call chain. Update in place.
             prevChain.Add(thisInvocation);
@@ -479,7 +479,7 @@ namespace Orleans.Runtime
                     case Message.RejectionTypes.Unrecoverable:
                     // fall through & reroute
                     case Message.RejectionTypes.Transient:
-                        if (!message.ContainsHeader(MsgHeader.CACHE_INVALIDATION_HEADER))
+                        if (!message.ContainsHeader(MsgHeaderTag.CACHE_INVALIDATION_HEADER))
                         {
                             // Remove from local directory cache. Note that SendingGrain is the original target, since message is the rejection response.
                             // If CacheMgmtHeader is present, we already did this. Otherwise, we left this code for backward compatability. 

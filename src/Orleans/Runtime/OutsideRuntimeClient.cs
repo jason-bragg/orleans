@@ -671,8 +671,8 @@ namespace Orleans
             
             if (!message.TargetGrain.IsSystemTarget)
             {
-                message.RemoveHeader(MsgHeader.TARGET_ACTIVATION);
-                message.RemoveHeader(MsgHeader.TARGET_SILO);
+                message.RemoveHeader(MsgHeaderTag.TARGET_ACTIVATION);
+                message.RemoveHeader(MsgHeaderTag.TARGET_SILO);
             }
             transport.SendMessage(message);
             return true;

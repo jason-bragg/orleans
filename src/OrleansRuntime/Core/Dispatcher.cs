@@ -357,7 +357,7 @@ namespace Orleans.Runtime
         /// <param name="message">Message to analyze</param>
         private void CheckDeadlock(Message message)
         {
-            object obj = message.GetApplicationHeader(MsgHeader.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
+            object obj = message.GetApplicationHeader(MsgHeaderTag.CALL_CHAIN_REQUEST_CONTEXT_HEADER);
             if (obj == null) return; // first call in a chain
 
             var prevChain = ((IList)obj);

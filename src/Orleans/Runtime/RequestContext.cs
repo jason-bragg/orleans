@@ -64,7 +64,7 @@ namespace Orleans.Runtime
         /// <param name="key">The key for the value to be retrieved.</param>
         /// <returns>The value currently in the RequestContext for the specified key, 
         /// otherwise returns <c>null</c> if no data is present for that key.</returns>
-        public static object Get(MsgHeader key)
+        public static object Get(MsgHeaderTag key)
         {
             Dictionary<byte, object> values = GetContextData();
             object result;
@@ -80,7 +80,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="key">The key for the value to be updated / added.</param>
         /// <param name="value">The value to be stored into RequestContext.</param>
-        public static void Set(MsgHeader key, object value)
+        public static void Set(MsgHeaderTag key, object value)
         {
             Dictionary<byte, object> values = GetContextData();
 
@@ -104,7 +104,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="key">The key for the value to be removed.</param>
         /// <returns>Boolean <c>True</c> if the value was previously in the RequestContext key-value bag and has now been removed, otherwise returns <c>False</c>.</returns>
-        public static bool Remove(MsgHeader key)
+        public static bool Remove(MsgHeaderTag key)
         {
             Dictionary<byte, object> values = GetContextData();
 
@@ -127,7 +127,7 @@ namespace Orleans.Runtime
             if (PropagateActivityId)
             {
                 object activityIdObj;
-                if (!values.TryGetValue((byte)MsgHeader.E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
+                if (!values.TryGetValue((byte)MsgHeaderTag.E2_E_TRACING_ACTIVITY_ID_HEADER, out activityIdObj))
                 {
                     activityIdObj = Guid.Empty;
                 }
@@ -156,7 +156,7 @@ namespace Orleans.Runtime
                 if (activityId != Guid.Empty)
                 {
                     values = values == null ? new Dictionary<byte, object>() : new Dictionary<byte, object>(values); // Create new copy before mutating data
-                    values[(byte)MsgHeader.E2_E_TRACING_ACTIVITY_ID_HEADER] = activityId;
+                    values[(byte)MsgHeaderTag.E2_E_TRACING_ACTIVITY_ID_HEADER] = activityId;
                     // We have some changed data, so write RC data back into LogicalCallContext
                     SetContextData(values);
                 }

@@ -31,7 +31,6 @@ using Orleans.Serialization;
 
 namespace Orleans.Runtime
 {
-    [Serializable]
     internal class Message : IOutgoingMessage
     {
         public static class Header
@@ -423,8 +422,11 @@ namespace Orleans.Runtime
                 }
                 finally
                 {
-                    BufferPool.GlobalPool.Release(bodyBytes);
-                    bodyBytes = null;
+                    if (bodyBytes != null)
+                    {
+                        BufferPool.GlobalPool.Release(bodyBytes);
+                        bodyBytes = null;
+                    }
                 }
                 return bodyObject;
             }
@@ -438,7 +440,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private object DeserializeBody(List<ArraySegment<byte>> bytes)
+        private static object DeserializeBody(List<ArraySegment<byte>> bytes)
         {
             if (bytes == null)
             {

@@ -24,6 +24,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -90,18 +91,10 @@ namespace Orleans.Runtime
             // read header
             int headerOffset = parseOffset + Message.LENGTH_HEADER_SIZE;
             List<ArraySegment<byte>> header = ByteArrayBuilder.GetSubSegments(readBuffer, headerOffset, headerLength);
-            if (header.Sum(s => s.Count) != headerLength)
-            {
-                throw new ApplicationException("header size off");
-            }
 
             // read body
             int bodyOffset = headerOffset + headerLength;
             List<ArraySegment<byte>> body = ByteArrayBuilder.GetSubSegments(readBuffer, bodyOffset, bodyLength);
-            if (body.Sum(s => s.Count) != bodyLength)
-            {
-                throw new ApplicationException("body size off");
-            }
 
             msg = new Message(header, body);
             MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
@@ -122,14 +115,13 @@ namespace Orleans.Runtime
                     readBuffer.Remove(seg);
                     BufferPool.GlobalPool.Release(seg.Array);
                 }
-                break;
+                else
+                {
+                    break;
+                }
             }
             parseOffset -= consumedBytes;
             readOffset -= consumedBytes;
-            if (parseOffset > readOffset)
-            {
-                throw new ApplicationException("parse ahead of read, not possible");
-            }
 
             // back fill buffer
             if (consumedBytes != 0)

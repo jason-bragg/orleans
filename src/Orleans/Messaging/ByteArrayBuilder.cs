@@ -497,13 +497,13 @@ namespace Orleans.Runtime
             {
                 if (added == 0)
                 {
-                    if (offset - skipped > seg.Count)
+                    if (offset - skipped >= seg.Count)
                     {
                         skipped += seg.Count;
                         continue;
                     }
                     int lastSkip = offset - skipped;
-                    if (seg.Count - lastSkip > length)
+                    if (seg.Count - lastSkip >= length)
                     {
                         result.Add(new ArraySegment<byte>(seg.Array, seg.Offset + offset - skipped, length));
                         return result;
@@ -513,7 +513,7 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    if (seg.Count > length - added)
+                    if (seg.Count >= length - added)
                     {
                         result.Add(new ArraySegment<byte>(seg.Array, seg.Offset, length - added));
                         return result;

@@ -31,7 +31,7 @@ namespace Orleans.Runtime
     internal abstract class AsynchQueueAgent<T> : AsynchAgent, IDisposable where T : IOutgoingMessage
     {
         private readonly IMessagingConfiguration config;
-        private RuntimeQueue<T> requestQueue;
+        protected RuntimeQueue<T> requestQueue;
         private QueueTrackingStatistic queueTracking;
 
         protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg)

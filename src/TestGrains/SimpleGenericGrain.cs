@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,30 +21,35 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System.Threading.Tasks;
+using System;
 using System.Collections.Generic;
-﻿using Orleans.Runtime;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Runtime;
+using UnitTests.GrainInterfaces;
 
-namespace Orleans.Streams
+namespace UnitTests.Grains
 {
-    internal interface IPubSubRendezvousGrain : IGrainWithGuidCompoundKey
+    class SimpleGenericGrain<T> :Grain, ISimpleGenericGrain<T>
     {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, IStreamProducerExtension streamProducer);
+        protected T Value { get; set; }
 
-        Task UnregisterProducer(StreamId streamId, IStreamProducerExtension streamProducer);
+        public virtual Task Set(T t)
+        {
+            Value = t;
+            return TaskDone.Done;
+        }
 
-        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
+        public virtual Task Transform()
+        {
+            return TaskDone.Done;
+        }
 
-        Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId);
-
-        Task<int> ProducerCount(StreamId streamId);
-
-        Task<int> ConsumerCount(StreamId streamId);
-
-        Task<PubSubSubscriptionState[]> DiagGetConsumers(StreamId streamId);
-
-        Task Validate();
-
-        Task<List<GuidId>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer);
+        public Task<T> Get()
+        {
+            return Task.FromResult(Value);
+        }
     }
 }

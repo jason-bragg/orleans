@@ -51,7 +51,6 @@ namespace Orleans.Messaging
             public List<ArraySegment<byte>> Data { get; set; }
             public SiloAddress TargetSilo { get; set; }
             public Message.Directions Direction { get; set; }
-            public bool IsBatch { get; set; }
             public int HeaderLength { get; set; }
             public int Length { get; set; }
             public int Sent { get; set; }
@@ -65,8 +64,14 @@ namespace Orleans.Messaging
             doneEvent = new ManualResetEvent(false);
             state = new SendState();
             sendSocketEvent = new SocketAsyncEventArgs();
-            sendSocketEvent.UserToken = state;
-            sendSocketEvent.Completed += OnSendCompleted;
+            if (config.UseMessageBatching)
+            {
+                sendSocketEvent.Completed += OnBatchSendCompleted;
+            }
+            else
+            {
+                sendSocketEvent.Completed += OnSendCompleted;
+            }
         }
 
         protected override void Process(Message msg)
@@ -83,7 +88,8 @@ namespace Orleans.Messaging
             bool continueSend = PrepareMessageForSend(msg);
             if (!continueSend)
             {
-                doneEvent.Set();
+                // skip this message
+                ProcessNext();
                 return;
             }
 
@@ -106,7 +112,7 @@ namespace Orleans.Messaging
             catch (Exception exc)
             {
                 OnMessageSerializationFailure(msg, exc);
-                doneEvent.Set();
+                ProcessNext();
                 return;
             }
 
@@ -116,7 +122,6 @@ namespace Orleans.Messaging
             state.HeaderLength = headerLength;
             state.Length = state.Data.Sum(x => x.Count);
             state.Sent = 0;
-            state.IsBatch = false;
             try
             {
                 sendSocketEvent.BufferList = state.Data;
@@ -127,11 +132,13 @@ namespace Orleans.Messaging
             }
             catch (Exception exc)
             {
+                string sendErrorStr = String.Empty;
                 if (!(exc is ObjectDisposedException))
                 {
-                    string sendErrorStr = String.Format("Exception sending message to {0}. Message: {1}. {2}", targetSilo, msg, exc);
+                    sendErrorStr = String.Format("Exception sending message to {0}. Message: {1}. {2}", targetSilo, msg, exc);
                     Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
                 }
+                ProcessMessageAfterSend(state.Message, true, sendErrorStr);
                 OnSendFailure(sock, targetSilo);
                 doneEvent.Set();
             }
@@ -190,13 +197,12 @@ namespace Orleans.Messaging
             state.HeaderLength = headerLength;
             state.Length = state.Data.Sum(x => x.Count);
             state.Sent = 0;
-            state.IsBatch = true;
             try
             {
                 sendSocketEvent.BufferList = state.Data;
                 if (!sock.SendAsync(sendSocketEvent))
                 {
-                    OnSendCompleted(sock, sendSocketEvent);
+                    OnBatchSendCompleted(sock, sendSocketEvent);
                 }
             }
             catch (Exception exc)
@@ -256,7 +262,7 @@ namespace Orleans.Messaging
             // no message serialized
         }
 
-        private void Process()
+        private void ProcessNext()
         {
             Message message;
             if (!requestQueue.TryTake(out message))
@@ -278,22 +284,10 @@ namespace Orleans.Messaging
             {
                 if (state.Sent == state.Length)
                 {
-                    if (state.IsBatch)
-                    {
-                        // batch of messages send, we're done here
-                        MessagingStatisticsGroup.OnMessageBatchSend(state.TargetSilo, state.Direction, state.Length, state.HeaderLength, GetSocketDirection(), state.Messages.Count);
-                        foreach (Message msg in state.Messages)
-                        {
-                            ProcessMessageAfterSend(msg, false, string.Empty);
-                        }
-                        doneEvent.Set();
-                        return;
-
-                    }
-                    // message send, process next message
+                    // message sent, process next message
                     MessagingStatisticsGroup.OnMessageSend(state.TargetSilo, state.Direction, state.Length, state.HeaderLength, GetSocketDirection());
                     ProcessMessageAfterSend(state.Message, false, string.Empty);
-                    Process();
+                    ProcessNext();
                     return;
                 }
 
@@ -318,17 +312,56 @@ namespace Orleans.Messaging
             }
 
             // something went wrong
-            if (state.IsBatch)
+            ProcessMessageAfterSend(state.Message, true, sendErrorStr);
+            OnSendFailure(sock, state.TargetSilo);
+            doneEvent.Set();
+        }
+
+        private void OnBatchSendCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            var sock = (Socket)sender;
+            state.Sent += e.BytesTransferred;
+            string sendErrorStr = String.Empty;
+
+            if (e.SocketError == SocketError.Success)
             {
-                foreach (Message msg in state.Messages)
+                if (state.Sent == state.Length)
                 {
-                    ProcessMessageAfterSend(msg, true, sendErrorStr);
+                    // batch of messages send, we're done here
+                    MessagingStatisticsGroup.OnMessageBatchSend(state.TargetSilo, state.Direction, state.Length, state.HeaderLength, GetSocketDirection(), state.Messages.Count);
+                    foreach (Message msg in state.Messages)
+                    {
+                        ProcessMessageAfterSend(msg, false, string.Empty);
+                    }
+                    doneEvent.Set();
+                    return;
+                }
+
+                try
+                {
+                    // send incomplete, send the rest
+                    e.BufferList = ByteArrayBuilder.BuildSegmentList(state.Data, state.Sent);
+                    if (!sock.SendAsync(e))
+                    {
+                        OnBatchSendCompleted(sender, e);
+                    }
+                    return;
+                }
+                catch (Exception exc)
+                {
+                    if (!(exc is ObjectDisposedException))
+                    {
+                        sendErrorStr = String.Format("Exception continueing to send message to {0}. {1}", state.TargetSilo, exc);
+                        Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
+                    }
                 }
             }
-            else
+
+            foreach (Message msg in state.Messages)
             {
-                ProcessMessageAfterSend(state.Message, true, sendErrorStr);
+                ProcessMessageAfterSend(msg, true, sendErrorStr);
             }
+
             OnSendFailure(sock, state.TargetSilo);
             doneEvent.Set();
         }

@@ -47,7 +47,6 @@ namespace Orleans.Messaging
         private class SendState
         {
             public Message Message { get; set; }
-//            public List<Message> Messages{ get; set; }
             public List<ArraySegment<byte>> Data { get; set; }
             public SiloAddress TargetSilo { get; set; }
             public Message.Directions Direction { get; set; }

@@ -47,7 +47,7 @@ namespace Orleans.Messaging
         private class SendState
         {
             public Message Message { get; set; }
-            public List<Message> Messages{ get; set; }
+//            public List<Message> Messages{ get; set; }
             public List<ArraySegment<byte>> Data { get; set; }
             public SiloAddress TargetSilo { get; set; }
             public Message.Directions Direction { get; set; }
@@ -64,14 +64,7 @@ namespace Orleans.Messaging
             doneEvent = new ManualResetEvent(false);
             state = new SendState();
             sendSocketEvent = new SocketAsyncEventArgs();
-            if (config.UseMessageBatching)
-            {
-                sendSocketEvent.Completed += OnBatchSendCompleted;
-            }
-            else
-            {
-                sendSocketEvent.Completed += OnSendCompleted;
-            }
+            sendSocketEvent.Completed += OnSendCompleted;
         }
 
         protected override void Process(Message msg)
@@ -84,13 +77,32 @@ namespace Orleans.Messaging
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private void Process_internal(Message msg)
         {
+            bool sendComplete = true;
+
+            try
+            {
+                sendComplete = SendAsync(msg);
+            }
+            catch (Exception exc)
+            {
+                string sendErrorStr = String.Format("Unhandled exception on async send. TargetSilo {0}. Exception: {1}", state.TargetSilo, exc);
+                Log.Error(ErrorCode.Messaging_OutgoingMS_ProcessMsgError, sendErrorStr, exc);
+            }
+
+            if (sendComplete)
+            {
+                ProcessNext();
+            }
+        }
+
+        // Return true if send completed and we should move to next message, false if it's still pending.
+        private bool SendAsync(Message msg)
+        {
             if (Log.IsVerbose2) Log.Verbose2("Got a {0} message to send: {1}", msg.Direction, msg);
             bool continueSend = PrepareMessageForSend(msg);
             if (!continueSend)
             {
-                // skip this message
-                ProcessNext();
-                return;
+                return true;
             }
 
             Socket sock;
@@ -100,8 +112,7 @@ namespace Orleans.Messaging
             if (!continueSend)
             {
                 OnGetSendingSocketFailure(msg, error);
-                doneEvent.Set();
-                return;
+                return true;
             }
 
             int headerLength;
@@ -112,8 +123,7 @@ namespace Orleans.Messaging
             catch (Exception exc)
             {
                 OnMessageSerializationFailure(msg, exc);
-                ProcessNext();
-                return;
+                return true;
             }
 
             state.Message = msg;
@@ -127,8 +137,9 @@ namespace Orleans.Messaging
                 sendSocketEvent.BufferList = state.Data;
                 if (!sock.SendAsync(sendSocketEvent))
                 {
-                    OnSendCompleted(sock, sendSocketEvent);
+                    return TryComplete(sock, sendSocketEvent);
                 }
+                return false;
             }
             catch (Exception exc)
             {
@@ -140,18 +151,96 @@ namespace Orleans.Messaging
                 }
                 ProcessMessageAfterSend(state.Message, true, sendErrorStr);
                 OnSendFailure(sock, targetSilo);
-                doneEvent.Set();
+                return true;
             }
+        }
+
+        private void ProcessNext()
+        {
+            Message message;
+            if (!requestQueue.TryTake(out message))
+            {
+                doneEvent.Set();
+                return;
+            }
+
+            Process_internal(message);
+        }
+
+        private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
+        {
+            bool sendComplete = true;
+
+            try
+            {
+                sendComplete = TryComplete(sender, e);
+            }
+            catch (Exception exc)
+            {
+                string sendErrorStr = String.Format("Unhandled exception on send complete. TargetSilo {0}. Exception: {1}", state.TargetSilo, exc);
+                Log.Error(ErrorCode.Messaging_OutgoingMS_SendCompleteError, sendErrorStr, exc);
+            }
+
+            if (sendComplete)
+            {
+                ProcessNext();
+            }
+        }
+
+        // return true if send completed and we should move to next message.  false if send is incomplete
+        private bool TryComplete(object sender, SocketAsyncEventArgs e)
+        {
+            var sock = (Socket)sender;
+            state.Sent += e.BytesTransferred;
+            string sendErrorStr = String.Empty;
+
+            if (e.SocketError == SocketError.Success)
+            {
+                if (state.Sent == state.Length)
+                {
+                    // message sent, process next message
+                    MessagingStatisticsGroup.OnMessageSend(state.TargetSilo, state.Direction, state.Length, state.HeaderLength, GetSocketDirection());
+                    ProcessMessageAfterSend(state.Message, false, string.Empty);
+                    return true;
+                }
+
+                try
+                {
+                    // send incomplete, send the rest
+                    e.BufferList = ByteArrayBuilder.BuildSegmentList(state.Data, state.Sent);
+                    if (!sock.SendAsync(e))
+                    {
+                        return TryComplete(sender, e);
+                    }
+                    return false;
+                }
+                catch (Exception exc)
+                {
+                    if (!(exc is ObjectDisposedException))
+                    {
+                        sendErrorStr = String.Format("Exception continueing to send message to {0}. {1}", state.TargetSilo, exc);
+                        Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
+                    }
+                }
+            }
+
+            // something went wrong
+            ProcessMessageAfterSend(state.Message, true, sendErrorStr);
+            OnSendFailure(sock, state.TargetSilo);
+            return true;
         }
 
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         protected override void ProcessBatch(List<Message> msgs)
         {
+            /*
             doneEvent.Reset();
             ProcessBatch_internal(msgs);
             doneEvent.WaitOne();
+             */
         }
 
+        /*
         private void ProcessBatch_internal(List<Message> msgs)
         {
             if (Log.IsVerbose2) Log.Verbose2("Got {0} messages to send.", msgs.Count);
@@ -216,107 +305,7 @@ namespace Orleans.Messaging
                 doneEvent.Set();
             }
         }
-
-        public static bool SerializeMessages(List<Message> msgs, out List<ArraySegment<byte>> data, out int headerLengthOut, Action<Message, Exception> msgSerializationFailureHandler)
-        {
-            int numberOfValidMessages = 0;
-            var lengths = new List<ArraySegment<byte>>();
-            var bodies = new List<ArraySegment<byte>>();
-            data = null;
-            headerLengthOut = 0;
-            int totalHeadersLen = 0;
-
-            foreach (var message in msgs)
-            {
-                try
-                {
-                    int headerLength;
-                    int bodyLength;
-                    List<ArraySegment<byte>> body = message.SerializeForBatching(out headerLength, out bodyLength);
-                    var headerLen = new ArraySegment<byte>(BitConverter.GetBytes(headerLength));
-                    var bodyLen = new ArraySegment<byte>(BitConverter.GetBytes(bodyLength));
-
-                    bodies.AddRange(body);
-                    lengths.Add(headerLen);
-                    lengths.Add(bodyLen);
-                    numberOfValidMessages++;
-                    totalHeadersLen += headerLength;
-                }
-                catch (Exception exc)
-                {
-                    if (msgSerializationFailureHandler != null)
-                        msgSerializationFailureHandler(message, exc);
-                    else
-                        throw;
-                }
-            }
-
-            // at least 1 message was successfully serialized
-            if (bodies.Count <= 0) return false;
-
-            data = new List<ArraySegment<byte>> { new ArraySegment<byte>(BitConverter.GetBytes(numberOfValidMessages)) };
-            data.AddRange(lengths);
-            data.AddRange(bodies);
-            headerLengthOut = totalHeadersLen;
-            return true;
-            // no message serialized
-        }
-
-        private void ProcessNext()
-        {
-            Message message;
-            if (!requestQueue.TryTake(out message))
-            {
-                doneEvent.Set();
-                return;
-            }
-
-            Process_internal(message);
-        }
-
-        private void OnSendCompleted(object sender, SocketAsyncEventArgs e)
-        {
-            var sock = (Socket)sender;
-            state.Sent += e.BytesTransferred;
-            string sendErrorStr = String.Empty;
-
-            if (e.SocketError == SocketError.Success)
-            {
-                if (state.Sent == state.Length)
-                {
-                    // message sent, process next message
-                    MessagingStatisticsGroup.OnMessageSend(state.TargetSilo, state.Direction, state.Length, state.HeaderLength, GetSocketDirection());
-                    ProcessMessageAfterSend(state.Message, false, string.Empty);
-                    ProcessNext();
-                    return;
-                }
-
-                try
-                {
-                    // send incomplete, send the rest
-                    e.BufferList = ByteArrayBuilder.BuildSegmentList(state.Data, state.Sent);
-                    if (!sock.SendAsync(e))
-                    {
-                        OnSendCompleted(sender, e);
-                    }
-                    return;
-                }
-                catch (Exception exc)
-                {
-                    if (!(exc is ObjectDisposedException))
-                    {
-                        sendErrorStr = String.Format("Exception continueing to send message to {0}. {1}", state.TargetSilo, exc);
-                        Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
-                    }
-                }
-            }
-
-            // something went wrong
-            ProcessMessageAfterSend(state.Message, true, sendErrorStr);
-            OnSendFailure(sock, state.TargetSilo);
-            doneEvent.Set();
-        }
-
+        
         private void OnBatchSendCompleted(object sender, SocketAsyncEventArgs e)
         {
             var sock = (Socket)sender;
@@ -364,6 +353,52 @@ namespace Orleans.Messaging
 
             OnSendFailure(sock, state.TargetSilo);
             doneEvent.Set();
+        }
+        */
+
+        public static bool SerializeMessages(List<Message> msgs, out List<ArraySegment<byte>> data, out int headerLengthOut, Action<Message, Exception> msgSerializationFailureHandler)
+        {
+            int numberOfValidMessages = 0;
+            var lengths = new List<ArraySegment<byte>>();
+            var bodies = new List<ArraySegment<byte>>();
+            data = null;
+            headerLengthOut = 0;
+            int totalHeadersLen = 0;
+
+            foreach (var message in msgs)
+            {
+                try
+                {
+                    int headerLength;
+                    int bodyLength;
+                    List<ArraySegment<byte>> body = message.SerializeForBatching(out headerLength, out bodyLength);
+                    var headerLen = new ArraySegment<byte>(BitConverter.GetBytes(headerLength));
+                    var bodyLen = new ArraySegment<byte>(BitConverter.GetBytes(bodyLength));
+
+                    bodies.AddRange(body);
+                    lengths.Add(headerLen);
+                    lengths.Add(bodyLen);
+                    numberOfValidMessages++;
+                    totalHeadersLen += headerLength;
+                }
+                catch (Exception exc)
+                {
+                    if (msgSerializationFailureHandler != null)
+                        msgSerializationFailureHandler(message, exc);
+                    else
+                        throw;
+                }
+            }
+
+            // at least 1 message was successfully serialized
+            if (bodies.Count <= 0) return false;
+
+            data = new List<ArraySegment<byte>> { new ArraySegment<byte>(BitConverter.GetBytes(numberOfValidMessages)) };
+            data.AddRange(lengths);
+            data.AddRange(bodies);
+            headerLengthOut = totalHeadersLen;
+            return true;
+            // no message serialized
         }
 
         protected abstract SocketDirection GetSocketDirection();

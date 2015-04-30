@@ -695,6 +695,8 @@ namespace Orleans
         Messaging_Dispatcher_TryForward         = MessagingBase + 31,
         Messaging_Dispatcher_TryForwardFailed   = MessagingBase + 32,
         Messaging_Dispatcher_ForwardingRequests = MessagingBase + 33,
+        Messaging_OutgoingMS_SendCompleteError  = MessagingBase + 34,
+        Messaging_OutgoingMS_ProcessMsgError    = MessagingBase + 35,
 
         DirectoryBase                           = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,

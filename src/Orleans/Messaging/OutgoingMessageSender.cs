@@ -159,6 +159,7 @@ namespace Orleans.Messaging
             Message message;
             if (!requestQueue.TryTake(out message))
             {
+                // all paths must eventually end up here, desite errors or whatever, or master thread will be blocked forever.
                 doneEvent.Set();
                 return;
             }

@@ -219,7 +219,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                             continue;
                     }
 
-                    Task task = remoteConsumer.DeliverItem(subscriptionKvp.Key, immutableItem, null);
+                    Task task = remoteConsumer.DeliverItem(subscriptionKvp.Key, immutableItem, new Immutable<StreamSequenceToken>(null));
                     if (fireAndForgetDelivery) task.Ignore();
                     else tasks.Add(task);
                 }

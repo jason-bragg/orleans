@@ -62,14 +62,14 @@ namespace Orleans.Serialization
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
             if (t.IsPrimitive || t.IsEnum || t == typeof (string) || t == typeof (DateTime) || t == typeof (Decimal) ||
-                t == typeof (Immutable<>))
+                t == typeof (Immutable<>) || t.IsSubclassOf(typeof(IImmutable)))
                 return true;
-
-            if (t.GetCustomAttributes(typeof (ImmutableAttribute), false).Length > 0) 
-                return true;  
 
             if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof (Immutable<>))
                 return true;
+
+            if (t.GetCustomAttributes(typeof(ImmutableAttribute), false).Length > 0)
+                return true;  
 
             if (t.IsValueType && !t.IsGenericType && !t.IsGenericTypeDefinition)
             {

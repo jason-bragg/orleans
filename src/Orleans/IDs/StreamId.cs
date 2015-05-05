@@ -33,8 +33,7 @@ namespace Orleans.Streams
     /// Identifier of an Orleans virtual stream.
     /// </summary>
     [Serializable]
-    [Immutable]
-    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId>, ISerializable
+    internal class StreamId : IStreamIdentity, IRingIdentifier<StreamId>, IEquatable<StreamId>, IComparable<StreamId>, ISerializable, IImmutable
     {
         [NonSerialized]
         private static readonly Lazy<Interner<StreamIdInternerKey, StreamId>> streamIdInternCache = new Lazy<Interner<StreamIdInternerKey, StreamId>>(
@@ -153,8 +152,7 @@ namespace Orleans.Streams
     }
 
     [Serializable]
-    [Immutable]
-    internal struct StreamIdInternerKey : IComparable<StreamIdInternerKey>, IEquatable<StreamIdInternerKey>
+    internal struct StreamIdInternerKey : IComparable<StreamIdInternerKey>, IEquatable<StreamIdInternerKey>, IImmutable
     {
         internal readonly Guid Guid;
         internal readonly string ProviderName;

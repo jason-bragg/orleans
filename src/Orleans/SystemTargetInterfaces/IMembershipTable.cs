@@ -61,8 +61,7 @@ namespace Orleans
     }
     
     [Serializable]
-    [Immutable]
-    internal class TableVersion
+    internal class TableVersion : IImmutable
     {
         public int Version { get; private set; }
         public string VersionEtag { get; private set; }

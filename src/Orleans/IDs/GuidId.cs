@@ -33,8 +33,7 @@ namespace Orleans.Runtime
     /// Can be used in places where Guid is optional and in those cases it can be set to null and will not use the storage of an empty Guid struct.
     /// </summary>
     [Serializable]
-    [Immutable]
-    public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>, ISerializable
+    public sealed class GuidId : IEquatable<GuidId>, IComparable<GuidId>, ISerializable, IImmutable
     {
         private static readonly Lazy<Interner<Guid, GuidId>> guidIdInternCache = new Lazy<Interner<Guid, GuidId>>(
                     () => new Interner<Guid, GuidId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));

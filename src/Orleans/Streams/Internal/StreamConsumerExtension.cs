@@ -164,13 +164,13 @@ namespace Orleans.Streams
             return true;
         }
 
-        public Task DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token)
+        public Task DeliverItem(GuidId subscriptionId, Immutable<object> item, Immutable<StreamSequenceToken> token)
         {
             if (logger.IsVerbose3) logger.Verbose3("DeliverItem {0} for subscription {1}", item.Value, subscriptionId);
 
             IStreamObservers observers;
             if (allStreamObservers.TryGetValue(subscriptionId, out observers))
-                return observers.DeliverItem(item.Value, token);
+                return observers.DeliverItem(item.Value, token.Value);
 
             logger.Warn((int)(ErrorCode.StreamProvider_NoStreamForItem), "{0} got an item for subscription {1}, but I don't have any subscriber for that stream. Dropping on the floor.",
                 providerRuntime.ExecutingEntityIdentity(), subscriptionId);

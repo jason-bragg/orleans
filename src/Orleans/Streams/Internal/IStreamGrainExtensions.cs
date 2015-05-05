@@ -33,7 +33,7 @@ namespace Orleans.Streams
     [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
     internal interface IStreamConsumerExtension : IGrain, IGrainExtension
     {
-        Task DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token);
+        Task DeliverItem(GuidId subscriptionId, Immutable<object> item, Immutable<StreamSequenceToken> token);
         Task DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> item);
         Task CompleteStream(GuidId subscriptionId);
         Task ErrorInStream(GuidId subscriptionId, Exception exc);

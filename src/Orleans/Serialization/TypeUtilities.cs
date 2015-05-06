@@ -30,11 +30,14 @@ using System.Text;
 
 using Orleans.Runtime;
 using Orleans.Concurrency;
+using Orleans.Streams;
 
 namespace Orleans.Serialization
 {
     internal static class TypeUtilities
     {
+        private static Type IImmutableType = typeof (IImmutable);
+
         internal static bool IsOrleansPrimitive(this Type t)
         {
             return t.IsPrimitive || t.IsEnum || t == typeof(string) || t == typeof(DateTime) || t == typeof(Decimal) || (t.IsArray && t.GetElementType().IsOrleansPrimitive());
@@ -62,7 +65,7 @@ namespace Orleans.Serialization
         internal static bool IsOrleansShallowCopyable(this Type t)
         {
             if (t.IsPrimitive || t.IsEnum || t == typeof (string) || t == typeof (DateTime) || t == typeof (Decimal) ||
-                t == typeof(Immutable<>) || typeof(IImmutable).IsAssignableFrom(t))
+                t == typeof(Immutable<>) || ImplementsIImmutable(t))
                 return true;
 
             if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof (Immutable<>))
@@ -89,6 +92,24 @@ namespace Orleans.Serialization
 
             return false;
         }
+
+        private static bool ImplementsIImmutable(Type t)
+        {
+            while (t != null)
+            {
+                Type[] interfaces = t.GetInterfaces();
+                foreach(Type iface in interfaces)
+                {
+                    if (iface == IImmutableType ||
+                        (iface != null && ImplementsIImmutable(iface)))
+                        return true;
+                }
+
+                t = t.BaseType;
+            }
+            return false;
+        }
+
 
         internal static bool IsSpecializationOf(this Type t, Type match)
         {

@@ -32,7 +32,7 @@ namespace Orleans.Streams
     /// Used by Orlens streaming extensions.
     /// </summary>
     [Serializable]
-    public class QueueId : IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>, IImmutable
+    public class QueueId : IImmutable, IRingIdentifier<QueueId>, IEquatable<QueueId>, IComparable<QueueId>
     {
         private static readonly Lazy<Interner<QueueId, QueueId>> queueIdInternCache = new Lazy<Interner<QueueId, QueueId>>(
                     () => new Interner<QueueId, QueueId>(InternerConstants.SIZE_LARGE, InternerConstants.DefaultCacheCleanupFreq));

@@ -31,7 +31,7 @@ using Orleans.Concurrency;
 namespace Orleans.Streams
 {
     [Serializable]
-    internal class StreamImpl<T> : IStreamIdentity, IAsyncStream<T>, IStreamControl, ISerializable, IImmutable
+    internal class StreamImpl<T> : IImmutable, IStreamIdentity, IAsyncStream<T>, IStreamControl, ISerializable
     {
         private readonly StreamId                               streamId;
         private readonly bool                                   isRewindable;

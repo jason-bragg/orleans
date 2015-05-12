@@ -517,17 +517,18 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
+            private readonly MessageReader reader;
+
             public Socket Sock { get; private set; }
             public EndPoint RemoteEndPoint { get; private set; }
             public IncomingMessageAcceptor IMA { get; private set; }
-
-            private MessageReader reader = new MessageReader();
 
             public ReceiveCallbackContext(Socket sock, IncomingMessageAcceptor ima)
             {
                 Sock = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
+                reader = new MessageReader();
             }
 
             // Builds the list of buffer segments to pass to Socket.BeginReceive, based on the total list (CurrentBuffer)

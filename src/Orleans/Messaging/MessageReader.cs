@@ -36,7 +36,9 @@ namespace Orleans.Runtime
         }
 
         private const int DefaultReadBufferSize = 1 << 17; // 128k
+        private const int MaxGrowBlockSize = 1 << 20; // 1mg
         private readonly List<ArraySegment<byte>> readBuffer;
+        private int currentBufferSize;
 
         private readonly byte[] lengthBuffer;
 
@@ -48,8 +50,9 @@ namespace Orleans.Runtime
 
         public MessageReader(int readBufferSize = DefaultReadBufferSize)
         {
+            currentBufferSize = readBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
-            readBuffer = BufferPool.GlobalPool.GetMultiBuffer(readBufferSize);
+            readBuffer = BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
         }
 
         public void UpdateDataRead(int bytesRead)
@@ -57,15 +60,23 @@ namespace Orleans.Runtime
             readOffset += bytesRead;
         }
 
+        public void Reset()
+        {
+            readOffset = 0;
+            parseOffset = 0;
+            headerLength = 0;
+            bodyLength = 0;
+        }
 
         public bool TryReadMessage(out Message msg)
         {
             msg = null;
 
+            // Is there enough read into the buffer to continue (at least read the lengths?)
             if (readOffset < headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset)
                 return false;
 
-            // read lengths if needed
+            // parse lengths if needed
             if (headerLength == 0 || bodyLength == 0)
             {
                 // get length segments
@@ -84,7 +95,18 @@ namespace Orleans.Runtime
                 bodyLength = BitConverter.ToInt32(lengthBuffer, 4);
             }
 
-            // have we read full message
+            // If message is too big for default buffer size, grow
+            while (parseOffset + Message.LENGTH_HEADER_SIZE + headerLength + bodyLength > currentBufferSize)
+            {
+                //TODO: Add configurable max message size for safety
+                //TODO: Review networking layer and add max size checks to all dictionaries, arrays, or other variable sized containers.
+                // double buffer size up to max grow block size, then only grow it in those intervals
+                int growBlockSize = Math.Min(currentBufferSize, MaxGrowBlockSize);
+                readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(growBlockSize));
+                currentBufferSize += growBlockSize;
+            }
+
+            // Is there enough read into the buffer to read full message
             if (readOffset < headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset)
                 return false;
 
@@ -96,6 +118,7 @@ namespace Orleans.Runtime
             int bodyOffset = headerOffset + headerLength;
             List<ArraySegment<byte>> body = ByteArrayBuilder.GetSubSegments(readBuffer, bodyOffset, bodyLength);
 
+            // build message
             msg = new Message(header, body);
             MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
             
@@ -105,6 +128,7 @@ namespace Orleans.Runtime
             bodyLength = 0;
 
             // drop buffers consumed in message and adjust parse readOffset
+            // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
             while (readBuffer.Count != 0)
             {
@@ -128,14 +152,6 @@ namespace Orleans.Runtime
                 readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
 
             return true;
-        }
-
-        public void Reset()
-        {
-            readOffset = 0;
-            parseOffset = 0;
-            headerLength = 0;
-            bodyLength = 0;
         }
     }
 }

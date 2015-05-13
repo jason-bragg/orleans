@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using Orleans.Runtime;
 
 namespace Orleans.CodeGeneration
@@ -183,7 +183,7 @@ namespace Orleans.CodeGeneration
             {
                 throw new ArgumentException("Cannot fabricate grain-reference for non-grain type: " + grainType.FullName);
             }
-            var implementation = TypeCodeMapper.GetImplementation(grainType, grainClassNamePrefix);
+            var implementation = TypeCodeMapper.GetImplementation(interfaceId, grainClassNamePrefix);
             GrainId grainId = getGrainId(implementation);
             return GrainReference.FromGrainId(grainId, 
                 grainType.IsGenericType ? grainType.UnderlyingSystemType.FullName : null);

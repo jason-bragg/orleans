@@ -21,10 +21,10 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.Collections.Concurrent;
-﻿using Orleans.CodeGeneration;
-﻿using Orleans.Runtime;
+using Orleans.CodeGeneration;
+using Orleans.Runtime;
 
 namespace Orleans
 {
@@ -127,7 +127,7 @@ namespace Orleans
         /// <param name="grainClassNamePrefix">An optional class name prefix used to find the runtime type of the grain.</param>
         /// <returns></returns>
         public static TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null)
-            where TGrainInterface : IGrainWithGuidCompoundKey
+            where TGrainInterface : IGrainWithIntegerCompoundKey
         {
             GrainFactoryBase.DisallowNullOrWhiteSpaceKeyExtensions(keyExtension);
 

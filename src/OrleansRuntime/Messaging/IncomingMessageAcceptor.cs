@@ -34,8 +34,6 @@ namespace Orleans.Runtime.Messaging
         private readonly IPEndPoint listenAddress;
         private Action<Message> sniffIncomingMessageHandler;
 
-        internal static readonly string PingHeader = Message.Header.APPLICATION_HEADER_FLAG + Message.Header.PING_APPLICATION_HEADER;
-
         internal Socket AcceptingSocket;
         protected MessageCenter MessageCenter;
         protected HashSet<Socket> OpenReceiveSockets;
@@ -75,7 +73,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
-                AcceptingSocket.BeginAccept(new AsyncCallback(AcceptCallback), this);
+                AcceptingSocket.BeginAccept(AcceptCallback, this);
             }
             catch (Exception ex)
             {
@@ -260,7 +258,7 @@ namespace Orleans.Runtime.Messaging
                 // Then, start a new Accept
                 try
                 {
-                    ima.AcceptingSocket.BeginAccept(new AsyncCallback(AcceptCallback), ima);
+                    ima.AcceptingSocket.BeginAccept(AcceptCallback, ima);
                 }
                 catch (Exception ex)
                 {
@@ -305,7 +303,7 @@ namespace Orleans.Runtime.Messaging
                     var rcc = new ReceiveCallbackContext(sock, ima);
                     try
                     {
-                        rcc.BeginReceive(new AsyncCallback(ReceiveCallback));
+                        rcc.BeginReceive(ReceiveCallback);
                     }
                     catch (Exception exception)
                     {
@@ -349,7 +347,7 @@ namespace Orleans.Runtime.Messaging
                     rcc.IMA.SafeCloseSocket(rcc.Sock);
                 }
 
-                int bytes = 0;
+                int bytes;
                 // Complete the receive
                 try
                 {
@@ -410,7 +408,12 @@ namespace Orleans.Runtime.Messaging
                 msg.AddTimestamp(Message.LifecycleTag.ReceiveIncoming);
 
             // See it's a Ping message, and if so, short-circuit it
-            if (msg.GetScalarHeader<bool>(PingHeader))
+            object pingObj;
+            var requestContext = msg.RequestContextData;
+            if (requestContext != null &&
+                requestContext.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out pingObj) &&
+                pingObj is bool &&
+                (bool)pingObj)
             {
                 MessagingStatisticsGroup.OnPingReceive(msg.SendingSilo);
 
@@ -421,7 +424,7 @@ namespace Orleans.Runtime.Messaging
                     MessagingStatisticsGroup.OnRejectedMessage(msg);
                     Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.Unrecoverable,
                         string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected ping message is {2}.",
-                            msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg.ToString()));
+                            msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
                     MessageCenter.OutboundQueue.SendMessage(rejection);
                 }
                 else
@@ -446,7 +449,7 @@ namespace Orleans.Runtime.Messaging
 
             // If we've stopped application message processing, then filter those out now
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && (msg.SendingGrain != Constants.SystemMembershipTableId))
+            if (MessageCenter.IsBlockingApplicationMessages && (msg.Category == Message.Categories.Application) && !Constants.SystemMembershipTableId.Equals(msg.SendingGrain))
             {
                 // We reject new requests, and drop all other messages
                 if (msg.Direction != Message.Directions.Request) return;
@@ -485,10 +488,10 @@ namespace Orleans.Runtime.Messaging
                 MessagingStatisticsGroup.OnRejectedMessage(msg);
                 Message rejection = msg.CreateRejectionResponse(Message.RejectionTypes.Transient,
                     string.Format("The target silo is no longer active: target was {0}, but this silo is {1}. The rejected message is {2}.", 
-                        msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg.ToString()));
+                        msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg));
                 MessageCenter.OutboundQueue.SendMessage(rejection);
                 if (Log.IsVerbose) Log.Verbose("Rejecting an obsolete request; target was {0}, but this silo is {1}. The rejected message is {2}.",
-                    msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg.ToString());
+                    msg.TargetSilo.ToLongString(), MessageCenter.MyAddress.ToLongString(), msg);
             }
         }
 
@@ -499,7 +502,7 @@ namespace Orleans.Runtime.Messaging
                 SocketManager.CloseSocket(AcceptingSocket);
                 AcceptingSocket = SocketManager.GetAcceptingSocketForEndpoint(listenAddress);
                 AcceptingSocket.Listen(LISTEN_BACKLOG_SIZE);
-                AcceptingSocket.BeginAccept(new AsyncCallback(AcceptCallback), this);
+                AcceptingSocket.BeginAccept(AcceptCallback, this);
             }
             catch (Exception ex)
             {
@@ -597,16 +600,16 @@ namespace Orleans.Runtime.Messaging
 
                     throw;
                 }
+#if TRACK_DETAILED_STATS
                 finally
                 {
-#if TRACK_DETAILED_STATS
                     if (StatisticsCollector.CollectThreadTimeTrackingStats)
                     {
                         tracker.IncrementNumberOfProcessed();
                         tracker.OnStopProcessing();
                     }
-#endif
                 }
+#endif
             }
         }
     }

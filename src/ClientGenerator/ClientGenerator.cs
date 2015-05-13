@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+using System;
 using System.CodeDom;
 using System.CodeDom.Compiler;
 using System.Collections.Generic;
@@ -458,7 +458,10 @@ namespace Orleans.CodeGeneration
             // add referrenced named spaces
             foreach (string referredNamespace in grainNamespace.ReferencedNamespaces)
                 if (referredNamespace != referenceNameSpace.Name)
-                    referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
+                    if (!String.IsNullOrEmpty(referredNamespace))
+                    {
+                        referenceNameSpace.Imports.Add(new CodeNamespaceImport(referredNamespace));
+                    }
 
             if (options.TargetLanguage == Language.VisualBasic && referenceNameSpace.Name.StartsWith(options.RootNamespace))
             {

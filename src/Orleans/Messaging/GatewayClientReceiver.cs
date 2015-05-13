@@ -23,12 +23,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 ﻿using System;
 using System.Collections.Generic;
-﻿using System.Data.Services.Client;
-﻿using System.IO;
+using System.IO;
 using System.Net.Sockets;
 using Orleans.Runtime;
-﻿using Orleans.Storage;
-
+﻿
 namespace Orleans.Messaging
 {
     /// <summary>
@@ -37,13 +35,13 @@ namespace Orleans.Messaging
     internal class GatewayClientReceiver : AsynchAgent
     {
         private readonly GatewayConnection gatewayConnection;
-        private readonly MessageReader reader;
+        private readonly IncommingMessageBuffer buffer;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
-            reader = new MessageReader(); 
+            buffer = new IncommingMessageBuffer(true); 
         }
 
         protected override void Run()
@@ -64,16 +62,16 @@ namespace Orleans.Messaging
             {
                 while (!Cts.IsCancellationRequested)
                 {
-                    int bytesRead = FillBuffer(reader.RecieveBuffer);
+                    int bytesRead = FillBuffer(buffer.RecieveBuffer);
                     if (bytesRead == 0)
                     {
                         continue;
                     }
 
-                    reader.UpdateDataRead(bytesRead);
+                    buffer.UpdateReceivedData(bytesRead);
 
                     Message msg;
-                    while (reader.TryReadMessage(out msg))
+                    while (buffer.TryReadMessage(out msg))
                     {
                         gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
                         if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);
@@ -90,6 +88,7 @@ namespace Orleans.Messaging
 
         private void RunBatch()
         {
+            /* Disable batching.  TODO: Remove or fix
             try
             {
                 var metaHeader = new byte[Message.LENGTH_META_HEADER];
@@ -155,8 +154,10 @@ namespace Orleans.Messaging
                     ex, gatewayConnection.Address), ex);
                 throw;
             }
+             */
         }
 
+        /* Disable batching.  TODO: Remove or fix
         [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1031:DoNotCatchGeneralExceptionTypes")]
         private bool FillBuffer(List<ArraySegment<byte>> buffer, int length)
         {
@@ -202,6 +203,7 @@ namespace Orleans.Messaging
             }
             return true;
         }
+         */
 
         private int FillBuffer(List<ArraySegment<byte>> buffer)
         {

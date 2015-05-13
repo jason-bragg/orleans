@@ -474,21 +474,22 @@ namespace Orleans.Runtime
             Direction = subtype;
         }
 
-        internal Message(byte[] header, byte[] body)
-            : this(new List<ArraySegment<byte>> { new ArraySegment<byte>(header) },
-                new List<ArraySegment<byte>> { new ArraySegment<byte>(body) })
-        {
-        }
-
         // Initializes body and header but does not take ownership of byte.
         // Caller must clean up bytes
-        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body)
+        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool supportForwarding = true)
         {
             metadata = new Dictionary<string, object>();
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-            bodyObject = DeserializeBody(body);
+            if (supportForwarding)
+            {
+                bodyBytes = body;
+            }
+            else
+            {
+                bodyObject = DeserializeBody(body);
+            }
         }
 
         public Message CreateResponseMessage()

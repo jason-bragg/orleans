@@ -24,19 +24,19 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
-    internal class MessageReader
+    internal class IncommingMessageBuffer
     {
         public List<ArraySegment<byte>> RecieveBuffer
         {
             get { return ByteArrayBuilder.BuildSegmentList(readBuffer, readOffset); }
         }
 
-        private const int DefaultReadBufferSize = 1 << 17; // 128k
-        private const int MaxGrowBlockSize = 1 << 20; // 1mg
+        private const int Kb = 1024;
+        private const int DefaultReadBufferSize = 128*Kb; // 128k
+        private const int MaxGrowBlockSize = 1024*Kb; // 1mg
         private readonly List<ArraySegment<byte>> readBuffer;
         private int currentBufferSize;
 
@@ -48,14 +48,21 @@ namespace Orleans.Runtime
         private int readOffset;
         private int parseOffset;
 
-        public MessageReader(int readBufferSize = DefaultReadBufferSize)
+        private readonly bool supportForwarding;
+
+        public IncommingMessageBuffer(bool supportForwarding = false, int readBufferSize = DefaultReadBufferSize)
         {
+            this.supportForwarding = supportForwarding;
             currentBufferSize = readBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
             readBuffer = BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
+            readOffset = 0;
+            parseOffset = 0;
+            headerLength = 0;
+            bodyLength = 0;
         }
 
-        public void UpdateDataRead(int bytesRead)
+        public void UpdateReceivedData(int bytesRead)
         {
             readOffset += bytesRead;
         }
@@ -73,14 +80,14 @@ namespace Orleans.Runtime
             msg = null;
 
             // Is there enough read into the buffer to continue (at least read the lengths?)
-            if (readOffset < headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset)
+            if (readOffset < EndOfMessageOffset())
                 return false;
 
             // parse lengths if needed
             if (headerLength == 0 || bodyLength == 0)
             {
                 // get length segments
-                List<ArraySegment<byte>> lenghts = ByteArrayBuilder.GetSubSegments(readBuffer, parseOffset, Message.LENGTH_HEADER_SIZE);
+                List<ArraySegment<byte>> lenghts = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, parseOffset, Message.LENGTH_HEADER_SIZE);
 
                 // copy length segment to buffer
                 int lengthBufferoffset = 0;
@@ -107,19 +114,25 @@ namespace Orleans.Runtime
             }
 
             // Is there enough read into the buffer to read full message
-            if (readOffset < headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset)
+            if (readOffset < EndOfMessageOffset())
                 return false;
 
             // read header
             int headerOffset = parseOffset + Message.LENGTH_HEADER_SIZE;
-            List<ArraySegment<byte>> header = ByteArrayBuilder.GetSubSegments(readBuffer, headerOffset, headerLength);
+            List<ArraySegment<byte>> header = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, headerOffset, headerLength);
 
             // read body
             int bodyOffset = headerOffset + headerLength;
-            List<ArraySegment<byte>> body = ByteArrayBuilder.GetSubSegments(readBuffer, bodyOffset, bodyLength);
+            List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
+
+            // need to maintain ownership of buffer, so if we are supporting forwarding we need to duplicate the body buffer.
+            if (supportForwarding)
+            {
+                body = DuplicateBuffer(body);
+            }
 
             // build message
-            msg = new Message(header, body);
+            msg = new Message(header, body, supportForwarding);
             MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
             
             // update parse readOffset and clear lengths
@@ -152,6 +165,23 @@ namespace Orleans.Runtime
                 readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
 
             return true;
+        }
+
+        private int EndOfMessageOffset()
+        {
+            return headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset;
+        }
+
+        private List<ArraySegment<byte>> DuplicateBuffer(List<ArraySegment<byte>> body)
+        {
+            var dupBody = new List<ArraySegment<byte>>(body.Count);
+            foreach (ArraySegment<byte> seg in body)
+            {
+                var dupSeg = new ArraySegment<byte>(BufferPool.GlobalPool.GetBuffer(), seg.Offset, seg.Count);
+                Buffer.BlockCopy(seg.Array, seg.Offset, dupSeg.Array, dupSeg.Offset, seg.Count);
+                dupBody.Add(dupSeg);
+            }
+            return dupBody;
         }
     }
 }

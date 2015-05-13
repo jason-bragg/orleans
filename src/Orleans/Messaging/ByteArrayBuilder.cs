@@ -488,48 +488,6 @@ namespace Orleans.Runtime
             return result;
         }
 
-        public static List<ArraySegment<byte>> GetSubSegments(List<ArraySegment<byte>> buffer, int offset, int length)
-        {
-            var result = new List<ArraySegment<byte>>();
-            int skipped = 0;
-            int added = 0;
-            foreach (var seg in buffer)
-            {
-                if (added == 0)
-                {
-                    // skip all segments prior to the offset
-                    if (offset - skipped >= seg.Count)
-                    {
-                        skipped += seg.Count;
-                        continue;
-                    }
-                    // skip this many of the first bytes in the segment
-                    int lastSkip = offset - skipped;
-                    // if segment has enough room in it (after the skipped bit) to meet the length requriements, we're done.
-                    if (seg.Count - lastSkip >= length)
-                    {
-                        result.Add(new ArraySegment<byte>(seg.Array, seg.Offset + offset - skipped, length));
-                        return result;
-                    }
-                    // use up the rest of this segment and record how much was added, then move to next segment.
-                    added = seg.Count - lastSkip;
-                    result.Add(new ArraySegment<byte>(seg.Array, seg.Offset + offset - skipped, added));
-                }
-                else
-                {
-                    // if segment has enough room in it to meet the remaining length requriements, we're done.
-                    if (seg.Count >= length - added)
-                    {
-                        result.Add(new ArraySegment<byte>(seg.Array, seg.Offset, length - added));
-                        return result;
-                    }
-                    added += seg.Count;
-                    result.Add(seg);
-                }
-            }
-            return result;
-        }
-
         // Utility function for manipulating lists of array segments
         public static List<ArraySegment<byte>> BuildSegmentListWithLengthLimit(List<ArraySegment<byte>> buffer, int offset, int length)
         {

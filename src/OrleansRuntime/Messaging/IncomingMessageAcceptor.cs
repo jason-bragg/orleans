@@ -517,7 +517,7 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
-            private readonly MessageReader reader;
+            private readonly IncommingMessageBuffer _buffer;
 
             public Socket Sock { get; private set; }
             public EndPoint RemoteEndPoint { get; private set; }
@@ -528,24 +528,14 @@ namespace Orleans.Runtime.Messaging
                 Sock = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
-                reader = new MessageReader();
-            }
-
-            // Builds the list of buffer segments to pass to Socket.BeginReceive, based on the total list (CurrentBuffer)
-            // and how much we've already filled in (Offset). We have to do this because the scatter/gather variant of
-            // the BeginReceive API doesn't allow you to specify an readOffset into the list of segments.
-            // To build the list, we walk through the complete buffer, skipping segments that we've already filled up; 
-            // add the partial segment for whatever's left in the first unfilled buffer, and then add any remaining buffers.
-            private List<ArraySegment<byte>> BuildSegmentList()
-            {
-                return reader.RecieveBuffer;
+                _buffer = new IncommingMessageBuffer();
             }
 
             public void BeginReceive(AsyncCallback callback)
             {
                 try
                 {
-                    Sock.BeginReceive(BuildSegmentList(), SocketFlags.None, callback, this);
+                    Sock.BeginReceive(_buffer.RecieveBuffer, SocketFlags.None, callback, this);
                 }
                 catch (Exception ex)
                 {
@@ -583,10 +573,10 @@ namespace Orleans.Runtime.Messaging
 #endif
                 try
                 {
-                    reader.UpdateDataRead(bytes);
+                    _buffer.UpdateReceivedData(bytes);
 
                     Message msg;
-                    while (reader.TryReadMessage(out msg))
+                    while (_buffer.TryReadMessage(out msg))
                     {
                         IMA.HandleMessage(msg, Sock);
                     }
@@ -603,7 +593,7 @@ namespace Orleans.Runtime.Messaging
                             exc);
                     }
                     catch (Exception) { }
-                    reader.Reset(); // Reset back to a hopefully good base state
+                    _buffer.Reset(); // Reset back to a hopefully good base state
 
                     throw;
                 }

@@ -23,21 +23,22 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace Orleans.Runtime
 {
-    internal class IncommingMessageBuffer
+    internal class IncomingMessageBuffer
     {
         public List<ArraySegment<byte>> RecieveBuffer
         {
-            get { return ByteArrayBuilder.BuildSegmentList(readBuffer, readOffset); }
+            get { return ByteArrayBuilder.BuildSegmentList(readBuffer, recieveOffset); }
         }
 
         private const int Kb = 1024;
-        private const int DefaultReadBufferSize = 128*Kb; // 128k
-        private const int MaxGrowBlockSize = 1024*Kb; // 1mg
+        private const int DEFAULT_RECEIVE_BUFFER_SIZE = 128 * Kb; // 128k
+        private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = DEFAULT_RECEIVE_BUFFER_SIZE * 8; // 1mg
+        private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
         private readonly List<ArraySegment<byte>> readBuffer;
+        private readonly int maxSustainedBufferSize;
         private int currentBufferSize;
 
         private readonly byte[] lengthBuffer;
@@ -45,49 +46,52 @@ namespace Orleans.Runtime
         private int headerLength;
         private int bodyLength;
 
-        private int readOffset;
-        private int parseOffset;
+        private int recieveOffset;
+        private int decodeOffset;
 
         private readonly bool supportForwarding;
+        private TraceLogger Log;
 
-        public IncommingMessageBuffer(bool supportForwarding = false, int readBufferSize = DefaultReadBufferSize)
+        public IncomingMessageBuffer(TraceLogger logger, bool supportForwarding = false, int receiveBufferSize = DEFAULT_RECEIVE_BUFFER_SIZE, int maxSustainedReceiveBufferSize = DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE)
         {
+            Log = logger;
             this.supportForwarding = supportForwarding;
-            currentBufferSize = readBufferSize;
+            currentBufferSize = receiveBufferSize;
+            maxSustainedBufferSize = maxSustainedReceiveBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
             readBuffer = BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
-            readOffset = 0;
-            parseOffset = 0;
+            recieveOffset = 0;
+            decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
         }
 
         public void UpdateReceivedData(int bytesRead)
         {
-            readOffset += bytesRead;
+            recieveOffset += bytesRead;
         }
 
         public void Reset()
         {
-            readOffset = 0;
-            parseOffset = 0;
+            recieveOffset = 0;
+            decodeOffset = 0;
             headerLength = 0;
             bodyLength = 0;
         }
 
-        public bool TryReadMessage(out Message msg)
+        public bool TryDecodeMessage(out Message msg)
         {
             msg = null;
 
             // Is there enough read into the buffer to continue (at least read the lengths?)
-            if (readOffset < EndOfMessageOffset())
+            if (recieveOffset - decodeOffset < KnownMessageSize())
                 return false;
 
             // parse lengths if needed
             if (headerLength == 0 || bodyLength == 0)
             {
                 // get length segments
-                List<ArraySegment<byte>> lenghts = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, parseOffset, Message.LENGTH_HEADER_SIZE);
+                List<ArraySegment<byte>> lenghts = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, decodeOffset, Message.LENGTH_HEADER_SIZE);
 
                 // copy length segment to buffer
                 int lengthBufferoffset = 0;
@@ -103,25 +107,25 @@ namespace Orleans.Runtime
             }
 
             // If message is too big for default buffer size, grow
-            while (parseOffset + Message.LENGTH_HEADER_SIZE + headerLength + bodyLength > currentBufferSize)
+            while (decodeOffset + KnownMessageSize() > currentBufferSize)
             {
                 //TODO: Add configurable max message size for safety
                 //TODO: Review networking layer and add max size checks to all dictionaries, arrays, or other variable sized containers.
                 // double buffer size up to max grow block size, then only grow it in those intervals
-                int growBlockSize = Math.Min(currentBufferSize, MaxGrowBlockSize);
+                int growBlockSize = Math.Min(currentBufferSize, GROW_MAX_BLOCK_SIZE);
                 readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(growBlockSize));
                 currentBufferSize += growBlockSize;
             }
 
             // Is there enough read into the buffer to read full message
-            if (readOffset < EndOfMessageOffset())
+            if (recieveOffset - decodeOffset < KnownMessageSize())
                 return false;
 
-            // read header
-            int headerOffset = parseOffset + Message.LENGTH_HEADER_SIZE;
+            // decode header
+            int headerOffset = decodeOffset + Message.LENGTH_HEADER_SIZE;
             List<ArraySegment<byte>> header = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, headerOffset, headerLength);
 
-            // read body
+            // decode body
             int bodyOffset = headerOffset + headerLength;
             List<ArraySegment<byte>> body = ByteArrayBuilder.BuildSegmentListWithLengthLimit(readBuffer, bodyOffset, bodyLength);
 
@@ -132,21 +136,28 @@ namespace Orleans.Runtime
             }
 
             // build message
-            msg = new Message(header, body, supportForwarding);
+            msg = new Message(header, body, !supportForwarding);
             MessagingStatisticsGroup.OnMessageReceive(msg, headerLength, bodyLength);
-            
-            // update parse readOffset and clear lengths
-            parseOffset = bodyOffset + bodyLength;
+
+            if (headerLength + bodyLength > Message.LargeMessageSizeThreshold)
+            {
+                Log.Info(ErrorCode.Messaging_LargeMsg_Incoming, "Receiving large message Size={0} HeaderLength={1} BodyLength={2}. Msg={3}",
+                    headerLength + bodyLength, headerLength, bodyLength, msg.ToString());
+                if (Log.IsVerbose3) Log.Verbose3("Received large message {0}", msg.ToLongString());
+            }
+
+            // update parse recieveOffset and clear lengths
+            decodeOffset = bodyOffset + bodyLength;
             headerLength = 0;
             bodyLength = 0;
 
-            // drop buffers consumed in message and adjust parse readOffset
+            // drop buffers consumed in message and adjust parse recieveOffset
             // TODO: This can be optimized further. Linked lists?
             int consumedBytes = 0;
             while (readBuffer.Count != 0)
             {
-                ArraySegment<byte> seg = readBuffer.First();
-                if (seg.Count <= parseOffset - consumedBytes)
+                ArraySegment<byte> seg = readBuffer[0];
+                if (seg.Count <= decodeOffset - consumedBytes)
                 {
                     consumedBytes += seg.Count;
                     readBuffer.Remove(seg);
@@ -157,19 +168,34 @@ namespace Orleans.Runtime
                     break;
                 }
             }
-            parseOffset -= consumedBytes;
-            readOffset -= consumedBytes;
+            decodeOffset -= consumedBytes;
+            recieveOffset -= consumedBytes;
 
-            // back fill buffer
             if (consumedBytes != 0)
-                readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
+            {
+                if (currentBufferSize <= maxSustainedBufferSize)
+                {
+                    readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(consumedBytes));
+                }
+                else
+                {
+                    // shrink buffer to DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE
+                    int backfillBytes = Math.Max(consumedBytes + maxSustainedBufferSize - currentBufferSize, 0);
+                    currentBufferSize -= consumedBytes;
+                    currentBufferSize += backfillBytes;
+                    if (backfillBytes > 0)
+                    {
+                        readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(backfillBytes));
+                    }
+                }
+            }
 
             return true;
         }
 
-        private int EndOfMessageOffset()
+        private int KnownMessageSize()
         {
-            return headerLength + bodyLength + Message.LENGTH_HEADER_SIZE + parseOffset;
+            return headerLength + bodyLength + Message.LENGTH_HEADER_SIZE;
         }
 
         private List<ArraySegment<byte>> DuplicateBuffer(List<ArraySegment<byte>> body)

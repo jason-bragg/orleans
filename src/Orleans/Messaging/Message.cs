@@ -484,19 +484,19 @@ namespace Orleans.Runtime
 
         // Initializes body and header but does not take ownership of byte.
         // Caller must clean up bytes
-        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool supportForwarding = true)
+        public Message(List<ArraySegment<byte>> header, List<ArraySegment<byte>> body, bool deserializeBody = false)
         {
             metadata = new Dictionary<string, object>();
 
             var input = new BinaryTokenStreamReader(header);
             headers = SerializationManager.DeserializeMessageHeaders(input);
-            if (supportForwarding)
+            if (deserializeBody)
             {
-                bodyBytes = body;
+                bodyObject = DeserializeBody(body);
             }
             else
             {
-                bodyObject = DeserializeBody(body);
+                bodyBytes = body;
             }
         }
 

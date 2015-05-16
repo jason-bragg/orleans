@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -26,7 +26,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using Orleans.Runtime;
-﻿
+ 
 namespace Orleans.Messaging
 {
     /// <summary>
@@ -35,13 +35,13 @@ namespace Orleans.Messaging
     internal class GatewayClientReceiver : AsynchAgent
     {
         private readonly GatewayConnection gatewayConnection;
-        private readonly IncommingMessageBuffer buffer;
+        private readonly IncomingMessageBuffer buffer;
 
         internal GatewayClientReceiver(GatewayConnection gateway)
         {
             gatewayConnection = gateway;
             OnFault = FaultBehavior.RestartOnFault;
-            buffer = new IncommingMessageBuffer(true); 
+            buffer = new IncomingMessageBuffer(Log, true); 
         }
 
         protected override void Run()
@@ -71,7 +71,7 @@ namespace Orleans.Messaging
                     buffer.UpdateReceivedData(bytesRead);
 
                     Message msg;
-                    while (buffer.TryReadMessage(out msg))
+                    while (buffer.TryDecodeMessage(out msg))
                     {
                         gatewayConnection.MsgCenter.QueueIncomingMessage(msg);
                         if (Log.IsVerbose3) Log.Verbose3("Received a message from gateway {0}: {1}", gatewayConnection.Address, msg);

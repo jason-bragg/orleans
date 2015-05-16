@@ -520,7 +520,7 @@ namespace Orleans.Runtime.Messaging
 
         private class ReceiveCallbackContext
         {
-            private readonly IncommingMessageBuffer _buffer;
+            private readonly IncomingMessageBuffer _buffer;
 
             public Socket Sock { get; private set; }
             public EndPoint RemoteEndPoint { get; private set; }
@@ -531,7 +531,7 @@ namespace Orleans.Runtime.Messaging
                 Sock = sock;
                 RemoteEndPoint = sock.RemoteEndPoint;
                 IMA = ima;
-                _buffer = new IncommingMessageBuffer();
+                _buffer = new IncomingMessageBuffer(ima.Log);
             }
 
             public void BeginReceive(AsyncCallback callback)
@@ -579,7 +579,7 @@ namespace Orleans.Runtime.Messaging
                     _buffer.UpdateReceivedData(bytes);
 
                     Message msg;
-                    while (_buffer.TryReadMessage(out msg))
+                    while (_buffer.TryDecodeMessage(out msg))
                     {
                         IMA.HandleMessage(msg, Sock);
                     }

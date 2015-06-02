@@ -23,9 +23,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.TestingHost;
 using UnitTests.SampleStreaming;
@@ -119,15 +119,15 @@ namespace Tester.StreamingTests
         private async Task StreamingTests_Consumer_Producer(Guid streamId, string streamProvider)
         {
             // consumer joins first, producer later
-            ISampleStreaming_ConsumerGrain consumer = SampleStreaming_ConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
 
@@ -139,39 +139,39 @@ namespace Tester.StreamingTests
         private async Task StreamingTests_Producer_Consumer(Guid streamId, string streamProvider)
         {
             // producer joins first, consumer later
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            ISampleStreaming_ConsumerGrain consumer = SampleStreaming_ConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
-            //int numProduced = producer.NumberProduced.Result;
+            //int numProduced = await producer.NumberProduced;
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 
             await consumer.StopConsuming();
         }
 
-        private async Task StreamingTests_Producer_InlineConsumer( Guid streamId, string streamProvider )
+        private async Task StreamingTests_Producer_InlineConsumer(Guid streamId, string streamProvider)
         {
             // producer joins first, consumer later
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain( Guid.NewGuid() );
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
             await producer.BecomeProducer(streamId, StreamNamespace, streamProvider);
 
-            ISampleStreaming_InlineConsumerGrain consumer = SampleStreaming_InlineConsumerGrainFactory.GetGrain( Guid.NewGuid() );
+            var consumer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_InlineConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, StreamNamespace, streamProvider);
 
             await producer.StartPeriodicProducing();
 
-            Thread.Sleep( 1000 );
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
 
             await producer.StopPeriodicProducing();
-            //int numProduced = producer.NumberProduced.Result;
+            //int numProduced = await producer.NumberProduced;
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, lastTry), _timeout);
 

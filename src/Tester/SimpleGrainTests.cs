@@ -42,14 +42,9 @@ namespace UnitTests.General
         {
         }
 
-        public static ISimpleGrain GetSimpleGrain()
+        public ISimpleGrain GetSimpleGrain()
         {
-            return SimpleGrainFactory.GetGrain(GetRandomGrainId(), SimpleGrainNamePrefix);
-        }
-
-        public static ISimpleGrain GetSimpleGrain(long grainId)
-        {
-            return SimpleGrainFactory.GetGrain(grainId, SimpleGrainNamePrefix);
+            return GrainFactory.GetGrain<ISimpleGrain>(GetRandomGrainId(), SimpleGrainNamePrefix);
         }
 
         private static int GetRandomGrainId()
@@ -71,18 +66,18 @@ namespace UnitTests.General
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]
-        public void SimpleGrainControlFlow()
+        public async Task SimpleGrainControlFlow()
         {
             ISimpleGrain grain = GetSimpleGrain();
             
             Task setPromise = grain.SetA(2);
-            setPromise.Wait();
+            await setPromise;
 
             setPromise = grain.SetB(3);
-            setPromise.Wait();
+            await setPromise;
 
             Task<int> intPromise = grain.GetAxB();
-            Assert.AreEqual(6, intPromise.Result);
+            Assert.AreEqual(6, await intPromise);
         }
 
         [TestMethod, TestCategory("BVT"), TestCategory("Nightly")]

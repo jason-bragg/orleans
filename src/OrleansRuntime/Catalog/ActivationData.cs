@@ -240,6 +240,13 @@ namespace Orleans.Runtime
             if (grainInstance != null)
             {
                 GrainInstanceType = grainInstance.GetType();
+
+                // Don't ever collect system grains or reminder table grain or memory store grains.
+                bool doNotCollect = typeof(IReminderTable).IsAssignableFrom(GrainInstanceType) || typeof(IMemoryStorageGrain).IsAssignableFrom(GrainInstanceType);
+                if (doNotCollect)
+                {
+                    this.collector = null;
+                }
             }
         }
 
@@ -339,7 +346,7 @@ namespace Orleans.Runtime
         /// </summary>
         public ActivationAddress ForwardingAddress { get; set; }
 
-        private readonly IActivationCollector collector;
+        private IActivationCollector collector;
 
         internal bool IsExemptFromCollection
         {
@@ -470,18 +477,6 @@ namespace Orleans.Runtime
             get
             {
                 return waiting == null ? 0 : waiting.Count;
-            }
-        }
-
-        public bool IsUsable
-        {
-            get
-            {
-                if (State == ActivationState.Create) return false;
-                if (State == ActivationState.Activating) return false;
-                if (State == ActivationState.Deactivating) return false;
-                if (State == ActivationState.Invalid) return false;
-                return true;
             }
         }
 

@@ -21,15 +21,15 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 using TestGrainInterfaces;
 using UnitTests.SampleStreaming;
 
@@ -54,8 +54,8 @@ namespace Tester.StreamingTests
         public async Task MultipleSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // setup two subscriptions
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
@@ -65,7 +65,7 @@ namespace Tester.StreamingTests
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             // check
@@ -79,8 +79,8 @@ namespace Tester.StreamingTests
         public async Task AddAndRemoveSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
@@ -88,7 +88,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -101,7 +101,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> secondSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 2, lastTry), Timeout);
@@ -114,7 +114,7 @@ namespace Tester.StreamingTests
             await consumer.StopConsuming(firstSubscriptionHandle);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -126,8 +126,8 @@ namespace Tester.StreamingTests
         public async Task ResubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
@@ -135,7 +135,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -146,7 +146,7 @@ namespace Tester.StreamingTests
             Assert.AreEqual(firstSubscriptionHandle, resumeHandle, "Handle matches");
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -158,8 +158,8 @@ namespace Tester.StreamingTests
         public async Task ResubscriptionAfterDeactivationTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
-            ISampleStreaming_ProducerGrain producer = SampleStreaming_ProducerGrainFactory.GetGrain(Guid.NewGuid());
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var producer = GrainClient.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
 
@@ -167,7 +167,7 @@ namespace Tester.StreamingTests
             StreamSubscriptionHandle<int> firstSubscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -176,7 +176,7 @@ namespace Tester.StreamingTests
             await consumer.Deactivate();
 
             // make sure grain has time to deactivate.
-            Thread.Sleep(100);
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
 
             // clear producer counts
             await producer.ClearNumberProduced();
@@ -187,7 +187,7 @@ namespace Tester.StreamingTests
             Assert.AreEqual(firstSubscriptionHandle, resumeHandle, "Handle matches");
 
             await producer.StartPeriodicProducing();
-            Thread.Sleep(1000);
+            await Task.Delay(TimeSpan.FromMilliseconds(1000));
             await producer.StopPeriodicProducing();
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, 1, lastTry), Timeout);
@@ -201,7 +201,7 @@ namespace Tester.StreamingTests
             const int subscriptionCount = 10;
 
             // get producer and consumer
-            IMultipleSubscriptionConsumerGrain consumer = MultipleSubscriptionConsumerGrainFactory.GetGrain(Guid.NewGuid());
+            var consumer = GrainClient.GrainFactory.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // create expected subscriptions
             IEnumerable<Task<StreamSubscriptionHandle<int>>> subscriptionTasks =

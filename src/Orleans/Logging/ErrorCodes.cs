@@ -1011,6 +1011,7 @@ namespace Orleans
         PersistentStreamPullingAgent_22 = PersistentStreamPullingAgentBase + 22,
         PersistentStreamPullingAgent_23 = PersistentStreamPullingAgentBase + 23,
         PersistentStreamPullingAgent_24 = PersistentStreamPullingAgentBase + 24,
+        PersistentStreamPullingAgent_25 = PersistentStreamPullingAgentBase + 25,
 
         StreamProviderManagerBase = Runtime +3400,
         StreamProvider_FailedToDispose              = StreamProviderManagerBase + 1,

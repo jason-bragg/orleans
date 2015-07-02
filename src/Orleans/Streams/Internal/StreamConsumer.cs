@@ -90,7 +90,7 @@ namespace Orleans.Streams
             GuidId subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId);
             await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
 
-            return myExtension.SetObserver(subscriptionId, stream, observer, filterWrapper);
+            return myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
         }
 
         public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
@@ -137,7 +137,7 @@ namespace Orleans.Streams
                 subscriptionId = oldHandleImpl.SubscriptionId;
             }
             
-            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(subscriptionId, stream, observer, null);
+            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(subscriptionId, stream, observer, token, null);
 
             // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
             oldHandleImpl.Invalidate();

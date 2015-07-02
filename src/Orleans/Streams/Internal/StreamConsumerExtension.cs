@@ -42,6 +42,7 @@ namespace Orleans.Streams
     {
         private interface IStreamObservers
         {
+            StreamSequenceToken Token { get; }
             Task DeliverItem(object item, StreamSequenceToken token);
             Task DeliverBatch(IBatchContainer item);
             Task CompleteStream();
@@ -52,6 +53,8 @@ namespace Orleans.Streams
         private class ObserversCollection<T> : IStreamObservers
         {
             private StreamSubscriptionHandleImpl<T> localObserver;
+
+            public StreamSequenceToken Token { get { return localObserver == null ? null : localObserver.Token; } }
 
             internal void SetObserver(StreamSubscriptionHandleImpl<T> observer)
             {
@@ -123,7 +126,7 @@ namespace Orleans.Streams
             logger = providerRuntime.GetLogger(this.GetType().Name);
         }
 
-        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, IStreamFilterPredicateWrapper filter)
+        internal StreamSubscriptionHandleImpl<T> SetObserver<T>(GuidId subscriptionId, StreamImpl<T> stream, IAsyncObserver<T> observer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter)
         {
             if (null == stream) throw new ArgumentNullException("stream");
             if (null == observer) throw new ArgumentNullException("observer");
@@ -134,7 +137,7 @@ namespace Orleans.Streams
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
                 IStreamObservers obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>());
-                var wrapper = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter);
+                var wrapper = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, token, filter);
                 ((ObserversCollection<T>)obs).SetObserver(wrapper);
                 return wrapper;
             }
@@ -223,6 +226,17 @@ namespace Orleans.Streams
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
+        }
+
+        public Task<SubscriptionInfo> GetSubscriptionInfo(GuidId subscriptionId)
+        {
+            IStreamObservers observers;
+            var subscriptionInfo = new SubscriptionInfo();
+            if (allStreamObservers.TryGetValue(subscriptionId, out observers))
+            {
+                subscriptionInfo.StreamSequenceToken = observers.Token;
+            }
+            return Task.FromResult(subscriptionInfo);
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)

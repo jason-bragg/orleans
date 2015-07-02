@@ -127,7 +127,7 @@ namespace Orleans.Streams
             {
                 GuidId subscriptionId = GuidId.GetGuidId(kvp.Key);
                 // we ignore duplicate entries-- there's no way a programmer could prevent the duplicate entry from being added if we threw an exception to communicate the problem. 
-                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value, null, null));
+                result.Add(new PubSubSubscriptionState(subscriptionId, streamId, kvp.Value, null));
             }
             return result;
         }

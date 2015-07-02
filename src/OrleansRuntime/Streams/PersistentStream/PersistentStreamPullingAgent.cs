@@ -424,8 +424,16 @@ namespace Orleans.Streams
                 
                 foreach (PubSubSubscriptionState item in streamData)
                 {
-                    var token = item.StreamSequenceToken ?? streamStartToken;
-                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.FilterWrapper);
+                    try
+                    {
+                        SubscriptionInfo subscriptionInfo = await item.Consumer.GetSubscriptionInfo(item.SubscriptionId);
+                        var token = subscriptionInfo.StreamSequenceToken ?? streamStartToken;
+                        AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.FilterWrapper);
+                    }
+                    catch (Exception exc)
+                    {
+                        logger.Error((int)ErrorCode.PersistentStreamPullingAgent_25, "Failed to ass subscription from obtained from pub bus", exc);
+                    }
                 }
             }
             catch (Exception exc)

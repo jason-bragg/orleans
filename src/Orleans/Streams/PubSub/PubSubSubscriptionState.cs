@@ -34,7 +34,6 @@ namespace Orleans.Streams
         public GuidId SubscriptionId;
         public StreamId Stream;
         public IStreamConsumerExtension Consumer;
-        public StreamSequenceToken StreamSequenceToken;
         public IStreamFilterPredicateWrapper FilterWrapper; // Serialized func info
 
         // This constructor has to be public for JSonSerialization to work!
@@ -43,13 +42,11 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
-            StreamSequenceToken token,
             IStreamFilterPredicateWrapper filterWrapper)
         {
             SubscriptionId = subscriptionId;
             Stream = streamId;
             Consumer = streamConsumer;
-            StreamSequenceToken = token;
             FilterWrapper = filterWrapper;
         }
 
@@ -114,8 +111,8 @@ namespace Orleans.Streams
 
         public override string ToString()
         {
-            return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2},SequenceToken={3}.",
-                SubscriptionId, Stream, Consumer, StreamSequenceToken);
+            return string.Format("PubSubSubscriptionState:SubscriptionId={0},StreamId={1},Consumer={2}.",
+                SubscriptionId, Stream, Consumer);
         }
     }
 }

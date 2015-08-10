@@ -39,27 +39,13 @@ namespace UnitTests.Grains
 {
     public class SimplePersistentGrain_State : GrainState
     {
-        public SimplePersistentGrain_State()
-            : base(typeof(SimplePersistentGrain).FullName) 
-            // TODO: GrainState takes name of the grain type here, which is probably a mistake
-            // since multiple grain classes can use the same state object interface/class.
-            // Need to figure out the right story for mapping grain classes to storage entity types (tables).
-        {}
-
         public int A { get; set; }
         public int B { get; set; }
-    }
-
-    public interface ISimplePersistentGrain_State : IGrainState
-    {
-        int A { get; set; }
-        int B { get; set; }
     }
 
     /// <summary>
     /// A simple grain that allows to set two arguments and then multiply them.
     /// </summary>
-    [StorageProvider(ProviderName = "MemoryStore")]
     public class SimplePersistentGrain : Grain<SimplePersistentGrain_State>, ISimplePersistentGrain
     {
         private Guid version;
@@ -97,62 +83,6 @@ namespace UnitTests.Grains
         public Task<int> GetAxB()
         {
             return Task.FromResult(State.A*State.B);
-        }
-
-        public Task<int> GetAxB(int a, int b)
-        {
-            return Task.FromResult(a * b);
-        }
-
-        public Task<int> GetA()
-        {
-            return Task.FromResult(State.A);
-        }
-
-        public Task<Guid> GetVersion()
-        {
-            return Task.FromResult(version);
-        }
-    }
-
-    [StorageProvider(ProviderName = "MemoryStore")]
-    public class SimpleInterfacePersistentGrain : Grain<ISimplePersistentGrain_State>, ISimplePersistentGrain
-    {
-        private Guid version;
-
-        public override Task OnActivateAsync()
-        {
-            version = Guid.NewGuid();
-            return base.OnActivateAsync();
-        }
-        public Task SetA(int a)
-        {
-            State.A = a;
-            return WriteStateAsync();
-        }
-
-        public Task SetA(int a, bool deactivate)
-        {
-            if (deactivate)
-                DeactivateOnIdle();
-            return SetA(a);
-        }
-
-        public Task SetB(int b)
-        {
-            State.B = b;
-            return WriteStateAsync();
-        }
-
-        public Task IncrementA()
-        {
-            State.A++;
-            return WriteStateAsync();
-        }
-
-        public Task<int> GetAxB()
-        {
-            return Task.FromResult(State.A * State.B);
         }
 
         public Task<int> GetAxB(int a, int b)

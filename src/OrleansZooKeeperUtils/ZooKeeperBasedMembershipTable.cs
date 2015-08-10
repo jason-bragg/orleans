@@ -205,7 +205,13 @@ namespace Orleans.Runtime.Host
 
         public IList<Uri> GetGateways()
         {
-            return ReadAll().Result.Members.Select(entryWithTag => entryWithTag.Item1.SiloAddress.Endpoint.ToGatewayUri()).ToList();
+            return ReadAll().Result.Members.Select(e => e.Item1).
+                                            Where(m => m.Status == SiloStatus.Active && m.ProxyPort != 0).
+                                            Select(m =>
+                                            {
+                                                m.SiloAddress.Endpoint.Port = m.ProxyPort;
+                                                return m.SiloAddress.ToGatewayUri();
+                                            }).ToList();
         }
 
         public TimeSpan MaxStaleness
@@ -320,12 +326,13 @@ namespace Orleans.Runtime.Host
                 logger = traceLogger;
             }
 
-            public override void process(WatchedEvent @event)
+            public override Task process(WatchedEvent @event)
             {
                 if (logger.IsVerbose)
                 {
                     logger.Verbose(@event.ToString());
                 }
+                return TaskDone.Done;
             }
         }
     }

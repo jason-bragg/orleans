@@ -33,17 +33,14 @@ using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Storage;
 
-namespace Orleans.CodeGeneration
+namespace Orleans
 {
-
     /// <summary>
     /// Base class for generated grain state classes.
     /// </summary>
     [Serializable]
     public abstract class GrainState : IGrainState
     {
-        private readonly string grainTypeName;
-
         /// <summary>
         /// This is used for serializing the state, so all base class fields must be here
         /// </summary>
@@ -109,8 +106,10 @@ namespace Orleans.CodeGeneration
         /// <param name="reference">The type of the associated grains that use this GrainState object. Used to initialize the <c>GrainType</c> property.</param>
         protected GrainState(string grainTypeFullName)
         {
-            grainTypeName = grainTypeFullName;
+            // TODO: remove after removing support for state interfaces
         }
+
+        protected GrainState() { }
 
         #region IGrainState storage operation methods
         /// <summary>

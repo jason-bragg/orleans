@@ -360,6 +360,7 @@ namespace Orleans
         Runtime_Error_100328 = Runtime + 328,
         Runtime_Error_100329 = Runtime + 329,
         Runtime_Error_100330 = Runtime + 330,
+        Runtime_Error_100331 = Runtime + 331,
 
         SiloBase                        = Runtime + 400,
         SiloStarting                    = SiloBase + 1,
@@ -447,7 +448,8 @@ namespace Orleans
         Catalog_DeactivateStreamResources_Exception     = CatalogBase + 42,
         Catalog_FinishDeactivateActivation_Exception    = CatalogBase + 43,
         Catalog_FinishGrainDeactivateAndCleanupStreams_Exception = CatalogBase + 44,
-        Catalog_DeactivateAllActivations = CatalogBase + 45,
+        Catalog_DeactivateAllActivations                = CatalogBase + 45,
+        Catalog_ActivationCollector_BadState_3          = CatalogBase + 46,
 
         MembershipBase                         = Runtime + 600,
         MembershipCantWriteLivenessDisabled    = Runtime_Error_100225, // Backward compatability
@@ -1021,6 +1023,7 @@ namespace Orleans
         Stream_ExtensionNotInstalled                = StreamProviderManagerBase + 5,
         Stream_ProducerIsDead                       = StreamProviderManagerBase + 6,
         StreamProvider_NoStreamForBatch             = StreamProviderManagerBase + 7,
+        StreamProvider_ConsumerFailedToUnregister   = StreamProviderManagerBase + 8,
 
         PersistentStreamPullingManagerBase = Runtime + 3500,
         PersistentStreamPullingManager_01 = PersistentStreamPullingManagerBase + 1,

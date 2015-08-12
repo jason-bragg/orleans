@@ -389,8 +389,8 @@ namespace Orleans.Streams
 
                     if (batch != null)
                     {
-                        deliveryTask = AsyncExecutorWithRetries.ExecuteWithRetries(i => consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable()),
-                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => true, maxDeliveryTime, DefaultBackoffProvider);
+                        deliveryTask = AsyncExecutorWithRetries.ExecuteWithRetries(i => DeliverBatchToConsumer(consumerData, batch),
+                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => !(exception is DataNotAvailableException), maxDeliveryTime, DefaultBackoffProvider);
                     }
                     else if (ex == null)
                     {
@@ -451,6 +451,17 @@ namespace Orleans.Streams
             }
         }
 
+        private async Task DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
+        {
+            StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
+            if (newToken != null)
+            {
+                consumerData.Token = newToken;
+                consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
+                    consumerData.StreamId.Namespace, newToken);
+            }
+        }
+
         private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)
         {
             try
@@ -460,19 +471,10 @@ namespace Orleans.Streams
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
                 ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
                 if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
-                
+
                 foreach (PubSubSubscriptionState item in streamData)
                 {
-                    try
-                    {
-                        SubscriptionInfo subscriptionInfo = await item.Consumer.GetSubscriptionInfo(item.SubscriptionId);
-                        var token = subscriptionInfo.StreamSequenceToken ?? streamStartToken;
-                        AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, token, item.FilterWrapper);
-                    }
-                    catch (Exception exc)
-                    {
-                        logger.Error((int)ErrorCode.PersistentStreamPullingAgent_25, "Failed to ass subscription from obtained from pub bus", exc);
-                    }
+                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken, item.FilterWrapper);
                 }
             }
             catch (Exception exc)

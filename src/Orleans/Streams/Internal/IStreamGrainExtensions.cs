@@ -29,22 +29,14 @@ using Orleans.Concurrency;
 
 namespace Orleans.Streams
 {
-    [Serializable]
-    [Immutable]
-    public class SubscriptionInfo
-    {
-        public StreamSequenceToken StreamSequenceToken { get; set; }
-    }
-
     // This is the extension interface for stream consumers
     [Factory(FactoryAttribute.FactoryTypes.ClientObject)]
     internal interface IStreamConsumerExtension : IGrainExtension
     {
-        Task DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token);
-        Task DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> item);
+        Task<StreamSequenceToken> DeliverItem(GuidId subscriptionId, Immutable<object> item, StreamSequenceToken token);
+        Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> item);
         Task CompleteStream(GuidId subscriptionId);
         Task ErrorInStream(GuidId subscriptionId, Exception exc);
-        Task<SubscriptionInfo> GetSubscriptionInfo(GuidId subscriptionId);
     }
 
     // This is the extension interface for stream producers

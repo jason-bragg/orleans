@@ -1039,9 +1039,6 @@ namespace Orleans
         PersistentStreamPullingManager_11 = PersistentStreamPullingManagerBase + 11,
         PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12,
 
-        StreamProviderBase = Runtime + 3600,
-        StreamProvider_FailedToUnsubscribeFromPubSub = StreamProviderBase + 1,
-
         AzureServiceRuntimeWrapper = Runtime + 3700,
         AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,
         AzureServiceRuntime_FailedToLoad    = AzureServiceRuntimeWrapper +2,

@@ -208,16 +208,47 @@ namespace Orleans.Streams
             IStreamFilterPredicateWrapper filter)
         {
             if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter);
+            // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter).Ignore();
             return TaskDone.Done;
         }
 
         // Called by rendezvous when new remote subscriber subscribes to this stream.
-        private void AddSubscriber_Impl(
+        private async Task AddSubscriber_Impl(
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
             StreamSequenceToken token,
+            IStreamFilterPredicateWrapper filter)
+        {
+            IQueueCacheCursor cursor;
+            try
+            {
+                StreamSequenceToken consumerToken = await streamConsumer.GetSequenceToken(subscriptionId);
+                // Set cursor if not cursor is set, or if subscription provides new token
+                consumerToken = consumerToken ?? token;
+                cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, consumerToken);
+            }
+            catch (GrainExtensionNotInstalledException)
+            {
+                cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
+            }
+            catch (DataNotAvailableException dataNotAvailableException)
+            {
+                // notify consumer that the data is not available, if we can.
+                streamConsumer.ErrorInStream(subscriptionId, dataNotAvailableException).Ignore();
+                // setup cursor with current token
+                cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
+            }
+            AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, filter);
+        }
+
+        // Called by rendezvous when new remote subscriber subscribes to this stream.
+        private void AddSubscriberToSubscriptionCache(
+            GuidId subscriptionId,
+            StreamId streamId,
+            IStreamConsumerExtension streamConsumer,
+            IQueueCacheCursor cursor,
             IStreamFilterPredicateWrapper filter)
         {
             StreamConsumerCollection streamDataCollection;
@@ -230,11 +261,9 @@ namespace Orleans.Streams
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
                 data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter);
-            
-            // Set cursor if not cursor is set, or if subscription provides new token
-            if ((data.Cursor == null || token != null) && queueCache != null)
-                data.Cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
-            
+
+            data.Cursor = cursor;
+
             if (data.State == StreamConsumerDataState.Inactive)
                 RunConsumerCursor(data, filter).Ignore(); // Start delivering events if not actively doing so
         }
@@ -389,7 +418,7 @@ namespace Orleans.Streams
                     if (batch != null)
                     {
                         deliveryTask = AsyncExecutorWithRetries.ExecuteWithRetries(i => DeliverBatchToConsumer(consumerData, batch),
-                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => !(exception is DataNotAvailableException), maxDeliveryTime, DefaultBackoffProvider);
+                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => true, maxDeliveryTime, DefaultBackoffProvider);
                     }
                     else if (ex == null)
                     {
@@ -455,8 +484,7 @@ namespace Orleans.Streams
             StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
             if (newToken != null)
             {
-                consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
-                    consumerData.StreamId.Namespace, newToken);
+                consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid, consumerData.StreamId.Namespace, newToken);
             }
         }
 
@@ -470,10 +498,12 @@ namespace Orleans.Streams
                 ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
                 if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
+                var addSubscriptionTasks = new List<Task>(streamData.Count);
                 foreach (PubSubSubscriptionState item in streamData)
                 {
-                    AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken, item.FilterWrapper);
+                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken, item.FilterWrapper));
                 }
+                await Task.WhenAll(addSubscriptionTasks);
             }
             catch (Exception exc)
             {

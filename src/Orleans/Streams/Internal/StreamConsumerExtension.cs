@@ -43,6 +43,7 @@ namespace Orleans.Streams
     {
         private interface IStreamObservers
         {
+            StreamSequenceToken Token { get; }
             Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
             Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
             Task CompleteStream();
@@ -55,7 +56,7 @@ namespace Orleans.Streams
             private StreamSubscriptionHandleImpl<T> localObserver;
             private bool newObserver = false;
 
-            private StreamSequenceToken Token { get { return localObserver == null ? null : localObserver.Token; } }
+            public StreamSequenceToken Token { get { return localObserver == null ? null : localObserver.Token; } }
 
             internal void SetObserver(StreamSubscriptionHandleImpl<T> observer)
             {
@@ -259,6 +260,12 @@ namespace Orleans.Streams
             // We got an item when we don't think we're the subscriber. This is a normal race condition.
             // We can drop the item on the floor, or pass it to the rendezvous, or ...
             return TaskDone.Done;
+        }
+
+        public Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId)
+        {
+            IStreamObservers observers;
+            return Task.FromResult(allStreamObservers.TryGetValue(subscriptionId, out observers) ? observers.Token : default(StreamSequenceToken));
         }
 
         internal int DiagCountStreamObservers<T>(StreamId streamId)

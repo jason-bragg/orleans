@@ -37,6 +37,7 @@ namespace Orleans.Streams
         Task<StreamSequenceToken> DeliverBatch(GuidId subscriptionId, Immutable<IBatchContainer> item);
         Task CompleteStream(GuidId subscriptionId);
         Task ErrorInStream(GuidId subscriptionId, Exception exc);
+        Task<StreamSequenceToken> GetSequenceToken(GuidId subscriptionId);
     }
 
     // This is the extension interface for stream producers

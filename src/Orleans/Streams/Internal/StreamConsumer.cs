@@ -88,7 +88,7 @@ namespace Orleans.Streams
                 pubSub, myGrainReference, token);
 
             GuidId subscriptionId = pubSub.CreateSubscriptionId(myGrainReference, stream.StreamId);
-            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, token, filterWrapper);
+            await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
 
             return myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
         }

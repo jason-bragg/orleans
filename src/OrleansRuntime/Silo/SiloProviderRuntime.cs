@@ -40,6 +40,7 @@ namespace Orleans.Runtime.Providers
         private static readonly object syncRoot = new Object();
 
         private IStreamPubSub pubSub;
+        private IStreamPubSub implictPubSub;
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         public IGrainFactory GrainFactory { get; private set; }
         public Guid ServiceId { get; private set; }
@@ -78,6 +79,7 @@ namespace Orleans.Runtime.Providers
         {
             Instance.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
             Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(grainFactory), implicitStreamSubscriberTable);
+            Instance.implictPubSub = new ImplicitStreamPubSubImpl(implicitStreamSubscriberTable);
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -118,7 +120,16 @@ namespace Orleans.Runtime.Providers
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.Default:
+                case StreamPubSubType.GrainBased:
+                    return pubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)

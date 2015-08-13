@@ -73,7 +73,7 @@ namespace Orleans.Streams
             QueueId = queueId;
             streamProviderName = strProviderName;
             providerRuntime = runtime;
-            pubSub = runtime.PubSub(StreamPubSubType.GrainBased);
+            pubSub = runtime.PubSub(StreamPubSubType.Default);
             pubSubCache = new Dictionary<StreamId, StreamConsumerCollection>();
             safeRandom = new SafeRandom();
             this.queueGetPeriod = queueGetPeriod;
@@ -205,11 +205,10 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
-            StreamSequenceToken token,
             IStreamFilterPredicateWrapper filter)
         {
-            if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1} Token={2}.", streamId, streamConsumer, token);
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, token, filter);
+            if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter);
             return TaskDone.Done;
         }
 
@@ -230,7 +229,7 @@ namespace Orleans.Streams
 
             StreamConsumerData data;
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, token, filter);
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter);
             
             // Set cursor if not cursor is set, or if subscription provides new token
             if ((data.Cursor == null || token != null) && queueCache != null)
@@ -456,7 +455,6 @@ namespace Orleans.Streams
             StreamSequenceToken newToken = await consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, batch.AsImmutable());
             if (newToken != null)
             {
-                consumerData.Token = newToken;
                 consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
                     consumerData.StreamId.Namespace, newToken);
             }

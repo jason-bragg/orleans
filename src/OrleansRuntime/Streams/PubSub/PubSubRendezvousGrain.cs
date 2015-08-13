@@ -160,7 +160,6 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             StreamId streamId, 
             IStreamConsumerExtension streamConsumer, 
-            StreamSequenceToken token, 
             IStreamFilterPredicateWrapper filter)
         {
             PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
@@ -205,7 +204,7 @@ namespace Orleans.Streams
                         continue;
                     }
 
-                    Task addSubscriberPromise = producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, token, filter)
+                    Task addSubscriberPromise = producer.Producer.AddSubscriber(subscriptionId, streamId, streamConsumer, filter)
                         .ContinueWith(t =>
                         {
                             if (t.IsFaulted)

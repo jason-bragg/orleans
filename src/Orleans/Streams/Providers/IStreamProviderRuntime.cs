@@ -120,7 +120,9 @@ namespace Orleans.Streams
 
     internal enum StreamPubSubType
     {
-        GrainBased
+        Default,
+        GrainBased,
+        ImplicitOnly
     }
 
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
@@ -129,7 +131,7 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
 
         Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
 

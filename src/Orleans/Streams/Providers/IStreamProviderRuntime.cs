@@ -103,6 +103,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamProviderName"></param>
         /// <param name="balancerType"></param>
+        /// <param name="pubSubType"></param>
         /// <param name="adapterFactory"></param>
         /// <param name="queueAdapter"></param>
         /// <param name="getQueueMsgsTimerPeriod"></param>
@@ -111,6 +112,7 @@ namespace Orleans.Streams
         Task StartPullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
@@ -120,7 +122,6 @@ namespace Orleans.Streams
 
     internal enum StreamPubSubType
     {
-        Default,
         GrainBased,
         ImplicitOnly
     }

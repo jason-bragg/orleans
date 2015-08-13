@@ -55,7 +55,7 @@ namespace Orleans.Providers.Streams.Common
         private StreamQueueBalancerType balancerType;
 
         private const string STREAM_PUBSUB_TYPE = "PubSubType";
-        private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.Default;
+        private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.GrainBased;
         private StreamPubSubType pubSubType;
 
         private const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
@@ -120,7 +120,7 @@ namespace Orleans.Providers.Streams.Common
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
-                await providerRuntime.StartPullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                await providerRuntime.StartPullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             }
         }
 

@@ -61,6 +61,7 @@ namespace Orleans.Streams
             GrainId id, 
             string strProviderName,
             IStreamProviderRuntime runtime,
+            IStreamPubSub streamPubSub,
             QueueId queueId, 
             TimeSpan queueGetPeriod,
             TimeSpan initQueueTimeout,
@@ -73,7 +74,7 @@ namespace Orleans.Streams
             QueueId = queueId;
             streamProviderName = strProviderName;
             providerRuntime = runtime;
-            pubSub = runtime.PubSub(StreamPubSubType.Default);
+            pubSub = streamPubSub;
             pubSubCache = new Dictionary<StreamId, StreamConsumerCollection>();
             safeRandom = new SafeRandom();
             this.queueGetPeriod = queueGetPeriod;
@@ -209,7 +210,10 @@ namespace Orleans.Streams
         {
             if (logger.IsVerbose) logger.Verbose((int)ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
             // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter).Ignore();
+            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null, filter)
+                .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
+                    String.Format("Failed to add subscription for stream {0}." , streamId))
+                .Ignore();
             return TaskDone.Done;
         }
 
@@ -228,10 +232,6 @@ namespace Orleans.Streams
                 // Set cursor if not cursor is set, or if subscription provides new token
                 consumerToken = consumerToken ?? token;
                 cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, consumerToken);
-            }
-            catch (GrainExtensionNotInstalledException)
-            {
-                cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
             }
             catch (DataNotAvailableException dataNotAvailableException)
             {
@@ -418,7 +418,7 @@ namespace Orleans.Streams
                     if (batch != null)
                     {
                         deliveryTask = AsyncExecutorWithRetries.ExecuteWithRetries(i => DeliverBatchToConsumer(consumerData, batch),
-                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => true, maxDeliveryTime, DefaultBackoffProvider);
+                            AsyncExecutorWithRetries.INFINITE_RETRIES, (exception, i) => !(exception is DataNotAvailableException), maxDeliveryTime, DefaultBackoffProvider);
                     }
                     else if (ex == null)
                     {
@@ -426,6 +426,13 @@ namespace Orleans.Streams
                     }
                     else
                     {
+                        // If data is not avialable, bring cursor current
+                        if (ex is DataNotAvailableException)
+                        {
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId.Guid,
+                                consumerData.StreamId.Namespace, null);
+                        }
+                        // Notify client of error.
                         deliveryTask = consumerData.StreamConsumer.ErrorInStream(consumerData.SubscriptionId, ex);
                     }
 

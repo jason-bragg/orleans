@@ -54,7 +54,7 @@ namespace Orleans.Providers
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
             pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(GrainFactory), implicitStreamSubscriberTable);
-            implictPubSub = new ImplicitStreamPubSubImpl(implicitStreamSubscriberTable);
+            implictPubSub = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
             streamDirectory = new StreamDirectory();
         }
 
@@ -165,7 +165,6 @@ namespace Orleans.Providers
         {
             switch (pubSubType)
             {
-                case StreamPubSubType.Default:
                 case StreamPubSubType.GrainBased:
                     return pubSub;
                 case StreamPubSubType.ImplicitOnly:
@@ -197,6 +196,7 @@ namespace Orleans.Providers
         public Task StartPullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,

@@ -56,7 +56,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
-            pubSub = providerRuntime.PubSub(StreamPubSubType.Default);
+            pubSub = providerRuntime.PubSub(StreamPubSubType.GrainBased);
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
             IsRewindable = isRewindable;

@@ -508,7 +508,7 @@ namespace Orleans.Streams
                 var addSubscriptionTasks = new List<Task>(streamData.Count);
                 foreach (PubSubSubscriptionState item in streamData)
                 {
-                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken, item.FilterWrapper));
+                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken, item.Filter));
                 }
                 await Task.WhenAll(addSubscriptionTasks);
             }

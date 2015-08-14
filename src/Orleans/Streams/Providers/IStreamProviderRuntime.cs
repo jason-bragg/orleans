@@ -122,8 +122,7 @@ namespace Orleans.Streams
 
     internal enum StreamPubSubType
     {
-        GrainBased,
-        ImplicitOnly
+        GrainBased
     }
 
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain

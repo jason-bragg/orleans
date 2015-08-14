@@ -40,7 +40,6 @@ namespace Orleans.Runtime.Providers
         private static readonly object syncRoot = new Object();
 
         private IStreamPubSub pubSub;
-        private IStreamPubSub implictPubSub;
         private ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         public IGrainFactory GrainFactory { get; private set; }
         public Guid ServiceId { get; private set; }
@@ -79,7 +78,6 @@ namespace Orleans.Runtime.Providers
         {
             Instance.implicitStreamSubscriberTable = implicitStreamSubscriberTable;
             Instance.pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(grainFactory), implicitStreamSubscriberTable);
-            Instance.implictPubSub = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
         }
 
         public StreamDirectory GetStreamDirectory()
@@ -124,8 +122,6 @@ namespace Orleans.Runtime.Providers
             {
                 case StreamPubSubType.GrainBased:
                     return pubSub;
-                case StreamPubSubType.ImplicitOnly:
-                    return implictPubSub;
                 default:
                     return null;
             }

@@ -225,30 +225,35 @@ namespace Orleans.Streams
             StreamSequenceToken token,
             IStreamFilterPredicateWrapper filter)
         {
-            IQueueCacheCursor cursor;
-            try
+            IQueueCacheCursor cursor = null;
+            // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
+            if (queueCache != null)
             {
-                StreamSequenceToken consumerToken = await streamConsumer.GetSequenceToken(subscriptionId);
-                // Set cursor if not cursor is set, or if subscription provides new token
-                consumerToken = consumerToken ?? token;
-                cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, consumerToken);
-            }
-            catch (DataNotAvailableException dataNotAvailableException)
-            {
-                // notify consumer that the data is not available, if we can.
-                streamConsumer.ErrorInStream(subscriptionId, dataNotAvailableException).Ignore();
-                // setup cursor with current token
-                cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, token);
+                try
+                {
+                    StreamSequenceToken consumerToken = await streamConsumer.GetSequenceToken(subscriptionId);
+                    // Set cursor if not cursor is set, or if subscription provides new token
+                    consumerToken = consumerToken ?? token;
+                    if (token != null)
+                    {
+                        cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, consumerToken);
+                    }
+                }
+                catch (DataNotAvailableException dataNotAvailableException)
+                {
+                    // notify consumer that the data is not available, if we can.
+                    streamConsumer.ErrorInStream(subscriptionId, dataNotAvailableException).Ignore();
+                }
             }
             AddSubscriberToSubscriptionCache(subscriptionId, streamId, streamConsumer, cursor, filter);
         }
 
-        // Called by rendezvous when new remote subscriber subscribes to this stream.
+        // Called by rendezvous when new remote subscriber subscribes to this stream or when registering a new stream with the pubsub system.
         private void AddSubscriberToSubscriptionCache(
             GuidId subscriptionId,
             StreamId streamId,
             IStreamConsumerExtension streamConsumer,
-            IQueueCacheCursor cursor,
+            IQueueCacheCursor newCursor,
             IStreamFilterPredicateWrapper filter)
         {
             StreamConsumerCollection streamDataCollection;
@@ -262,7 +267,15 @@ namespace Orleans.Streams
             if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
                 data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, filter);
 
-            data.Cursor = cursor;
+            // if we have a new cursor, use it
+            if (newCursor != null)
+            {
+                data.Cursor = newCursor;
+            } // else if we don't yet have a cursor, get a cursor at the end of the cash (null sequence token).
+            else if (data.Cursor == null && queueCache != null)
+            {
+                data.Cursor = queueCache.GetCacheCursor(streamId.Guid, streamId.Namespace, null);
+            }
 
             if (data.State == StreamConsumerDataState.Inactive)
                 RunConsumerCursor(data, filter).Ignore(); // Start delivering events if not actively doing so

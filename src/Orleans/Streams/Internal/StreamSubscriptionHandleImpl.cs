@@ -36,7 +36,6 @@ namespace Orleans.Streams
         private readonly IStreamFilterPredicateWrapper filterWrapper;
 
         internal StreamId StreamId { get { return streamImpl.StreamId; } }
-        internal StreamSequenceToken Token { get; private set; }
         public object FilterData { get { return filterWrapper != null ? filterWrapper.FilterData : null; } }
         public override IStreamIdentity StreamIdentity { get { return streamImpl; } }
 
@@ -46,11 +45,11 @@ namespace Orleans.Streams
         public override Guid HandleId { get { return SubscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> stream)
-            : this(subscriptionId, null, stream, null, null)
+            : this(subscriptionId, null, stream, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, StreamSequenceToken token, IStreamFilterPredicateWrapper filterWrapper)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, StreamImpl<T> stream, IStreamFilterPredicateWrapper filterWrapper)
         {
             if (subscriptionId == null) throw new ArgumentNullException("subscriptionId");
             if (stream == null) throw new ArgumentNullException("stream");
@@ -58,7 +57,6 @@ namespace Orleans.Streams
             IsValid = true;
             this.observer = observer;
             streamImpl = stream;
-            Token = token;
             this.SubscriptionId = subscriptionId;
             this.filterWrapper = filterWrapper;
         }
@@ -77,27 +75,21 @@ namespace Orleans.Streams
         public override Task<StreamSubscriptionHandle<T>> ResumeAsync(IAsyncObserver<T> obs, StreamSequenceToken token = null)
         {
             if (!IsValid) throw new InvalidOperationException("Handle is no longer valid.  It has been used to unsubscribe or resume.");
-            Token = token ?? Token;
-            return streamImpl.ResumeAsync(this, obs, Token);
+            return streamImpl.ResumeAsync(this, obs, token);
         }
 
         #region IAsyncObserver methods
-        public async Task OnNextAsync(T item, StreamSequenceToken token)
+        public Task OnNextAsync(T item, StreamSequenceToken token)
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (observer == null)
-                return;
+                return TaskDone.Done;
 
             if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, FilterData, item))
-                return;
+                return TaskDone.Done;
 
-            await observer.OnNextAsync(item, token);
-
-            if (token != null && token.Newer(Token))
-            {
-                Token = token;
-            }
+            return observer.OnNextAsync(item, token);
         }
 
         public Task OnCompletedAsync()

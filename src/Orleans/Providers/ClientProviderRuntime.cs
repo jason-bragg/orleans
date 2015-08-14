@@ -33,7 +33,6 @@ namespace Orleans.Providers
     internal class ClientProviderRuntime : IStreamProviderRuntime
     {
         private IStreamPubSub pubSub;
-        private IStreamPubSub implictPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
@@ -54,7 +53,6 @@ namespace Orleans.Providers
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
             pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(GrainFactory), implicitStreamSubscriberTable);
-            implictPubSub = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
             streamDirectory = new StreamDirectory();
         }
 
@@ -167,8 +165,6 @@ namespace Orleans.Providers
             {
                 case StreamPubSubType.GrainBased:
                     return pubSub;
-                case StreamPubSubType.ImplicitOnly:
-                    return implictPubSub;
                 default:
                     return null;
             }

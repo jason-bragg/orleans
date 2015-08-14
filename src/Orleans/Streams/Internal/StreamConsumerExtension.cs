@@ -24,7 +24,10 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Runtime.Remoting.Messaging;
+using System.Security.Principal;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -43,7 +46,7 @@ namespace Orleans.Streams
     {
         private interface IStreamObservers
         {
-            StreamSequenceToken Token { get; }
+            Streams.StreamSequenceToken Token { get; }
             Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token);
             Task<StreamSequenceToken> DeliverBatch(IBatchContainer item);
             Task CompleteStream();
@@ -54,20 +57,25 @@ namespace Orleans.Streams
         private class ObserversCollection<T> : IStreamObservers
         {
             private StreamSubscriptionHandleImpl<T> localObserver;
-            private bool newObserver = false;
+            private bool dirty = false;
+            private StreamSequenceToken expectedToken;
 
-            public StreamSequenceToken Token { get { return localObserver == null ? null : localObserver.Token; } }
+            public StreamSequenceToken Token
+            {
+                get { return expectedToken; }
+            }
 
-            internal void SetObserver(StreamSubscriptionHandleImpl<T> observer)
+            internal void SetObserver(StreamSubscriptionHandleImpl<T> observer, StreamSequenceToken token)
             {
                 localObserver = observer;
-                newObserver = true;
+                this.expectedToken = token;
+                dirty = true;
             }
 
             internal void RemoveObserver()
             {
                 localObserver = null;
-                newObserver = false;
+                dirty = false;
             }
 
             internal bool IsEmpty
@@ -77,14 +85,15 @@ namespace Orleans.Streams
 
             public async Task<StreamSequenceToken> DeliverItem(object item, StreamSequenceToken token)
             {
-                if (newObserver)
+                if (dirty)
                 {
-                    newObserver = false;
-                    if (Token != null)
+                    dirty = false;
+                    if (expectedToken != null)
                     {
-                        return Token;
+                        return expectedToken;
                     }
                 }
+
                 T typedItem;
                 try
                 {
@@ -95,18 +104,26 @@ namespace Orleans.Streams
                     // We got an illegal item on the stream -- close it with a Cast exception
                     throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
                 }
+
                 if (localObserver != null)
                 {
                     await localObserver.OnNextAsync(typedItem, token);
                 }
-                if (newObserver)
+
+                if (dirty)
                 {
-                    newObserver = false;
-                    if (Token != null)
+                    dirty = false;
+                    if (expectedToken != null)
                     {
-                        return Token;
+                        return expectedToken;
                     }
                 }
+
+                if (token != null && token.Newer(expectedToken))
+                {
+                    expectedToken = token;
+                }
+
                 return default(StreamSequenceToken);
             }
 
@@ -170,9 +187,9 @@ namespace Orleans.Streams
                 if (logger.IsVerbose) logger.Verbose("{0} AddObserver for stream {1}", providerRuntime.ExecutingEntityIdentity(), stream);
 
                 // Note: The caller [StreamConsumer] already handles locking for Add/Remove operations, so we don't need to repeat here.
-                IStreamObservers obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>());
-                var wrapper = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, token, filter);
-                ((ObserversCollection<T>)obs).SetObserver(wrapper);
+                var obs = allStreamObservers.GetOrAdd(subscriptionId, new ObserversCollection<T>()) as ObserversCollection<T>;
+                var wrapper = new StreamSubscriptionHandleImpl<T>(subscriptionId, observer, stream, filter);
+                obs.SetObserver(wrapper, token);
                 return wrapper;
             }
             catch (Exception exc)

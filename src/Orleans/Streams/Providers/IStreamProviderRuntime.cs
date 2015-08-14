@@ -103,6 +103,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamProviderName"></param>
         /// <param name="balancerType"></param>
+        /// <param name="pubSubType"></param>
         /// <param name="adapterFactory"></param>
         /// <param name="queueAdapter"></param>
         /// <param name="getQueueMsgsTimerPeriod"></param>
@@ -111,6 +112,7 @@ namespace Orleans.Streams
         Task StartPullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,
@@ -120,7 +122,8 @@ namespace Orleans.Streams
 
     internal enum StreamPubSubType
     {
-        GrainBased
+        GrainBased,
+        ImplicitOnly
     }
 
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
@@ -129,7 +132,7 @@ namespace Orleans.Streams
 
         Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
-        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, StreamSequenceToken token, IStreamFilterPredicateWrapper filter);
+        Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
 
         Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
 

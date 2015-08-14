@@ -54,6 +54,10 @@ namespace Orleans.Providers.Streams.Common
         private const StreamQueueBalancerType DEFAULT_STREAM_QUEUE_BALANCER_TYPE = StreamQueueBalancerType.ConsistentRingBalancer;
         private StreamQueueBalancerType balancerType;
 
+        private const string STREAM_PUBSUB_TYPE = "PubSubType";
+        private const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.GrainBased;
+        private StreamPubSubType pubSubType;
+
         private const string MAX_EVENT_DELIVERY_TIME = "MaxEventDeliveryTime";
         private readonly TimeSpan DEFAULT_MAX_EVENT_DELIVERY_TIME = TimeSpan.FromMinutes(1);
         private TimeSpan maxEventDeliveryTime;
@@ -93,6 +97,11 @@ namespace Orleans.Providers.Streams.Common
                 ? DEFAULT_STREAM_QUEUE_BALANCER_TYPE
                 : (StreamQueueBalancerType)Enum.Parse(typeof(StreamQueueBalancerType), balanceTypeString);
 
+            string pubSubTypeString;
+            pubSubType = !config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString)
+                ? DEFAULT_STREAM_PUBSUB_TYPE
+                : (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+
             if (!config.Properties.TryGetValue(MAX_EVENT_DELIVERY_TIME, out timeout))
                 maxEventDeliveryTime = DEFAULT_MAX_EVENT_DELIVERY_TIME;
             else
@@ -111,7 +120,7 @@ namespace Orleans.Providers.Streams.Common
             if (queueAdapter.Direction.Equals(StreamProviderDirection.ReadOnly) ||
                 queueAdapter.Direction.Equals(StreamProviderDirection.ReadWrite))
             {
-                await providerRuntime.StartPullingAgents(Name, balancerType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
+                await providerRuntime.StartPullingAgents(Name, balancerType, pubSubType, adapterFactory, queueAdapter, getQueueMsgsTimerPeriod, initQueueTimeout, maxEventDeliveryTime);
             }
         }
 
@@ -134,7 +143,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(StreamPubSubType.GrainBased), IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(pubSubType), IsRewindable);
         }
     }
 }

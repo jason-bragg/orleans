@@ -23,10 +23,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Reflection;
 using System.Threading.Tasks;
-using Orleans.Core;
 using Orleans.Streams;
 
 using Orleans.Runtime;
@@ -34,8 +31,9 @@ using Orleans.Runtime;
 namespace Orleans.Providers
 {
     internal class ClientProviderRuntime : IStreamProviderRuntime
-    { 
+    {
         private IStreamPubSub pubSub;
+        private IStreamPubSub implictPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
@@ -56,6 +54,7 @@ namespace Orleans.Providers
                 throw new ArgumentNullException("implicitStreamSubscriberTable");
             }
             pubSub = new StreamPubSubImpl(new GrainBasedPubSubRuntime(GrainFactory), implicitStreamSubscriberTable);
+            implictPubSub = new ImplicitStreamPubSub(implicitStreamSubscriberTable);
             streamDirectory = new StreamDirectory();
         }
 
@@ -164,7 +163,15 @@ namespace Orleans.Providers
 
         public IStreamPubSub PubSub(StreamPubSubType pubSubType)
         {
-            return pubSubType == StreamPubSubType.GrainBased ? pubSub : null;
+            switch (pubSubType)
+            {
+                case StreamPubSubType.GrainBased:
+                    return pubSub;
+                case StreamPubSubType.ImplicitOnly:
+                    return implictPubSub;
+                default:
+                    return null;
+            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
@@ -189,6 +196,7 @@ namespace Orleans.Providers
         public Task StartPullingAgents(
             string streamProviderName,
             StreamQueueBalancerType balancerType,
+            StreamPubSubType pubSubType,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             TimeSpan getQueueMsgsTimerPeriod,

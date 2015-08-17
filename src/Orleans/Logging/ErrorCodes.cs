@@ -1039,6 +1039,13 @@ namespace Orleans
         PersistentStreamPullingManager_10 = PersistentStreamPullingManagerBase + 10,
         PersistentStreamPullingManager_11 = PersistentStreamPullingManagerBase + 11,
         PersistentStreamPullingManager_12 = PersistentStreamPullingManagerBase + 12,
+        PersistentStreamPullingManager_Starting         = PersistentStreamPullingManagerBase + 13,
+        PersistentStreamPullingManager_Stopping         = PersistentStreamPullingManagerBase + 14,
+        PersistentStreamPullingManager_Started          = PersistentStreamPullingManagerBase + 15,
+        PersistentStreamPullingManager_Stopped          = PersistentStreamPullingManagerBase + 16,
+        PersistentStreamPullingManager_AlreadyStarted   = PersistentStreamPullingManagerBase + 17,
+        PersistentStreamPullingManager_AlreadyStopped   = PersistentStreamPullingManagerBase + 18,
+
 
         AzureServiceRuntimeWrapper = Runtime + 3700,
         AzureServiceRuntime_NotLoaded       = AzureServiceRuntimeWrapper +1,

@@ -31,7 +31,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
-using UnitTests.Grains;
 
 namespace UnitTests.StreamingTests
 {
@@ -287,17 +286,14 @@ namespace UnitTests.StreamingTests
             const int firstProduced = 5, secondProduced = 3;
 
             var producer = GrainClient.GrainFactory.GetGrain<IIntStreamProducerGrain>(streamGuid);
-            var grain = GrainClient.GrainFactory.GetGrain<IImplicitSubscriptionKillmeGrain>(streamGuid, typeof(GreenImplicitSubscriptionKillmeGrain).FullName);
 
             await producer.Produce(streamNamespace, firstProduced);
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounter(grain, firstProduced, lastTry), Timeout);
-
-            await grain.Killme();
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounter(producer, firstProduced, lastTry), Timeout);
 
             await producer.Produce(streamNamespace, secondProduced);
 
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounter(grain, secondProduced, lastTry), Timeout);
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounter(producer, secondProduced, lastTry), Timeout);
         }
 
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
@@ -342,7 +338,7 @@ namespace UnitTests.StreamingTests
             return true;
         }
 
-        private async Task<bool> CheckCounter(IImplicitSubscriptionKillmeGrain consumer, int expectedCounter, bool assertIsTrue)
+        private async Task<bool> CheckCounter(IIntStreamProducerGrain consumer, int expectedCounter, bool assertIsTrue)
         {
             int counter = await consumer.GetCounter();
 

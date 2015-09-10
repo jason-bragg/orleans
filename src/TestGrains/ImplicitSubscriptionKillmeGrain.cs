@@ -21,7 +21,6 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Concurrency;
@@ -34,6 +33,8 @@ namespace UnitTests.Grains
     [StatelessWorker(1)]
     public abstract class ImplicitSubscriptionKillmeGrain : Grain, IImplicitSubscriptionKillmeGrain
     {
+        public const int KillSignal = -1;
+
         public abstract string StreamProvider { get; }
         public abstract string StreamNamespace { get; }
 
@@ -50,13 +51,7 @@ namespace UnitTests.Grains
             var streamProvider = GetStreamProvider(StreamProvider);
             stream = streamProvider.GetStream<int>(this.GetPrimaryKey(), StreamNamespace);
 
-            handle = await stream.SubscribeAsync(
-                (e, t) =>
-                {
-                    logger.Info("Received an event {0}", e);
-                    counter++;
-                    return TaskDone.Done;
-                });
+            handle = await stream.SubscribeAsync(OnNext);
         }
 
         public override async Task OnDeactivateAsync()
@@ -70,15 +65,20 @@ namespace UnitTests.Grains
             }
         }
 
-        public Task<int> GetCounter()
+        private async Task OnNext(int evt, StreamSequenceToken token)
         {
-            return Task.FromResult(counter);
-        }
-
-        public Task Killme()
-        {
-            base.DeactivateOnIdle();
-            return TaskDone.Done;
+            if (evt == KillSignal)
+            {
+                logger.Info("Received kill event");
+                var producerGrain = GrainFactory.GetGrain<IIntStreamProducerGrain>(this.GetPrimaryKey());
+                await producerGrain.ReportCount(counter);
+                base.DeactivateOnIdle();
+            }
+            else
+            {
+                logger.Info("Received an event {0}", evt);
+                counter++;
+            }
         }
     }
 
@@ -112,14 +112,30 @@ namespace UnitTests.Grains
 
     public class IntStreamProducerGrain : Grain, IIntStreamProducerGrain
     {
+        private int counter;
+
         public async Task Produce(string streamNamespace, int count)
         {
             var streamProvider = GetStreamProvider("AzureQueueProvider");
             IAsyncObserver<int> observer = streamProvider.GetStream<int>(this.GetPrimaryKey(), streamNamespace);
+            // send count events;
             for (int i = 0; i < count; i++)
             {
                 await observer.OnNextAsync(i);
             }
+            // send kill message
+            await observer.OnNextAsync(ImplicitSubscriptionKillmeGrain.KillSignal);
+        }
+
+        public Task ReportCount(int reportedCounter)
+        {
+            counter = reportedCounter;
+            return TaskDone.Done;
+        }
+
+        public Task<int> GetCounter()
+        {
+            return Task.FromResult(counter);
         }
     }
 }

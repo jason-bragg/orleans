@@ -28,13 +28,12 @@ namespace UnitTests.GrainInterfaces
 {
     public interface IImplicitSubscriptionKillmeGrain : IGrainWithGuidKey
     {
-        Task<int> GetCounter();
-
-        Task Killme();
     }
 
     public interface IIntStreamProducerGrain : IGrainWithGuidKey
     {
         Task Produce(string streamNamespace, int count);
+        Task ReportCount(int counter);
+        Task<int> GetCounter();
     }
 }

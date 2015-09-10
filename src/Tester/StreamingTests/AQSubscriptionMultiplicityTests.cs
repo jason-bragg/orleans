@@ -111,8 +111,7 @@ namespace UnitTests.StreamingTests
         public async Task AQImplicitSubscriptionReactivationTest()
         {
             logger.Info("************************ AQImplicitSubscriptionReactivationTest *********************************");
-            Guid streamId = Guid.NewGuid();
-            await runner.ImplicitSubscriptionReactivationTest(streamId, "green");
+            await runner.ImplicitSubscriptionReactivationTest(Guid.NewGuid(), "green");
         }
     }
 }

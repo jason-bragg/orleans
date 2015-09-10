@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="GenericGrains.cs" />
+    <Compile Include="ImplicitSubscriptionKillmeGrain.cs" />
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
     <Compile Include="SimpleGenericGrain.cs" />

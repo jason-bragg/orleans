@@ -106,5 +106,13 @@ namespace UnitTests.StreamingTests
             logger.Info("************************ AQActiveSubscriptionTest *********************************");
             await runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
         }
+
+        [TestMethod, TestCategory("Functional"), TestCategory("Azure"), TestCategory("Storage"), TestCategory("Streaming")]
+        public async Task AQImplicitSubscriptionReactivationTest()
+        {
+            logger.Info("************************ AQImplicitSubscriptionReactivationTest *********************************");
+            Guid streamId = Guid.NewGuid();
+            await runner.ImplicitSubscriptionReactivationTest(streamId, "green");
+        }
     }
 }

@@ -31,6 +31,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using UnitTests.GrainInterfaces;
+using UnitTests.Grains;
 
 namespace UnitTests.StreamingTests
 {
@@ -281,6 +282,24 @@ namespace UnitTests.StreamingTests
             Assert.AreEqual(0, actualSubscriptions.Count, "Subscription Count");
         }
 
+        public async Task ImplicitSubscriptionReactivationTest(Guid streamGuid, string streamNamespace)
+        {
+            const int firstProduced = 5, secondProduced = 3;
+
+            var producer = GrainClient.GrainFactory.GetGrain<IIntStreamProducerGrain>(streamGuid);
+            var grain = GrainClient.GrainFactory.GetGrain<IImplicitSubscriptionKillmeGrain>(streamGuid, typeof(GreenImplicitSubscriptionKillmeGrain).FullName);
+
+            await producer.Produce(streamNamespace, firstProduced);
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounter(grain, firstProduced, lastTry), Timeout);
+
+            await grain.Killme();
+
+            await producer.Produce(streamNamespace, secondProduced);
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounter(grain, secondProduced, lastTry), Timeout);
+        }
+
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
@@ -321,6 +340,17 @@ namespace UnitTests.StreamingTests
             logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, 
                 Utils.EnumerableToString(numConsumed, kvp => kvp.Key.HandleId.ToString() + "->" +  kvp.Value.ToString()));
             return true;
+        }
+
+        private async Task<bool> CheckCounter(IImplicitSubscriptionKillmeGrain consumer, int expectedCounter, bool assertIsTrue)
+        {
+            int counter = await consumer.GetCounter();
+
+            if (assertIsTrue)
+            {
+                Assert.AreEqual(expectedCounter, counter);
+            }
+            return expectedCounter == counter;
         }
     }
 }

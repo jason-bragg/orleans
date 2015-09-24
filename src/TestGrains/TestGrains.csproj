@@ -50,6 +50,9 @@
   <ItemGroup>
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
+    <Compile Include="GeneratedEventCollectorGrain.cs" />
+    <Compile Include="GeneratedEvent.cs" />
+    <Compile Include="GeneratedEventReporterGrain.cs" />
     <Compile Include="GenericGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />

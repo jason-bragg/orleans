@@ -114,6 +114,15 @@
     <Compile Include="StreamingTests\SMSDeactivationTests.cs" />
     <Compile Include="StreamingTests\SMSSubscriptionMultiplicityTests.cs" />
     <Compile Include="StreamingTests\SubscriptionMultiplicityTestRunner.cs" />
+    <Compile Include="StreamingTests\StreamGeneratorProviderTests.cs" />
+    <Compile Include="TestStreamProviders\Generator\GeneratedBatchContainer.cs" />
+    <Compile Include="TestStreamProviders\Generator\IStreamGenerator.cs" />
+    <Compile Include="TestStreamProviders\Generator\IStreamGeneratorQueue.cs" />
+    <Compile Include="TestStreamProviders\Generator\SimpleStreamGenerator.cs" />
+    <Compile Include="TestStreamProviders\Generator\SimpleStreamGeneratorQueue.cs" />
+    <Compile Include="TestStreamProviders\Generator\StreamGeneratorAdapterFactory.cs" />
+    <Compile Include="TestStreamProviders\Generator\StreamGeneratorComponentFactory.cs" />
+    <Compile Include="TestStreamProviders\Generator\SimpleGeneratorStreamProvider.cs" />
     <Compile Include="UnitTestSiloHost.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -142,6 +151,9 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <Content Include="OrleansStartupConfigurationForTesting.xml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="OrleansConfigurationUnitTests.xml">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

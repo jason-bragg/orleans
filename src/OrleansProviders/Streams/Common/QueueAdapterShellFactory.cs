@@ -23,36 +23,39 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System.Threading.Tasks;
 using Orleans.Runtime;
+using Orleans.Streams;
 
-namespace Orleans.Streams
+namespace Orleans.Providers.Streams.Common
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    public abstract class QueueAdapterShellFactory : IQueueAdapterFactory
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+        private QueueFactoryShell shell;
+
+        public void Init(IProviderConfiguration config, string providerName, Logger logger)
         {
+            shell = CreateShell(config, providerName, logger);
         }
 
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
+        public Task<IQueueAdapter> CreateAdapter()
         {
-            ShouldFaultSubsriptionOnError = faultOnError;
+            return shell.CreateAdapter();
         }
 
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
-
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
+        public IQueueAdapterCache GetQueueAdapterCache()
         {
-            return TaskDone.Done;
+            return shell.GetQueueAdapterCache();
         }
 
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
+        public IStreamQueueMapper GetStreamQueueMapper()
         {
-            return TaskDone.Done;
+            return shell.GetStreamQueueMapper();
         }
+
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
+        {
+            return shell.GetDeliveryFailureHandler(queueId);
+        }
+
+        abstract protected QueueFactoryShell CreateShell(IProviderConfiguration config, string providerName, Logger logger);
     }
 }

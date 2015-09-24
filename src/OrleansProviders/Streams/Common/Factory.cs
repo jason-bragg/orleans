@@ -21,38 +21,50 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Runtime;
+using System.Collections.Generic;
 
-namespace Orleans.Streams
+namespace Orleans.Providers.Streams.Common
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    public interface IClassFactory<out T>
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+        T Create();
+    }
+
+    public class ConcreteInstanceClassFactory<TBase, TSpecific> : IClassFactory<TBase> where TSpecific : TBase, new()
+    {
+        public TBase Create()
         {
+            return new TSpecific();
+        }
+    }
+
+    public interface IFactory<in TKey, out T>
+    {
+        T Create(TKey key);
+    }
+
+    public class Factory<TType, TClass> : IFactory<TType, TClass>
+    {
+        private readonly Dictionary<TType, IClassFactory<TClass>> classFactories = new Dictionary<TType, IClassFactory<TClass>>();
+
+        public void Register(TType type, IClassFactory<TClass> classFactory)
+        {
+            classFactories[type] = classFactory;
         }
 
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
+        public void Register<TSpecialization>(TType type) where TSpecialization : TClass, new()
         {
-            ShouldFaultSubsriptionOnError = faultOnError;
+            Register(type, new ConcreteInstanceClassFactory<TClass, TSpecialization>());
         }
 
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
-
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
+        public TClass Create(TType type)
         {
-            return TaskDone.Done;
-        }
-
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
+            IClassFactory<TClass> classFactory;
+            return classFactories.TryGetValue(type, out classFactory)
+                ? classFactory.Create()
+                : default(TClass);
         }
     }
 }
+
+

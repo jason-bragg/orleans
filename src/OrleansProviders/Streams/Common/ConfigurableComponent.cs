@@ -21,38 +21,35 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Runtime;
-
-namespace Orleans.Streams
+namespace Orleans.Providers.Streams.Common
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    public interface IComponentConfig
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+    }
+
+    public interface IConfigurableComponent
+    {
+        void Configure(ComponentFactory factory, IComponentConfig config);
+    }
+
+    public class ComponentFactory
+    {
+        private readonly Factory<string, IConfigurableComponent> _factory = new Factory<string, IConfigurableComponent>();
+
+        public void Register<T>(string componentId) where T : IConfigurableComponent, new()
         {
+            _factory.Register(componentId, new ConcreteInstanceClassFactory<IConfigurableComponent, T>());
         }
 
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
+        public T Create<T>(string componentId, IComponentConfig config)
         {
-            ShouldFaultSubsriptionOnError = faultOnError;
-        }
+            IConfigurableComponent cpnt = _factory.Create(componentId);
+            if (cpnt == null)
+                return default(T);
 
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
+            cpnt.Configure(this, config);
 
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
-        }
-
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
+            return (T)cpnt;
         }
     }
 }

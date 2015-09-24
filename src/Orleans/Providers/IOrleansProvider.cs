@@ -21,8 +21,10 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 
 
@@ -111,5 +113,28 @@ namespace Orleans.Providers
         /// <returns>True if the property was found and removed, false otherwise.</returns>
         bool RemoveProperty(string key);
 
+    }
+
+    public static class ProviderConfigurationExtensions
+    {
+        public static int GetIntSetting(this IProviderConfiguration config, string settingName, int settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(settingName, out s) ? int.Parse(s) : settingDefault;
+        }
+
+        public static string GetStringSetting(this IProviderConfiguration config, string settingName, string settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(settingName, out s) ? s : settingDefault;
+        }
     }
 }

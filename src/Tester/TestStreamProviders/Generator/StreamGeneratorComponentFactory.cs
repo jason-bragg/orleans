@@ -21,38 +21,16 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using System.Threading.Tasks;
-using Orleans.Runtime;
+using Orleans.Providers.Streams.Common;
 
-namespace Orleans.Streams
+namespace Tester.TestStreamProviders.Generator
 {
-    public class NoOpStreamDeliveryFailureHandler : IStreamFailureHandler
+    public class StreamGeneratorComponentFactory : ComponentFactory
     {
-        public NoOpStreamDeliveryFailureHandler()
-            : this(true)
+        public StreamGeneratorComponentFactory()
         {
-        }
-
-        public NoOpStreamDeliveryFailureHandler(bool faultOnError)
-        {
-            ShouldFaultSubsriptionOnError = faultOnError;
-        }
-
-        public bool ShouldFaultSubsriptionOnError { get; private set; }
-
-        /// <summary>
-        /// Should be called when an event could not be delivered to a consumer, after exhausting retry attempts.
-        /// </summary>
-        public Task OnDeliveryFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
-        }
-
-        public Task OnSubscriptionFailure(GuidId subscriptionId, string streamProviderName, IStreamIdentity streamIdentity,
-            StreamSequenceToken sequenceToken)
-        {
-            return TaskDone.Done;
+            Register<SimpleStreamGeneratorQueue>(SimpleStreamGeneratorQueue.TypeId);
+            Register<SimpleStreamGenerator>(SimpleStreamGenerator.TypeId);
         }
     }
 }

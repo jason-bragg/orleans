@@ -21,14 +21,55 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Threading.Tasks;
-using GPSTracker.Common;
 using Orleans;
 
-namespace GPSTracker.GrainInterface
+namespace UnitTests.GrainInterfaces
 {
-    public interface IPushNotifierGrain : IGrainWithIntegerKey
+    [Serializable]
+    public class MyObserverSubscriptionManager<T> : ObserverSubscriptionManager<T> where T : IGrainObserver
     {
-        Task SendMessage(VelocityMessage message);
+        public int Foo { get; set; }
+    }
+
+    public class MyState<T> : GrainState
+         where T : IGrainObserver
+    {
+        public MyObserverSubscriptionManager<T> Subscription { get; set; }
+    }
+
+    public class MyGrain<T> : Grain<MyState<T>>, ISimpleGrain
+        where T : IGrainObserver
+    {
+        public Task SetA(int a)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task SetB(int b)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task IncrementA()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<int> GetAxB()
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<int> GetAxB(int a, int b)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<int> GetA()
+        {
+            throw new NotImplementedException();
+        }
     }
 }

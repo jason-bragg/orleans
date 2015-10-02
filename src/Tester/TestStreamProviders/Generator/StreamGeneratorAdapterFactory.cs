@@ -34,61 +34,71 @@ using Orleans.Streams;
 
 namespace Tester.TestStreamProviders.Generator
 {
-    public abstract class StreamGeneratorAdapterFactory : QueueAdapterShellFactory
+    public abstract class StreamGeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter
     {
         private readonly ComponentFactory factory;
+        private IConfig config;
+        private Logger logger;
+
+        public bool IsRewindable { get { return true; } }
+        public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadOnly; } }
 
         protected StreamGeneratorAdapterFactory(ComponentFactory factory)
         {
+            if (factory == null)
+            {
+                throw new ArgumentNullException("factory");
+            }
             this.factory = factory;
         }
 
-        public interface IConfig : QueueAdapterShell.IConfig, IStreamGeneratorQueueConfig
+        public interface IConfig : IStreamGeneratorQueueConfig
         {
+            string StreamProviderName { get; }
             int CacheSize { get; }
             int TotalQueueCount { get; }
         }
 
         public abstract IConfig BuildConfig(IProviderConfiguration config);
 
-        protected override QueueFactoryShell CreateShell(IProviderConfiguration providerConfig, string providerName, Logger logger)
+        public void Init(IProviderConfiguration providerConfig, string providerName, Logger log)
         {
-            IConfig config = BuildConfig(providerConfig);
-            IQueueAdapterCache queueAdapterCache = new SimpleQueueAdapterCache(config.CacheSize, logger);
-            IStreamQueueMapper streamQueueMapper = new HashRingBasedStreamQueueMapper(config.TotalQueueCount, config.StreamProviderName);
-            IQueueAdapterShellSender sender = new ReadOnlyQueueAdapterShellSender();
-            IQueueAdapterShellReceiverFactory receiverFactory = new ReceiverFactory(factory, config, streamQueueMapper.GetAllQueues());;
-            IQueueAdapter queueAdapter = new QueueAdapterShell(config, sender, receiverFactory);
-
-            IFactory<QueueId, IStreamFailureHandler> streamFailureHandlerFactory = new FailureHandlerFactory(streamQueueMapper.GetAllQueues());
-
-            return new QueueFactoryShell(queueAdapter, queueAdapterCache, streamQueueMapper, streamFailureHandlerFactory);
+            this.logger = log;
+            config = BuildConfig(providerConfig);
         }
 
-        private class ReceiverFactory : IQueueAdapterShellReceiverFactory
+        public Task<IQueueAdapter> CreateAdapter()
         {
-            private readonly QueueId[] queueIds;
-            private readonly ConcurrentDictionary<QueueId, IStreamGenerator> queues;
+            return Task.FromResult<IQueueAdapter>(this);
+        }
 
-            public ReceiverFactory(ComponentFactory factory, IStreamGeneratorQueueConfig generatorConfig, IEnumerable<QueueId> queueIds)
-            {
-                this.queueIds = queueIds.ToArray();
-                queues = new ConcurrentDictionary<QueueId, IStreamGenerator>();
-                foreach (QueueId queueId in this.queueIds)
-                {
-                    queues.TryAdd(queueId, factory.Create<IStreamGenerator>(generatorConfig.StreamGeneratorQueueTypeId, generatorConfig));
-                }
-            }
+        public IQueueAdapterCache GetQueueAdapterCache()
+        {
+            return new SimpleQueueAdapterCache(config.CacheSize, logger);
+        }
 
-            public IQueueAdapterReceiver Create(QueueId queueId)
-            {
-                IStreamGenerator qeueue;
-                if (!queues.TryGetValue(queueId, out qeueue))
-                {
-                    throw new ArgumentOutOfRangeException("queueId");
-                }
-                return new Receiver(queueId, qeueue);
-            }
+        public IStreamQueueMapper GetStreamQueueMapper()
+        {
+            return new HashRingBasedStreamQueueMapper(config.TotalQueueCount, config.StreamProviderName);
+        }
+
+        public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId)
+        {
+            return Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
+        }
+
+        public string Name { get { return config.StreamProviderName; } }
+
+        public Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+            Dictionary<string, object> requestContext)
+        {
+            return TaskDone.Done;
+        }
+
+        public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
+        {
+            var streamGenerator = factory.Create<IStreamGenerator>(config.StreamGeneratorQueueTypeId, config);
+            return new Receiver(queueId, streamGenerator);
         }
 
         private class Receiver : IQueueAdapterReceiver
@@ -129,18 +139,6 @@ namespace Tester.TestStreamProviders.Generator
             public Task Shutdown(TimeSpan timeout)
             {
                 return TaskDone.Done;
-            }
-        }
-
-        private class FailureHandlerFactory : Factory<QueueId, IStreamFailureHandler>
-        {
-            public FailureHandlerFactory(IEnumerable<QueueId> queueIds)
-            {
-                foreach (QueueId queueId in queueIds)
-                {
-                    // should log, but for now just ignore.
-                    Register<NoOpStreamDeliveryFailureHandler>(queueId);
-                }
             }
         }
     }

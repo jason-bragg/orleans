@@ -113,6 +113,5 @@ namespace UnitTests.StreamingTests
             logger.Info("************************ AQTwoIntermitentStreamTest *********************************");
             await runner.TwoIntermitentStreamTest(Guid.NewGuid());
         }
-        
     }
 }

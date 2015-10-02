@@ -38,7 +38,7 @@ namespace Orleans.Providers.Streams.Common
 
         public void Register<T>(string componentId) where T : IConfigurableComponent, new()
         {
-            _factory.Register(componentId, new ConcreteInstanceClassFactory<IConfigurableComponent, T>());
+            _factory.Register<T>(componentId);
         }
 
         public T Create<T>(string componentId, IComponentConfig config)

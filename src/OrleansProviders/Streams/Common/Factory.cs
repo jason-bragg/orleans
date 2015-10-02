@@ -21,23 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using System;
 using System.Collections.Generic;
 
 namespace Orleans.Providers.Streams.Common
 {
-    public interface IClassFactory<out T>
-    {
-        T Create();
-    }
-
-    public class ConcreteInstanceClassFactory<TBase, TSpecific> : IClassFactory<TBase> where TSpecific : TBase, new()
-    {
-        public TBase Create()
-        {
-            return new TSpecific();
-        }
-    }
-
     public interface IFactory<in TKey, out T>
     {
         T Create(TKey key);
@@ -45,23 +33,23 @@ namespace Orleans.Providers.Streams.Common
 
     public class Factory<TType, TClass> : IFactory<TType, TClass>
     {
-        private readonly Dictionary<TType, IClassFactory<TClass>> classFactories = new Dictionary<TType, IClassFactory<TClass>>();
+        private readonly Dictionary<TType, Func<TClass>> classFactories = new Dictionary<TType, Func<TClass>>();
 
-        public void Register(TType type, IClassFactory<TClass> classFactory)
+        public void Register(TType type, Func<TClass> classFactory)
         {
             classFactories[type] = classFactory;
         }
 
         public void Register<TSpecialization>(TType type) where TSpecialization : TClass, new()
         {
-            Register(type, new ConcreteInstanceClassFactory<TClass, TSpecialization>());
+            Register(type, () => new TSpecialization());
         }
 
         public TClass Create(TType type)
         {
-            IClassFactory<TClass> classFactory;
+            Func<TClass> classFactory;
             return classFactories.TryGetValue(type, out classFactory)
-                ? classFactory.Create()
+                ? classFactory()
                 : default(TClass);
         }
     }

@@ -42,8 +42,6 @@ namespace Tester.TestStreamProviders.Generator
             [Serializable]
             public class Config : SimpleStreamGeneratorQueue.IConfig, SimpleStreamGenerator.IConfig, IConfig
             {
-                public bool IsRewindable { get { return true; } }
-                public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadOnly; } }
                 public string StreamGeneratorQueueTypeId { get { return SimpleStreamGeneratorQueue.TypeId; } }
                 public string StreamGeneratorTypeId { get { return SimpleStreamGenerator.TypeId; } }
 

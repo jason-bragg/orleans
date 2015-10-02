@@ -61,9 +61,6 @@
     <Compile Include="Storage\MemoryStorageWithLatency.cs" />
     <Compile Include="Storage\ShardedStorageProvider.cs" />
     <Compile Include="Streams\Common\Factory.cs" />
-    <Compile Include="Streams\Common\QueueAdapterShell.cs" />
-    <Compile Include="Streams\Common\QueueAdapterShellFactory.cs" />
-    <Compile Include="Streams\Common\QueueFactoryShell.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

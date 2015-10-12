@@ -37,7 +37,7 @@ using UnitTests.Tester;
 
 namespace UnitTests.StreamingTests
 {
-    [DeploymentItem("OrleansConfigurationUnitTests.xml")]
+    [DeploymentItem("OrleansConfigurationForTesting.xml")]
     [DeploymentItem("OrleansProviders.dll")]
     [TestClass]
     public class StreamGeneratorProviderTests : UnitTestSiloHost
@@ -56,22 +56,24 @@ namespace UnitTests.StreamingTests
             TotalEventCountPerStream = 5,
         };
 
-        private static void  MutateClusterConfig(ClusterConfiguration clusterConfiguration)
-        {
-            var settings = Config.Flatten();
-            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
-            settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
-            clusterConfiguration.Globals.RegisterStreamProvider<SimpleGeneratorStreamProvider>(StreamProviderName, settings);
-        }
-
         public StreamGeneratorProviderTests()
             : base(new TestingSiloOptions
             {
                 StartFreshOrleans = true,
-                SiloConfigFile = new FileInfo("OrleansConfigurationUnitTests.xml"),
-                ConfigMutator = MutateClusterConfig
+                SiloConfigFile = new FileInfo("OrleansConfigurationForTesting.xml")
             })
         {
+        }
+
+        public override void AdjustForTest(ClusterConfiguration config)
+        {
+            var settings = Config.Flatten();
+            settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+            settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+            config.Globals.RegisterStreamProvider<SimpleGeneratorStreamProvider>(StreamProviderName, settings);
+            config.GetConfigurationForNode("Primary");
+            config.GetConfigurationForNode("Secondary_1");
+            base.AdjustForTest(config);
         }
 
         // Use ClassCleanup to run code after all tests in a class have run

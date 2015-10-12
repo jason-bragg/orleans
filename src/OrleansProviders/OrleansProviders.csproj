@@ -44,7 +44,6 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Streams\Common\ConfigurableComponent.cs" />
     <Compile Include="Streams\Common\SimpleQueueCache.cs" />
     <Compile Include="Streams\Common\SimpleQueueCacheCursor.cs" />
     <Compile Include="Streams\Common\SimpleQueueAdapterCache.cs" />
@@ -60,7 +59,6 @@
     <Compile Include="Storage\MemoryStorage.cs" />
     <Compile Include="Storage\MemoryStorageWithLatency.cs" />
     <Compile Include="Storage\ShardedStorageProvider.cs" />
-    <Compile Include="Streams\Common\Factory.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

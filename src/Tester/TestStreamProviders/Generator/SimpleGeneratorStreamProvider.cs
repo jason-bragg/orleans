@@ -26,7 +26,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
-using Orleans.Streams;
 
 namespace Tester.TestStreamProviders.Generator
 {
@@ -104,18 +103,18 @@ namespace Tester.TestStreamProviders.Generator
 
                 public void Load(IProviderConfiguration providerConfiguration)
                 {
-                    StreamProviderName = providerConfiguration.GetStringSetting(StreamProviderNameName, string.Empty);
+                    StreamProviderName = providerConfiguration.GetProperty(StreamProviderNameName, string.Empty);
                     if (string.IsNullOrWhiteSpace(StreamProviderName))
                     {
                         throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");
                     }
-                    CacheSize = providerConfiguration.GetIntSetting(CacheSizeName, CacheSizeDefault);
-                    TotalQueueCount = providerConfiguration.GetIntSetting(TotalQueueCountName, TotalQueueCountDefault);
-                    TotalStreamCountPerQueue = providerConfiguration.GetIntSetting(TotalStreamCountPerQueueName, TotalStreamCountPerQueueDefault);
-                    GenerationRateStreamsPerMinute = providerConfiguration.GetIntSetting(GenerationRateStreamsPerMinuteName, GenerationRateStreamsPerMinuteDefault);
-                    StreamNamespace = providerConfiguration.GetStringSetting(StreamNamespaceName, null);
-                    TotalEventCountPerStream = providerConfiguration.GetIntSetting(TotalEventCountPerStreamName, TotalEventCountPerStreamDefault);
-                    GenerationRateEventsPerSecond = providerConfiguration.GetIntSetting(GenerationRateEventsPerSecondName, GenerationRateEventsPerSecondDefault);
+                    CacheSize = providerConfiguration.GetIntProperty(CacheSizeName, CacheSizeDefault);
+                    TotalQueueCount = providerConfiguration.GetIntProperty(TotalQueueCountName, TotalQueueCountDefault);
+                    TotalStreamCountPerQueue = providerConfiguration.GetIntProperty(TotalStreamCountPerQueueName, TotalStreamCountPerQueueDefault);
+                    GenerationRateStreamsPerMinute = providerConfiguration.GetIntProperty(GenerationRateStreamsPerMinuteName, GenerationRateStreamsPerMinuteDefault);
+                    StreamNamespace = providerConfiguration.GetProperty(StreamNamespaceName, null);
+                    TotalEventCountPerStream = providerConfiguration.GetIntProperty(TotalEventCountPerStreamName, TotalEventCountPerStreamDefault);
+                    GenerationRateEventsPerSecond = providerConfiguration.GetIntProperty(GenerationRateEventsPerSecondName, GenerationRateEventsPerSecondDefault);
                 }
             }
 

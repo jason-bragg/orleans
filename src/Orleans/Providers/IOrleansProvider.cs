@@ -114,24 +114,24 @@ namespace Orleans.Providers
 
     public static class ProviderConfigurationExtensions
     {
-        public static int GetIntSetting(this IProviderConfiguration config, string settingName, int settingDefault)
+        public static int GetIntProperty(this IProviderConfiguration config, string key, int settingDefault)
         {
             if (config == null)
             {
                 throw new ArgumentNullException("config");
             }
             string s;
-            return config.Properties.TryGetValue(settingName, out s) ? int.Parse(s) : settingDefault;
+            return config.Properties.TryGetValue(key, out s) ? int.Parse(s) : settingDefault;
         }
 
-        public static string GetStringSetting(this IProviderConfiguration config, string settingName, string settingDefault)
+        public static string GetProperty(this IProviderConfiguration config, string key, string settingDefault)
         {
             if (config == null)
             {
                 throw new ArgumentNullException("config");
             }
             string s;
-            return config.Properties.TryGetValue(settingName, out s) ? s : settingDefault;
+            return config.Properties.TryGetValue(key, out s) ? s : settingDefault;
         }
     }
 }

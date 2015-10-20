@@ -29,7 +29,6 @@ using System.Net.Sockets;
 using System.Text;
 using System.Xml;
 using Orleans.Providers;
-using Orleans.Runtime.Storage.Relational;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -201,7 +200,7 @@ namespace Orleans.Runtime.Configuration
             DeploymentId = Environment.UserName;
             DataConnectionString = "";
             // Assume the ado invariant is for sql server storage if not explicitly specified
-            AdoInvariant = AdoNetInvariants.InvariantNameSqlServer;
+            AdoInvariant = Constants.INVARIANT_NAME_SQL_SERVER;
 
             DefaultTraceLevel = Logger.Severity.Info;
             TraceLevelOverrides = new List<Tuple<string, Logger.Severity>>();
@@ -243,7 +242,7 @@ namespace Orleans.Runtime.Configuration
                     switch (child.LocalName)
                     {
                         case "Gateway":
-                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child));
+                            Gateways.Add(ConfigUtilities.ParseIPEndPoint(child).GetAwaiter().GetResult());
                             if (GatewayProvider == GatewayProviderType.None)
                             {
                                 GatewayProvider = GatewayProviderType.Config;

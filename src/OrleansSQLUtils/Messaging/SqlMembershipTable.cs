@@ -23,11 +23,11 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using Orleans.Messaging;
 using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Storage.Relational;
-using Orleans.Runtime.Storage.Relational.Management;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.SqlUtils;
+using Orleans.SqlUtils.Management;
 
 
 namespace Orleans.Runtime.MembershipService
@@ -98,10 +98,12 @@ namespace Orleans.Runtime.MembershipService
         {
             if (logger.IsVerbose3) logger.Verbose3("SqlMembershipTable.GetGateways called.");
             try
-            {
-                //TODO: Refactor this to async.
+            {                
                 var query = queryConstants.GetConstant(database.InvariantName, QueryKeys.ActiveGatewaysQuery);
-                return database.ActiveGatewaysAsync(query, deploymentId).Result;
+
+                //The rationale for GetAwaiter().GetResult() instead of .Result
+                //is presented at https://github.com/aspnet/Security/issues/59.                
+                return database.ActiveGatewaysAsync(query, deploymentId).GetAwaiter().GetResult();
             }
             catch(Exception ex)
             {

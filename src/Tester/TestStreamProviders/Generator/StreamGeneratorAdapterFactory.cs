@@ -22,7 +22,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 */
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -52,7 +51,7 @@ namespace Tester.TestStreamProviders.Generator
             this.factory = factory;
         }
 
-        public interface IConfig : IStreamGeneratorQueueConfig
+        public interface IConfig : IStreamGeneratorConfig
         {
             string StreamProviderName { get; }
             int CacheSize { get; }
@@ -97,7 +96,7 @@ namespace Tester.TestStreamProviders.Generator
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            var streamGenerator = factory.Create<IStreamGenerator>(config.StreamGeneratorQueueTypeId, config);
+            var streamGenerator = factory.Create<IStreamGenerator>(config.StreamGeneratorTypeId, config);
             return new Receiver(queueId, streamGenerator);
         }
 

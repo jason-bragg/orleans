@@ -36,11 +36,12 @@ namespace Tester.TestStreamProviders.Generator
         public string StreamNamespace { get; private set; }
         public StreamSequenceToken SequenceToken { get; set; }
 
-        public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload)
+        public GeneratedBatchContainer(Guid streamGuid, string streamNamespace, object payload, StreamSequenceToken token)
         {
             StreamGuid = streamGuid;
             StreamNamespace = streamNamespace;
             this.payload = payload;
+            this.SequenceToken = token;
         }
 
         public IEnumerable<Tuple<T, StreamSequenceToken>> GetEvents<T>()

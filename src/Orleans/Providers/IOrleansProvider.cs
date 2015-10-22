@@ -133,5 +133,15 @@ namespace Orleans.Providers
             string s;
             return config.Properties.TryGetValue(key, out s) ? s : settingDefault;
         }
+
+        public static Guid GetGuidProperty(this IProviderConfiguration config, string key, Guid settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? Guid.Parse(s) : settingDefault;
+        }
     }
 }

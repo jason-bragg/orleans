@@ -23,7 +23,6 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 
 using System;
 using System.Collections.Generic;
-using Orleans.Providers.Streams.Common;
 
 namespace Tester.TestStreamProviders.Generator
 {

@@ -21,16 +21,23 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-using Orleans.Providers.Streams.Common;
+using Tester.TestStreamProviders.Generator;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
 {
-    public class StreamGeneratorComponentFactory : ComponentFactory
+    /// <summary>
+    /// Component factory that contains all the stream generators available to the simple generator stream provider
+    /// 
+    /// Since we don't want to write a stream provider for every possible stream generation senario we want, instead
+    ///  we can just write a stream generator component, along with it's configuration class, and register it in this component factory.
+    /// The simple generator stream provider can be configured to generate streams using any generator registered in this factory.
+    /// </summary>
+    public class SimpleGeneratorComponentFactory : ComponentFactory
     {
-        public StreamGeneratorComponentFactory()
+        public SimpleGeneratorComponentFactory()
         {
-            Register<SimpleStreamGeneratorQueue>(SimpleStreamGeneratorQueue.TypeId);
-            Register<SimpleStreamGenerator>(SimpleStreamGenerator.TypeId);
+            // Register any generators we may want to use.  The generated created at runtime is determined by configuration.
+            Register<SimpleGenerator>(SimpleGenerator.TypeId);
         }
     }
 }

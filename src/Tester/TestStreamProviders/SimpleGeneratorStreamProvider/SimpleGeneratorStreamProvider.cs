@@ -21,16 +21,27 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
+using Tester.TestStreamProviders.Generator;
 
-namespace Tester.TestStreamProviders.Generator
+namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
 {
-    public interface IStreamGeneratorQueue : IStreamGenerator
+    public class SimpleGeneratorStreamProvider : PersistentStreamProvider<SimpleGeneratorStreamProvider.AdapterFactory>
     {
-    }
-
-    public interface IStreamGeneratorQueueConfig : IComponentConfig
-    {
-        string StreamGeneratorQueueTypeId { get; }
+        public class AdapterFactory : StreamGeneratorAdapterFactory
+        {
+            public AdapterFactory()
+                : base(new SimpleGeneratorComponentFactory())
+            {
+            }
+            
+            public override IConfig BuildConfig(IProviderConfiguration providerConfiguration)
+            {
+                var config = new SimpleGeneratorAdapterConfig();
+                config.PopulateFromProviderConfig(providerConfiguration);
+                return config;
+            }
+        }
     }
 }

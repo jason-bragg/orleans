@@ -30,7 +30,7 @@ using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester.TestStreamProviders.Generator;
+using Tester.TestStreamProviders.SimpleGeneratorStreamProvider;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Tester;
@@ -47,13 +47,12 @@ namespace UnitTests.StreamingTests
         private const string StreamProviderName = GeneratedEventCollectorGrain.StreamProviderName;
         private const string StreamNamespace = GeneratedEventCollectorGrain.StreamNamespace;
 
-        private readonly static SimpleGeneratorStreamProvider.AdapterFactory.Config Config = new SimpleGeneratorStreamProvider.AdapterFactory.Config
+        private readonly static SimpleGeneratorAdapterConfig Config = new SimpleGeneratorAdapterConfig
         {
             StreamProviderName = StreamProviderName,
             StreamNamespace = StreamNamespace,
-            TotalStreamCountPerQueue = 5,
+            EventsInStream = 100,
             TotalQueueCount = 4,
-            TotalEventCountPerStream = 5,
         };
 
         public StreamGeneratorProviderTests()
@@ -67,12 +66,22 @@ namespace UnitTests.StreamingTests
 
         public override void AdjustForTest(ClusterConfiguration config)
         {
+            // get initial settings from config
             var settings = Config.Flatten();
+
+            // add queue balancer setting
             settings.Add(PersistentStreamProviderConfig.QUEUE_BALANCER_TYPE, StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer.ToString());
+
+            // add pub/sub settting
             settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
+
+            // register stream provider
             config.Globals.RegisterStreamProvider<SimpleGeneratorStreamProvider>(StreamProviderName, settings);
+
+            // make sure all node configs exist, for dynamic cluster queue balancer
             config.GetConfigurationForNode("Primary");
             config.GetConfigurationForNode("Secondary_1");
+
             base.AdjustForTest(config);
         }
 
@@ -97,14 +106,15 @@ namespace UnitTests.StreamingTests
             var report = await reporter.GetReport(GeneratedEventCollectorGrain.StreamProviderName, GeneratedEventCollectorGrain.StreamNamespace);
             if (assertIsTrue)
             {
-                Assert.AreEqual(Config.TotalStreamCountPerQueue * Config.TotalQueueCount, report.Count, "Stream count");
+                // one stream per queue
+                Assert.AreEqual(Config.TotalQueueCount, report.Count, "Stream count");
                 foreach (int eventsPerStream in report.Values)
                 {
-                    Assert.AreEqual(Config.TotalEventCountPerStream, eventsPerStream, "Events per stream");
+                    Assert.AreEqual(Config.EventsInStream, eventsPerStream, "Events per stream");
                 }
             }
-            else if (Config.TotalStreamCountPerQueue * Config.TotalQueueCount != report.Count ||
-                     report.Values.Any(count => count != Config.TotalEventCountPerStream))
+            else if (Config.TotalQueueCount != report.Count ||
+                     report.Values.Any(count => count != Config.EventsInStream))
             {
                 return false;
             }

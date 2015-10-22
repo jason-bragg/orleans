@@ -26,13 +26,18 @@ using System.Collections.Generic;
 
 namespace Tester.TestStreamProviders.Generator
 {
-    public interface IStreamGenerator : IConfigurableComponent
+    public enum StreamGeneratorsType
+    {
+        Simple,
+    }
+
+    public interface IStreamGenerator
     {
         bool TryReadEvents(DateTime utcNow, out List<GeneratedBatchContainer> events);
     }
 
-    public interface IStreamGeneratorConfig : IComponentConfig
+    public interface IStreamGeneratorConfig
     {
-        string StreamGeneratorTypeId { get; }
+        StreamGeneratorsType StreamGeneratorTypeId { get; }
     }
 }

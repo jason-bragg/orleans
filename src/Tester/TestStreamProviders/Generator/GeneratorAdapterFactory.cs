@@ -30,40 +30,36 @@ using Orleans.Providers;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
+using Tester.TestStreamProviders.Generator.Generators;
 
 namespace Tester.TestStreamProviders.Generator
 {
-    public abstract class StreamGeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter
+    public class GeneratorAdapterFactory : IQueueAdapterFactory, IQueueAdapter
     {
-        private readonly ComponentFactory factory;
-        private IConfig config;
+        private GeneratorAdapterConfig config;
         private Logger logger;
 
         public bool IsRewindable { get { return true; } }
         public StreamProviderDirection Direction { get { return StreamProviderDirection.ReadOnly; } }
 
-        protected StreamGeneratorAdapterFactory(ComponentFactory factory)
-        {
-            if (factory == null)
-            {
-                throw new ArgumentNullException("factory");
-            }
-            this.factory = factory;
-        }
-
-        public interface IConfig : IStreamGeneratorConfig
-        {
-            string StreamProviderName { get; }
-            int CacheSize { get; }
-            int TotalQueueCount { get; }
-        }
-
-        public abstract IConfig BuildConfig(IProviderConfiguration config);
-
         public void Init(IProviderConfiguration providerConfig, string providerName, Logger log)
         {
             this.logger = log;
-            config = BuildConfig(providerConfig);
+            var generatorType = providerConfig.GetEnumProperty(GeneratorAdapterConfig.StreamGeneratorTypeIdName, GeneratorAdapterConfig.StreamGeneratorTypeIdDefault);
+            switch (generatorType)
+            {
+                case StreamGeneratorsType.Simple:
+                {
+                    var cfg = new SimpleGeneratorAdapterConfig();
+                    cfg.PopulateFromProviderConfig(providerConfig);
+                    config = cfg;
+                    break;
+                }
+                default:
+                {
+                    throw new ArgumentOutOfRangeException("providerConfig", "StreamGeneratorsType not set.");
+                }
+            }
         }
 
         public Task<IQueueAdapter> CreateAdapter()
@@ -96,8 +92,7 @@ namespace Tester.TestStreamProviders.Generator
 
         public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
         {
-            var streamGenerator = factory.Create<IStreamGenerator>(config.StreamGeneratorTypeId, config);
-            return new Receiver(queueId, streamGenerator);
+            return new Receiver(queueId, BuildGenerator());
         }
 
         private class Receiver : IQueueAdapterReceiver
@@ -108,6 +103,10 @@ namespace Tester.TestStreamProviders.Generator
 
             public Receiver(QueueId queueId, IStreamGenerator queue)
             {
+                if (queue == null)
+                {
+                    throw new NullReferenceException("queue");
+                }
                 Id = queueId;
                 this.queue = queue;
             }
@@ -121,7 +120,7 @@ namespace Tester.TestStreamProviders.Generator
 
             public async Task<IList<IBatchContainer>> GetQueueMessagesAsync(int maxCount)
             {
-                await Task.Delay(random.Next(MaxDelayMs));
+                await Task.Delay(random.Next(1,MaxDelayMs));
                 List<GeneratedBatchContainer> batches;
                 if (!queue.TryReadEvents(DateTime.UtcNow, out batches))
                 {
@@ -139,6 +138,18 @@ namespace Tester.TestStreamProviders.Generator
             {
                 return TaskDone.Done;
             }
+        }
+
+        private IStreamGenerator BuildGenerator()
+        {
+            switch (config.StreamGeneratorTypeId)
+            {
+                case StreamGeneratorsType.Simple:
+                {
+                    return new SimpleGenerator(config);
+                }
+            }
+            return null;
         }
     }
 }

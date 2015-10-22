@@ -143,5 +143,15 @@ namespace Orleans.Providers
             string s;
             return config.Properties.TryGetValue(key, out s) ? Guid.Parse(s) : settingDefault;
         }
+
+        public static T GetEnumProperty<T>(this IProviderConfiguration config, string key, T settingDefault)
+        {
+            if (config == null)
+            {
+                throw new ArgumentNullException("config");
+            }
+            string s;
+            return config.Properties.TryGetValue(key, out s) ? (T)Enum.Parse(typeof(T),s) : settingDefault;
+        }
     }
 }

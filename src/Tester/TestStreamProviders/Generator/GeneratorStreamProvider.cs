@@ -21,35 +21,11 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
+using Orleans.Providers.Streams.Common;
+
 namespace Tester.TestStreamProviders.Generator
 {
-    public interface IComponentConfig
+    public class GeneratorStreamProvider : PersistentStreamProvider<GeneratorAdapterFactory>
     {
-    }
-
-    public interface IConfigurableComponent
-    {
-        void Configure(ComponentFactory factory, IComponentConfig config);
-    }
-
-    public class ComponentFactory
-    {
-        private readonly Factory<string, IConfigurableComponent> _factory = new Factory<string, IConfigurableComponent>();
-
-        public void Register<T>(string componentId) where T : IConfigurableComponent, new()
-        {
-            _factory.Register<T>(componentId);
-        }
-
-        public T Create<T>(string componentId, IComponentConfig config)
-        {
-            IConfigurableComponent cpnt = _factory.Create(componentId);
-            if (cpnt == null)
-                return default(T);
-
-            cpnt.Configure(this, config);
-
-            return (T)cpnt;
-        }
     }
 }

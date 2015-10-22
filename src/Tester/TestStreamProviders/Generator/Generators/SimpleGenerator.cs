@@ -24,10 +24,9 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR TH
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
-using Tester.TestStreamProviders.Generator;
 using TestGrains;
 
-namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
+namespace Tester.TestStreamProviders.Generator.Generators
 {
     /// <summary>
     /// Simple Generator
@@ -36,9 +35,21 @@ namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
     public class SimpleGenerator : IStreamGenerator
     {
         public static readonly string TypeId = typeof(SimpleGenerator).FullName;
-        private SimpleGeneratorAdapterConfig config;
-        private Guid streamGuid;
+        private readonly SimpleGeneratorAdapterConfig config;
+        private readonly Guid streamGuid;
         private int sequenceId;
+
+        public SimpleGenerator(IStreamGeneratorConfig generatorConfig)
+        {
+            var cfg = generatorConfig as SimpleGeneratorAdapterConfig;
+            if (cfg == null)
+            {
+                throw new ArgumentOutOfRangeException("generatorConfig");
+            }
+            config = cfg;
+            sequenceId = 0;
+            streamGuid = Guid.NewGuid();
+        }
 
         /// <summary>
         /// Untill we've generated the configured number of events, return a single generated event
@@ -59,23 +70,6 @@ namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
             return true;
         }
         
-        /// <summary>
-        /// All stream generators are components.  Configure this component
-        /// </summary>
-        /// <param name="componentFactory"></param>
-        /// <param name="componentConfig"></param>
-        public void Configure(ComponentFactory componentFactory, IComponentConfig componentConfig)
-        {
-            var cfg = componentConfig as SimpleGeneratorAdapterConfig;
-            if (cfg == null)
-            {
-                throw new ArgumentOutOfRangeException("componentConfig");
-            }
-            config = cfg;
-            sequenceId = 0;
-            streamGuid = Guid.NewGuid();
-        }
-
         private GeneratedBatchContainer GenerateBatch()
         {
             sequenceId++;

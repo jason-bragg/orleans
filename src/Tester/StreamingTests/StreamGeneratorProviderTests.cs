@@ -30,7 +30,8 @@ using Orleans;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
-using Tester.TestStreamProviders.SimpleGeneratorStreamProvider;
+using Tester.TestStreamProviders.Generator;
+using Tester.TestStreamProviders.Generator.Generators;
 using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Tester;
@@ -76,7 +77,7 @@ namespace UnitTests.StreamingTests
             settings.Add(PersistentStreamProviderConfig.STREAM_PUBSUB_TYPE, StreamPubSubType.ImplicitOnly.ToString());
 
             // register stream provider
-            config.Globals.RegisterStreamProvider<SimpleGeneratorStreamProvider>(StreamProviderName, settings);
+            config.Globals.RegisterStreamProvider<GeneratorStreamProvider>(StreamProviderName, settings);
 
             // make sure all node configs exist, for dynamic cluster queue balancer
             config.GetConfigurationForNode("Primary");

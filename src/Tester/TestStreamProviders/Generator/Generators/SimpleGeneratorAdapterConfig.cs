@@ -25,24 +25,12 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Orleans.Providers;
-using Tester.TestStreamProviders.Generator;
 
-namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
+namespace Tester.TestStreamProviders.Generator.Generators
 {
     [Serializable]
-    public class SimpleGeneratorAdapterConfig : StreamGeneratorAdapterFactory.IConfig
+    public class SimpleGeneratorAdapterConfig : GeneratorAdapterConfig
     {
-        public string StreamGeneratorTypeId { get { return SimpleGenerator.TypeId; } }
-
-        private const string StreamProviderNameName = "StreamProviderName";
-        public string StreamProviderName { get; set; }
-
-        public int CacheSize { get { return 1024; } }
-
-            private const string TotalQueueCountName = "TotalQueueCount";
-        private const int TotalQueueCountDefault = 4;
-        public int TotalQueueCount { get; set; }
-
         private const string StreamNamespaceName = "StreamNamespace";
         public string StreamNamespace { get; set; }
 
@@ -55,7 +43,7 @@ namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
 
         public SimpleGeneratorAdapterConfig()
         {
-            TotalQueueCount = TotalQueueCountDefault;
+            StreamGeneratorTypeId = StreamGeneratorsType.Simple;
             EventsInStream = EventsInStreamDefault;
         }
 
@@ -67,11 +55,10 @@ namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
         {
             var values = new Dictionary<string, string>
             {
-                {StreamProviderNameName, StreamProviderName},
-                {TotalQueueCountName, TotalQueueCount.ToString(CultureInfo.InvariantCulture)},
                 {EventsInStreamName, EventsInStream.ToString(CultureInfo.InvariantCulture)},
                 {StreamNamespaceName, StreamNamespace},
             };
+            WriteProperties(values);
             return values;
         }
 
@@ -79,14 +66,9 @@ namespace Tester.TestStreamProviders.SimpleGeneratorStreamProvider
         /// Utility function to populate config from provider config
         /// </summary>
         /// <param name="providerConfiguration"></param>
-        public void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
+        public new void PopulateFromProviderConfig(IProviderConfiguration providerConfiguration)
         {
-            StreamProviderName = providerConfiguration.GetProperty(StreamProviderNameName, string.Empty);
-            if (string.IsNullOrWhiteSpace(StreamProviderName))
-            {
-                throw new ArgumentOutOfRangeException("providerConfiguration", "StreamProviderName not set.");
-            }
-            TotalQueueCount = providerConfiguration.GetIntProperty(TotalQueueCountName, TotalQueueCountDefault);
+            base.PopulateFromProviderConfig(providerConfiguration);
             EventsInStream = providerConfiguration.GetIntProperty(EventsInStreamName, EventsInStreamDefault);
             StreamNamespace = providerConfiguration.GetProperty(StreamNamespaceName, null);
         }

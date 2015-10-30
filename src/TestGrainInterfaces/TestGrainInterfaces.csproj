@@ -37,7 +37,7 @@
     <WarningsAsErrors>4014</WarningsAsErrors>
   </PropertyGroup>
   <PropertyGroup>
-    <SignAssembly>true</SignAssembly>
+    <SignAssembly>false</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
   </PropertyGroup>
   <ItemGroup>
@@ -45,8 +45,13 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ICircularStateTestGrain.cs" />
     <Compile Include="IExceptionGrain.cs" />
     <Compile Include="IFaultableConsumerGrain.cs" />
+    <Compile Include="IGeneratorTestDerivedDerivedGrain.cs" />
+    <Compile Include="IGeneratorTestDerivedGrain1.cs" />
+    <Compile Include="IGeneratorTestDerivedGrain2.cs" />
+    <Compile Include="IGeneratorTestGrain.cs" />
     <Compile Include="IJournaledPersonGrain.cs" />
     <Compile Include="IGeneratedEventCollectorGrain.cs" />
     <Compile Include="IGeneratedEventReporterGrain.cs" />
@@ -78,9 +83,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Orleans.snk">
-      <Link>Orleans.snk</Link>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

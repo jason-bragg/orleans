@@ -12,7 +12,7 @@
     <AssemblyName>TestGrains</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <SignAssembly>true</SignAssembly>
+    <SignAssembly>false</SignAssembly>
     <AssemblyOriginatorKeyFile>..\Orleans.snk</AssemblyOriginatorKeyFile>
     <TargetFrameworkProfile />
     <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\</SolutionDir>
@@ -48,12 +48,17 @@
     <Reference Include="System.Core" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CircularStateTestGrain.cs" />
     <Compile Include="ExceptionGrain.cs" />
     <Compile Include="FaultableConsumerGrain.cs" />
     <Compile Include="EventSourcing\PersonState.cs" />
     <Compile Include="GeneratedEventCollectorGrain.cs" />
     <Compile Include="GeneratedEvent.cs" />
     <Compile Include="GeneratedEventReporterGrain.cs" />
+    <Compile Include="GeneratorTestDerivedDerivedGrain.cs" />
+    <Compile Include="GeneratorTestDerivedGrain1.cs" />
+    <Compile Include="GeneratorTestDerivedGrain2.cs" />
+    <Compile Include="GeneratorTestGrain.cs" />
     <Compile Include="GenericGrains.cs" />
     <Compile Include="InitialStateGrain.cs" />
     <Compile Include="MultipleImplicitSubscriptionGrain.cs" />
@@ -94,9 +99,6 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <None Include="..\Orleans.snk">
-      <Link>Orleans.snk</Link>
-    </None>
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup />

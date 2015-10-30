@@ -30,10 +30,12 @@ using System.Text;
 
 using Orleans.Providers;
 using Orleans.CodeGeneration;
+using Orleans.Serialization;
 
 
 namespace Orleans.Runtime
 {
+    [NonSerializable]
     internal class SiloAssemblyLoader
     {
         private readonly TraceLogger logger = TraceLogger.GetLogger("AssemblyLoader.Silo");
@@ -46,7 +48,7 @@ namespace Orleans.Runtime
 
         private void LoadApplicationAssemblies()
         {
-            var exeRoot = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
+            var exeRoot = Path.GetDirectoryName(typeof(SiloAssemblyLoader).GetTypeInfo().Assembly.Location);
             var appRoot = Path.Combine(exeRoot, "Applications");
             var directories = new Dictionary<string, SearchOption>
                     {

@@ -9,7 +9,7 @@ namespace Orleans.Runtime
     internal abstract class AsynchQueueAgent<T> : AsynchAgent, IDisposable where T : IOutgoingMessage
     {
         private readonly IMessagingConfiguration config;
-        private BlockingCollection<T> requestQueue;
+        protected BlockingCollection<T> requestQueue;
         private QueueTrackingStatistic queueTracking;
 
         protected AsynchQueueAgent(string nameSuffix, IMessagingConfiguration cfg)
@@ -62,7 +62,7 @@ namespace Orleans.Runtime
         }
 
 
-        protected void RunNonBatching()
+        protected virtual void RunNonBatching()
         {            
             while (true)
             {

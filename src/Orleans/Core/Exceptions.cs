@@ -192,5 +192,20 @@ namespace Orleans.Runtime
             : base(info, context)
         { }
     }
+
+    /// <summary>
+    /// Indicates that an error has occurred during serialization
+    /// </summary>
+    internal class OrleansSerializationException : OrleansException
+    {
+        public Message Msg { get; private set; }
+
+        internal OrleansSerializationException(string message, Message msg, Exception innerException)
+            : base(message, innerException)
+        {
+            Msg = msg;
+        }
+    }
+
 }
 

@@ -11,10 +11,10 @@ namespace Orleans.Messaging
     /// </summary>
     internal class GatewayClientReceiver : AsynchAgent
     {
-        private readonly GatewayConnection gatewayConnection;
+        private readonly GatewaySocketConnection gatewayConnection;
         private readonly IncomingMessageBuffer buffer;
 
-        internal GatewayClientReceiver(GatewayConnection gateway)
+        internal GatewayClientReceiver(GatewaySocketConnection gateway)
             : base(gateway.Address.ToString())
         {
             gatewayConnection = gateway;

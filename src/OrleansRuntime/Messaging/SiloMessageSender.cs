@@ -1,12 +1,13 @@
+
 using System;
 using System.Collections.Generic;
-using System.Net.Sockets;
 using System.Text;
-using Orleans.Messaging;
+using System.Threading.Tasks;
+using DotNetty.Transport.Channels;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class SiloMessageSender : OutgoingMessageSender
+    internal class SiloMessageSender : AsynchQueueAgent<Message>
     {
         private readonly MessageCenter messageCenter;
         private const int DEFAULT_MAX_RETRIES = 0;
@@ -14,7 +15,6 @@ namespace Orleans.Runtime.Messaging
 
         internal const string RETRY_COUNT_TAG = "RetryCount";
         internal static readonly TimeSpan CONNECTION_RETRY_DELAY = TimeSpan.FromMilliseconds(1000);
-
         
         internal SiloMessageSender(string nameSuffix, MessageCenter msgCtr)
             : base(nameSuffix, msgCtr.MessagingConfiguration)
@@ -25,12 +25,7 @@ namespace Orleans.Runtime.Messaging
             OnFault = FaultBehavior.RestartOnFault;
         }
 
-        protected override SocketDirection GetSocketDirection()
-        {
-            return SocketDirection.SiloToSilo;
-        }
-
-        protected override bool PrepareMessageForSend(Message msg)
+        private bool PrepareMessageForSend(Message msg)
         {
             // Don't send messages that have already timed out
             if (msg.IsExpired)
@@ -54,7 +49,7 @@ namespace Orleans.Runtime.Messaging
             // If we know this silo is dead, don't bother
             if ((messageCenter.SiloDeadOracle != null) && messageCenter.SiloDeadOracle(msg.TargetSilo))
             {
-                FailMessage(msg, String.Format("Target {0} silo is known to be dead", msg.TargetSilo.ToLongString()));
+                FailMessage(msg, $"Target {msg.TargetSilo.ToLongString()} silo is known to be dead");
                 return false;
             }
 
@@ -65,8 +60,8 @@ namespace Orleans.Runtime.Messaging
                 var since = DateTime.UtcNow.Subtract(failure);
                 if (since < CONNECTION_RETRY_DELAY)
                 {
-                    FailMessage(msg, String.Format("Recent ({0} ago, at {1}) connection failure trying to reach target silo {2}. Going to drop {3} msg {4} without sending. CONNECTION_RETRY_DELAY = {5}.",
-                        since, TraceLogger.PrintDate(failure), msg.TargetSilo.ToLongString(), msg.Direction, msg.Id, CONNECTION_RETRY_DELAY));
+                    FailMessage(msg,
+                        $"Recent ({since} ago, at {TraceLogger.PrintDate(failure)}) connection failure trying to reach target silo {msg.TargetSilo.ToLongString()}. Going to drop {msg.Direction} msg {msg.Id} without sending. CONNECTION_RETRY_DELAY = {CONNECTION_RETRY_DELAY}.");
                     return false;
                 }
             }
@@ -74,68 +69,38 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        protected override bool GetSendingSocket(Message msg, out Socket socket, out SiloAddress targetSilo, out string error)
+        private async Task<IChannel> GetSendingChannel(Message msg)
         {
-            socket = null;
-            targetSilo = msg.TargetSilo;
-            error = null;
+            var targetSilo = msg.TargetSilo;
             try
             {
-                socket = messageCenter.SocketManager.GetSendingSocket(targetSilo.Endpoint);
-                if (socket.Connected) return true;
+                IChannel channel = await messageCenter.ChannelManager.GetChannel(targetSilo.Endpoint);
+                if (channel.Open && channel.Active) return channel;
 
-                messageCenter.SocketManager.InvalidateEntry(targetSilo.Endpoint);
-                socket = messageCenter.SocketManager.GetSendingSocket(targetSilo.Endpoint);
-                return true;
+                messageCenter.ChannelManager.InvalidateEntry(targetSilo.Endpoint);
+                return await messageCenter.ChannelManager.GetChannel(targetSilo.Endpoint);
             }
             catch (Exception ex)
             {
-                error = "Exception getting a sending socket to endpoint " + targetSilo.ToString();
-                Log.Warn(ErrorCode.Messaging_UnableToGetSendingSocket, error, ex);
-                messageCenter.SocketManager.InvalidateEntry(targetSilo.Endpoint);
+                var error = "Exception getting a sending channel to endpoint " + targetSilo;
+                Log.Warn(ErrorCode.Messaging_UnableToGetSendingChannel, error, ex);
+                messageCenter.ChannelManager.InvalidateEntry(targetSilo.Endpoint);
                 lastConnectionFailure[targetSilo] = DateTime.UtcNow;
-                return false;
+                throw;
             }
         }
 
-        protected override void OnGetSendingSocketFailure(Message msg, string error)
+        private void OnGetSendingFailure(Message msg, string error)
         {
             FailMessage(msg, error);
         }
 
-        protected override void OnMessageSerializationFailure(Message msg, Exception exc)
+        private void OnSendFailure(SiloAddress targetSilo)
         {
-            // we only get here if we failed to serialize the msg (or any other catastrophic failure).
-            // Request msg fails to serialize on the sending silo, so we just enqueue a rejection msg.
-            // Response msg fails to serialize on the responding silo, so we try to send an error response back.
-            Log.Warn(ErrorCode.MessagingUnexpectedSendError, String.Format("Unexpected error sending message {0}", msg.ToString()), exc);
-            
-            msg.ReleaseBodyAndHeaderBuffers();
-            MessagingStatisticsGroup.OnFailedSentMessage(msg);
-            if (msg.Direction == Message.Directions.Request)
-            {
-                messageCenter.SendRejection(msg, Message.RejectionTypes.Unrecoverable, exc.ToString());
-            }
-            else if (msg.Direction == Message.Directions.Response && msg.Result != Message.ResponseTypes.Error)
-            {
-                // if we failed sending an original response, turn the response body into an error and reply with it.
-                // unless the response was already an error response (so we don't loop forever).
-                msg.Result = Message.ResponseTypes.Error;
-                msg.BodyObject = Response.ExceptionResponse(exc);
-                messageCenter.SendMessage(msg);
-            }
-            else
-            {
-                MessagingStatisticsGroup.OnDroppedSentMessage(msg);
-            }
+            messageCenter.ChannelManager.InvalidateEntry(targetSilo.Endpoint);
         }
 
-        protected override void OnSendFailure(Socket socket, SiloAddress targetSilo)
-        {
-            messageCenter.SocketManager.InvalidateEntry(targetSilo.Endpoint);
-        }
-
-        protected override void ProcessMessageAfterSend(Message msg, bool sendError, string sendErrorStr)
+        private void ProcessMessageAfterSend(Message msg, bool sendError)
         {
             if (sendError)
             {
@@ -149,7 +114,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        protected override void FailMessage(Message msg, string reason)
+        private void FailMessage(Message msg, string reason)
         {
             msg.ReleaseBodyAndHeaderBuffers();
             MessagingStatisticsGroup.OnFailedSentMessage(msg);
@@ -157,7 +122,8 @@ namespace Orleans.Runtime.Messaging
             {
                 if (Log.IsVerbose) Log.Verbose(ErrorCode.MessagingSendingRejection, "Silo {0} is rejecting message: {0}. Reason = {1}", messageCenter.MyAddress, msg, reason);
                 // Done retrying, send back an error instead
-                messageCenter.SendRejection(msg, Message.RejectionTypes.Transient, String.Format("Silo {0} is rejecting message: {1}. Reason = {2}", messageCenter.MyAddress, msg, reason));
+                messageCenter.SendRejection(msg, Message.RejectionTypes.Transient,
+                    $"Silo {messageCenter.MyAddress} is rejecting message: {msg}. Reason = {reason}");
             }else
             {
                 Log.Info(ErrorCode.Messaging_OutgoingMS_DroppingMessage, "Silo {0} is dropping message: {0}. Reason = {1}", messageCenter.MyAddress, msg, reason);
@@ -187,11 +153,51 @@ namespace Orleans.Runtime.Messaging
                 var reason = new StringBuilder("Retry count exceeded. ");
                 if (ex != null)
                 {
-                    reason.Append("Original exception is: ").Append(ex.ToString());
+                    reason.Append("Original exception is: ").Append(ex);
                 }
                 reason.Append("Msg is: ").Append(msg);
                 FailMessage(msg, reason.ToString());
             }
+        }
+
+        protected override void Process(Message request)
+        {
+            ProcessAsync(request).Wait();
+        }
+
+        private async Task ProcessAsync(Message request)
+        {
+            if (Log.IsVerbose2) Log.Verbose2("Got a {0} message to send: {1}", request.Direction, request);
+            bool continueSend = PrepareMessageForSend(request);
+            if (!continueSend) return;
+
+            IChannel channel;
+            SiloAddress targetSilo = request.TargetSilo;
+            try
+            {
+                channel = await GetSendingChannel(request);
+            }
+            catch (Exception ex)
+            {
+                OnGetSendingFailure(request, ex.ToString());
+                return;
+            }
+
+            bool exceptionSending = false;
+            try
+            {
+                await channel.WriteAndFlushAsync(request);
+            }
+            catch (Exception exc)
+            {
+                exceptionSending = true;
+                string sendErrorStr = $"Exception sending message to {targetSilo}. Message: {request}. {exc}";
+                Log.Warn(ErrorCode.Messaging_ExceptionSending, sendErrorStr, exc);
+            }
+            if (exceptionSending)
+                OnSendFailure(targetSilo);
+
+            ProcessMessageAfterSend(request, exceptionSending);
         }
     }
 }

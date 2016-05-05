@@ -21,7 +21,7 @@ namespace Orleans.Runtime.Messaging
 
         internal IOutboundMessageQueue OutboundQueue { get; set; }
         internal IInboundMessageQueue InboundQueue { get; set; }
-        internal SocketManager SocketManager;
+        internal ChannelManager ChannelManager;
         internal bool IsBlockingApplicationMessages { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get; private set; }
         
@@ -46,7 +46,7 @@ namespace Orleans.Runtime.Messaging
         {
             if(log.IsVerbose3) log.Verbose3("Starting initialization.");
 
-            SocketManager = new SocketManager(config);
+            ChannelManager = new ChannelManager(config);
             ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo);
             MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
             MessagingConfiguration = config;
@@ -93,7 +93,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.Runtime_Error_100108, "Stop failed.", exc);
+                log.Error(ErrorCode.Runtime_Error_100108, "IncomingMessageAcceptor Stop failed.", exc);
             }
 
             StopAcceptingClientMessages();
@@ -104,16 +104,16 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.Runtime_Error_100110, "Stop failed.", exc);
+                log.Error(ErrorCode.Runtime_Error_100110, "OutboundQueue Stop failed.", exc);
             }
 
             try
             {
-                SocketManager.Stop();
+                ChannelManager.Stop();
             }
             catch (Exception exc)
             {
-                log.Error(ErrorCode.Runtime_Error_100111, "Stop failed.", exc);
+                log.Error(ErrorCode.Runtime_Error_100111, "ChannelManager Stop failed.", exc);
             }
         }
 

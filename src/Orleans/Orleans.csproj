@@ -58,6 +58,22 @@
     <IntermediateOutputPath>$(BootstrapOutputPath)Intermediate\</IntermediateOutputPath>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="DotNetty.Buffers, Version=0.2.6.0, Culture=neutral, PublicKeyToken=e7a0210a354f294a, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetty.Buffers-signed.0.2.6\lib\net45\DotNetty.Buffers.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="DotNetty.Codecs, Version=0.2.6.0, Culture=neutral, PublicKeyToken=e7a0210a354f294a, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetty.Codecs-signed.0.2.6\lib\net45\DotNetty.Codecs.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="DotNetty.Common, Version=0.2.6.0, Culture=neutral, PublicKeyToken=e7a0210a354f294a, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetty.Common-signed.0.2.6\lib\net45\DotNetty.Common.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="DotNetty.Transport, Version=0.2.6.0, Culture=neutral, PublicKeyToken=e7a0210a354f294a, processorArchitecture=MSIL">
+      <HintPath>..\packages\DotNetty.Transport-signed.0.2.6\lib\net45\DotNetty.Transport.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
@@ -96,6 +112,12 @@
     <Compile Include="Core\InterceptedMethodInvoker.cs" />
     <Compile Include="Core\InvocationMethodInfoMap.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
+    <Compile Include="Messaging\ChannelManager.cs" />
+    <Compile Include="Messaging\Protocol\InterSilo\IInterSiloProtocol.cs" />
+    <Compile Include="Messaging\Protocol\InterSilo\InterSiloProtocol.cs" />
+    <Compile Include="Messaging\Protocol\InterSilo\v1\InterSiloProtocol_v1.cs" />
+    <Compile Include="Messaging\Protocol\Common\MessageFrameConstants.cs" />
+    <Compile Include="Messaging\Protocol\Common\MessageFrameEncoder.cs" />
     <Compile Include="Providers\DefaultServiceProvider.cs" />
     <Compile Include="GrainDirectory\MultiClusterStatus.cs" />
     <Compile Include="Serialization\IExternalSerializer.cs" />

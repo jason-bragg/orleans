@@ -14,11 +14,11 @@ namespace Orleans.Messaging.Protocol
         protected override void Encode(IChannelHandlerContext context, Message message, List<object> output)
         {
             int headerLength;
-            var data = message.Serialize(out headerLength);
+            List<ArraySegment<byte>> data = message.Serialize(out headerLength);
             IByteBuffer buffer = context.Allocator.Buffer(data.Sum(seg => seg.Count));
             foreach (ArraySegment<byte> segment in data)
             {
-                buffer.WriteBytes(segment.ToArray());
+                buffer.WriteBytes(segment.Array, segment.Offset, segment.Count);
             }
             output.Add(buffer.Retain());
         }

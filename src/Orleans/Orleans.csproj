@@ -113,6 +113,8 @@
     <Compile Include="Core\InvocationMethodInfoMap.cs" />
     <Compile Include="Core\IStatefulGrain.cs" />
     <Compile Include="Messaging\ChannelManager.cs" />
+    <Compile Include="Messaging\Protocol\Common\MessageFrameDecoder.cs" />
+    <Compile Include="Messaging\Protocol\InterSilo\IMessageHandler.cs" />
     <Compile Include="Messaging\Protocol\InterSilo\IInterSiloProtocol.cs" />
     <Compile Include="Messaging\Protocol\InterSilo\InterSiloProtocol.cs" />
     <Compile Include="Messaging\Protocol\InterSilo\v1\InterSiloProtocol_v1.cs" />

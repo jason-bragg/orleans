@@ -74,7 +74,9 @@ namespace Orleans.Runtime.Messaging
             var targetSilo = msg.TargetSilo;
             try
             {
+                Log.Warn(0, "SiloMessageSender.GetSendingChannel: " + targetSilo.Endpoint);
                 IChannel channel = await messageCenter.ChannelManager.GetChannel(targetSilo.Endpoint);
+                Log.Warn(0, "SiloMessageSender.GetSendingChannel: " + targetSilo.Endpoint + " => " + channel.RemoteAddress);
                 if (channel.Open && channel.Active) return channel;
 
                 messageCenter.ChannelManager.InvalidateEntry(targetSilo.Endpoint);

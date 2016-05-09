@@ -687,6 +687,8 @@ namespace Orleans
         Messaging_Dispatcher_ForwardingRequests = MessagingBase + 33,
         Messaging_SimulatedMessageLoss          = MessagingBase + 34,
         Messaging_UnableToGetSendingChannel     = MessagingBase + 35,
+        Messaging_IMA_FailedToShutdownListener  = MessagingBase + 36,
+
 
         DirectoryBase = Runtime + 1100,
         DirectoryBothPrimaryAndBackupForGrain   = DirectoryBase + 1,

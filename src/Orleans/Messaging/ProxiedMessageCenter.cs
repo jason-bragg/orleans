@@ -97,6 +97,7 @@ namespace Orleans.Messaging
             numMessages = 0;
             grainBuckets = new WeakReference[config.ClientSenderBuckets];
             logger = TraceLogger.GetLogger("Messaging.ProxiedMessageCenter", TraceLogger.LoggerType.Runtime);
+            logger.Warn(0, "ProxiedMessageCenter.MyAddress = " + MyAddress);
             if (logger.IsVerbose) logger.Verbose("Proxy grain client constructed");
             IntValueStatistic.FindOrCreate(StatisticNames.CLIENT_CONNECTED_GATEWAY_COUNT, () =>
                 {

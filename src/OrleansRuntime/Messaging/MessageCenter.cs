@@ -47,8 +47,8 @@ namespace Orleans.Runtime.Messaging
             if(log.IsVerbose3) log.Verbose3("Starting initialization.");
 
             ChannelManager = new ChannelManager(config);
-            ima = new IncomingMessageAcceptor(this, here, SocketDirection.SiloToSilo);
-            MyAddress = SiloAddress.New((IPEndPoint)ima.AcceptingSocket.LocalEndPoint, generation);
+            ima = new IncomingMessageAcceptor(this, here);
+            MyAddress = SiloAddress.New(here, generation);
             MessagingConfiguration = config;
             InboundQueue = new InboundMessageQueue();
             OutboundQueue = new OutboundMessageQueue(this, config);
@@ -75,8 +75,7 @@ namespace Orleans.Runtime.Messaging
 
         public void StartGateway(ClientObserverRegistrar clientRegistrar)
         {
-            if (Gateway != null)
-                Gateway.Start(clientRegistrar);
+            Gateway?.Start(clientRegistrar);
         }
 
         public void PrepareToStop()
@@ -190,12 +189,6 @@ namespace Orleans.Runtime.Messaging
 
         public void Dispose()
         {
-            if (ima != null)
-            {
-                ima.Dispose();
-                ima = null;
-            }
-
             OutboundQueue.Dispose();
 
             GC.SuppressFinalize(this);

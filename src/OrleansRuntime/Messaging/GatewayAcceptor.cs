@@ -6,7 +6,7 @@ using Orleans.Messaging;
 
 namespace Orleans.Runtime.Messaging
 {
-    internal class GatewayAcceptor : IncomingMessageAcceptor
+    internal class GatewayAcceptor : IncomingMessageSocketAcceptor
     {
         private readonly Gateway gateway;
         private readonly CounterStatistic loadSheddingCounter;

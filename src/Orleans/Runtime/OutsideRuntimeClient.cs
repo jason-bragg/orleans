@@ -40,7 +40,7 @@ namespace Orleans
 
         internal ClientStatisticsManager ClientStatistics;
         private readonly GrainId clientId;
-        private GrainInterfaceMap grainInterfaceMap;
+        private IGrainTypeResolver grainInterfaceMap;
         private readonly ThreadTrackingStatistic incomingMessagesThreadTimeTracking;
 
         // initTimeout used to be AzureTableDefaultPolicies.TableCreationTimeout, which was 3 min
@@ -153,7 +153,7 @@ namespace Orleans
                 // Ensure SerializationManager static constructor is called before AssemblyLoad event is invoked
                 SerializationManager.GetDeserializer(typeof(String));
 
-                clientProviderRuntime = new ClientProviderRuntime(grainFactory, new DefaultServiceProvider());
+                clientProviderRuntime = new ClientProviderRuntime(grainFactory, null);
                 statisticsProviderManager = new StatisticsProviderManager("Statistics", clientProviderRuntime);
                 var statsProviderName = statisticsProviderManager.LoadProvider(config.ProviderConfigurations)
                     .WaitForResultWithThrow(initTimeout);

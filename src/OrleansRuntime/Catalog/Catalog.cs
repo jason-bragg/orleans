@@ -135,7 +135,6 @@ namespace Orleans.Runtime
         private readonly CounterStatistic activationsFailedToActivate;
         private readonly IntValueStatistic inProcessRequests;
         private readonly CounterStatistic collectionCounter;
-        private readonly IGrainRuntime grainRuntime;
         private readonly GrainCreator grainCreator;
 
         internal Catalog(
@@ -147,7 +146,7 @@ namespace Orleans.Runtime
             OrleansTaskScheduler scheduler, 
             ActivationDirectory activationDirectory, 
             ClusterConfiguration config, 
-            IGrainRuntime grainRuntime,
+            GrainCreator grainCreator,
             out Action<Dispatcher> setDispatcher)
             : base(grainId, silo)
         {
@@ -157,11 +156,9 @@ namespace Orleans.Runtime
             activations = activationDirectory;
             this.scheduler = scheduler;
             GrainTypeManager = typeManager;
-            this.grainRuntime = grainRuntime;
             collectionNumber = 0;
             destroyActivationsNumber = 0;
-
-            grainCreator = new GrainCreator(grainRuntime, Runtime.Silo.CurrentSilo.Services);
+            this.grainCreator = grainCreator;
 
             logger = LogManager.GetLogger("Catalog", Runtime.LoggerType.Runtime);
             this.config = config.Globals;
@@ -442,7 +439,7 @@ namespace Orleans.Runtime
 
                 if (typeCode != 0)
                 {
-                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy);
+                    GetGrainTypeInfo(typeCode, out actualGrainType, out placement, out activationStrategy, genericArguments);
                 }
                 else
                 {
@@ -486,11 +483,8 @@ namespace Orleans.Runtime
             return result;
         }
 
-        private void SetupActivationInstance(ActivationData result, string grainType, string genericInterface)
+        private void SetupActivationInstance(ActivationData result, string grainType, string genericArguments)
         {
-            var genericArguments = String.IsNullOrEmpty(genericInterface) ? null
-                : TypeUtils.GenericTypeArgsString(genericInterface);
-
             lock (result)
             {
                 if (result.GrainInstance == null)
@@ -500,7 +494,7 @@ namespace Orleans.Runtime
             }
         }
 
-        private async Task InitActivation(ActivationData activation, string grainType, string genericInterface, Dictionary<string, object> requestContextData)
+        private async Task InitActivation(ActivationData activation, string grainType, string genericArguments, Dictionary<string, object> requestContextData)
         {
             // We've created a dummy activation, which we'll eventually return, but in the meantime we'll queue up (or perform promptly)
             // the operations required to turn the "dummy" activation into a real activation
@@ -515,7 +509,7 @@ namespace Orleans.Runtime
                 await RegisterActivationInGrainDirectoryAndValidate(activation);
 
                 initStage = 2;
-                await SetupActivationState(activation, grainType);                
+                await SetupActivationState(activation, String.IsNullOrEmpty(genericArguments) ? grainType : $"{grainType}[{genericArguments}]");
 
                 initStage = 3;
                 await InvokeActivate(activation, requestContextData);

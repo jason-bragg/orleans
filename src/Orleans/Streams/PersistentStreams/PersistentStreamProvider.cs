@@ -48,6 +48,25 @@ namespace Orleans.Providers.Streams.Common
         public string                   Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
+        private class AdaperServicePrider : IServiceProvider
+        {
+            private readonly IServiceProvider realprovider;
+            private readonly IGrainFactory grainFactory;
+
+            public AdaperServicePrider(IServiceProvider realprovider, IGrainFactory grainFactory)
+            {
+                this.realprovider = realprovider;
+                this.grainFactory = grainFactory;
+            }
+
+            public object GetService(Type serviceType)
+            {
+                if (serviceType == typeof (IGrainFactory))
+                    return this.grainFactory;
+                return this.GetService(serviceType);
+            }
+        }
+
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException("name");
@@ -58,7 +77,7 @@ namespace Orleans.Providers.Streams.Common
             providerRuntime = (IStreamProviderRuntime)providerUtilitiesManager;
             logger = providerRuntime.GetLogger(this.GetType().Name);
             adapterFactory = new TAdapterFactory();
-            adapterFactory.Init(config, Name, logger, providerRuntime.ServiceProvider);
+            adapterFactory.Init(config, Name, logger, new AdaperServicePrider(providerRuntime.ServiceProvider, providerRuntime.GrainFactory));
             queueAdapter = await adapterFactory.CreateAdapter();
             myConfig = new PersistentStreamProviderConfig(config);
             string startup;

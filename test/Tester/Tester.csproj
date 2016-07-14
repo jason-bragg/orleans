@@ -105,12 +105,32 @@
       <HintPath>$(SolutionDir)packages\Newtonsoft.Json.7.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="PipeRx.Core, Version=0.1.14.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\src\packages\PipeRx.Core.0.1.14.0\lib\net45\PipeRx.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data" />
     <Reference Include="System.Management.Automation">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\..\..\..\..\Windows\Microsoft.NET\assembly\GAC_MSIL\System.Management.Automation\v4.0_3.0.0.0__31bf3856ad364e35\System.Management.Automation.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Reactive.Core, Version=2.2.5.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\src\packages\Rx-Core.2.2.5\lib\net45\System.Reactive.Core.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Reactive.Interfaces, Version=2.2.5.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\src\packages\Rx-Interfaces.2.2.5\lib\net45\System.Reactive.Interfaces.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Reactive.Linq, Version=2.2.5.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\src\packages\Rx-Linq.2.2.5\lib\net45\System.Reactive.Linq.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Reactive.PlatformServices, Version=2.2.5.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\..\src\packages\Rx-PlatformServices.2.2.5\lib\net45\System.Reactive.PlatformServices.dll</HintPath>
+      <Private>True</Private>
     </Reference>
     <Reference Include="System.Runtime.Serialization" />
     <Reference Include="System.ServiceModel" />
@@ -148,6 +168,9 @@
     <Compile Include="MethodInterceptionTests.cs" />
     <Compile Include="BaseClusterFixture.cs" />
     <Compile Include="General\JsonGrainTests.cs" />
+    <Compile Include="OrleansRxTests\OrleansRxBroadcastTest.cs" />
+    <Compile Include="OrleansRxTests\OrleansRxBroadcastClientGrain.cs" />
+    <Compile Include="OrleansRxTests\OrleansRxBroadcastServerGrain.cs" />
     <Compile Include="SerializationTests\DeepCopyTests.cs" />
     <Compile Include="SerializationTests\ConsiderForCodeGenerationAttributeTests.cs" />
     <Compile Include="StreamingTests\AQClientStreamTests.cs" />
@@ -188,10 +211,10 @@
     </Compile>
     <Compile Include="DefaultClusterFixture.cs" />
     <Compile Include="ProviderTests.cs" />
-    <Compile Include="RelationalUtilities\MySqlStorageForTesting.cs" />
+    <Compile Include="SerializationTests\RelationalUtilities\MySqlStorageForTesting.cs" />
     <Compile Include="InvocationInterceptTests.cs" />
-    <Compile Include="RelationalUtilities\RelationalStorageForTesting.cs" />
-    <Compile Include="RelationalUtilities\SqlServerStorageForTesting.cs" />
+    <Compile Include="SerializationTests\RelationalUtilities\RelationalStorageForTesting.cs" />
+    <Compile Include="SerializationTests\RelationalUtilities\SqlServerStorageForTesting.cs" />
     <Compile Include="ReminderTest.cs" />
     <Compile Include="RequestContextTest.cs" />
     <Compile Include="SerializationTests\BondSerializationTests.cs" />
@@ -315,6 +338,10 @@
     <ProjectReference Include="..\..\src\OrleansProviders\OrleansProviders.csproj">
       <Project>{0054db14-2a92-4cc0-959e-a2c51f5e65d4}</Project>
       <Name>OrleansProviders</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansReactiveExtensions\OrleansReactiveExtensions.csproj">
+      <Project>{972bdb45-69ee-4332-9ec6-87b014c88506}</Project>
+      <Name>OrleansReactiveExtensions</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansRuntime\OrleansRuntime.csproj">
       <Project>{6ff2004c-cdf8-479c-bf27-c6bfe8ef93e0}</Project>

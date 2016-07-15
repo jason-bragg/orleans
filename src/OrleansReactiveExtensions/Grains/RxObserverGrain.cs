@@ -4,13 +4,10 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Rx.AsyncRx;
 
 namespace Orleans.Rx
 {
-    public interface IDisposableAsyncObservable<out T> : IAsyncObservable<T>, IAsyncDisposable
-    {
-    }
-
     public class RxObserverGrain : Grain, IRxObserverGrain
     {
         private Dictionary<Tuple<string, Guid>, IObserverBridge> bridges;
@@ -23,16 +20,15 @@ namespace Orleans.Rx
 
         public override async Task OnDeactivateAsync()
         {
-            List<Task> pending = bridges.Values.Select(bridge => bridge.DisposeAsync()).ToList();
+            List<Task> pending = bridges.Values.Select(bridge => bridge.Disposer.DisposeAsync()).ToList();
             await Task.WhenAll(pending);
             await base.OnDeactivateAsync();
         }
 
-        public async Task<IDisposableAsyncObservable<T>> Subscribe<T>(IRxObservableGrain grain, string topic)
+        public IAsyncConnectableObservable<T> Subscribe<T>(IRxObservableGrain observableGrain, string topic)
         {
             Guid subscriptionId = Guid.NewGuid();
-            IAsyncDisposable disposer = await grain.SubscribeAsync(topic, subscriptionId, this.AsReference<IRxObserverGrain>());
-            var bridge = new ObserverBridge<T>(disposer);
+            var bridge = new ObserverBridge<T>(topic, subscriptionId, observableGrain, this.AsReference<IRxObserverGrain>());
             bridges.Add(Tuple.Create(topic, subscriptionId), bridge);
             return bridge;
         }
@@ -70,59 +66,57 @@ namespace Orleans.Rx
             return bridge.OnCompletedAsync();
         }
 
-        private interface IObserverBridge : IAsyncDisposable
+        private interface IObserverBridge
         {
             Task OnErrorAsync(Exception error, CancellationToken token = new CancellationToken());
             Task OnCompletedAsync(CancellationToken token = new CancellationToken());
             Task OnNextAsync(object value);
+            IAsyncDisposable Disposer { get; }
         }
 
-        private class ObserverBridge<T> : IObserverBridge, IDisposableAsyncObservable<T>, IAsyncObserver<T>
+        private class ObserverBridge<T> : IObserverBridge, IAsyncConnectableObservable<T>, IAsyncObserver<T>
         {
+            private readonly string topic;
+            private readonly Guid subscriptionId;
+            private readonly IRxObservableGrain observableGrain;
+            private readonly IRxObserverGrain observerGrain;
             private readonly List<IAsyncObserver<T>> observers;
-            private readonly IAsyncDisposable asyncDisposable;
-            private bool isDisposed;
             private bool isActive;
 
-            public ObserverBridge(IAsyncDisposable asyncDisposable)
+            public IAsyncDisposable Disposer { get; private set; }
+
+            public ObserverBridge(string topic, Guid subscriptionId, IRxObservableGrain observableGrain, IRxObserverGrain observerGrain)
             {
-                this.asyncDisposable = asyncDisposable;
+                this.topic = topic;
+                this.subscriptionId = subscriptionId;
+                this.observableGrain = observableGrain;
+                this.observerGrain = observerGrain;
                 observers = new List<IAsyncObserver<T>>();
-                isDisposed = false;
-                isActive = true;
             }
 
-            public async Task<IAsyncDisposable> SubscribeAsync(IAsyncObserver<T> observer, CancellationToken token = new CancellationToken())
+            public Task<IAsyncDisposable> SubscribeAsync(IAsyncObserver<T> observer, CancellationToken token = new CancellationToken())
             {
-                if (isDisposed) throw new ObjectDisposedException("");
-                if (!isActive)
-                {
-                    await observer.OnCompletedAsync(token);
-                    return NoOpDisposable.Instance;
-                }
-
                 observers.Add(observer);
-                return new DisposeAction(() => observers.Remove(observer));
+                return Task.FromResult<IAsyncDisposable>(new DisposeAction(() => observers.Remove(observer)));
             }
 
-            public async Task DisposeAsync(CancellationToken token = new CancellationToken())
+            public async Task<IAsyncDisposable> Connect()
             {
-                if (isDisposed) throw new ObjectDisposedException("");
-                Task pending = asyncDisposable.DisposeAsync(token);
-                isDisposed = true;
-                await pending;
+                Disposer = await observableGrain.SubscribeAsync(topic, subscriptionId, observerGrain);
+                isActive = true;
+                return Disposer;
             }
 
             public Task OnNextAsync(T value, CancellationToken token = new CancellationToken())
             {
-                if (isDisposed) throw new ObjectDisposedException("");
+                if (!isActive) return TaskDone.Done;
                 List<Task> pending = observers.Select(obs => obs.OnNextAsync(value, token)).ToList();
                 return Task.WhenAll(pending);
             }
 
             public Task OnErrorAsync(Exception error, CancellationToken token = new CancellationToken())
             {
-                if (isDisposed) throw new ObjectDisposedException("");
+                if (!isActive) return TaskDone.Done;
                 List<Task> pending = observers.Select(obs => obs.OnErrorAsync(error, token)).ToList();
                 isActive = false;
                 return Task.WhenAll(pending);
@@ -130,7 +124,7 @@ namespace Orleans.Rx
 
             public Task OnCompletedAsync(CancellationToken token = new CancellationToken())
             {
-                if (isDisposed) throw new ObjectDisposedException("");
+                if (!isActive) return TaskDone.Done;
                 List<Task> pending = observers.Select(obs => obs.OnCompletedAsync(token)).ToList();
                 isActive = false;
                 return Task.WhenAll(pending);
@@ -161,14 +155,9 @@ namespace Orleans.Rx
                 }
             }
 
-            private class NoOpDisposable : IAsyncDisposable
+            public Task DisposeAsync(CancellationToken token = new CancellationToken())
             {
-                public static IAsyncDisposable Instance = new NoOpDisposable();
-
-                public Task DisposeAsync(CancellationToken token = new CancellationToken())
-                {
-                    return TaskDone.Done;
-                }
+                throw new NotImplementedException();
             }
         }
     }

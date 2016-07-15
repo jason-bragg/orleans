@@ -62,6 +62,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AsyncRx\AsyncObservableExtensions.cs" />
+    <Compile Include="AsyncRx\IAsyncConnectableObservable.cs" />
     <Compile Include="AsyncRx\IAsyncDisposable.cs" />
     <Compile Include="AsyncRx\IAsyncObservable.cs" />
     <Compile Include="AsyncRx\IAsyncObserver.cs" />

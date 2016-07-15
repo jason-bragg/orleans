@@ -5,6 +5,7 @@ using System.Reactive.Linq;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Rx;
+using Orleans.Rx.AsyncRx;
 
 namespace Tester.OrleansRxTests
 {
@@ -16,15 +17,16 @@ namespace Tester.OrleansRxTests
 
     class ReactiveBroadcastClientGrain : RxObserverGrain, IOrleansRxBroadcastClientGrain
     {
-        private IDisposableAsyncObservable<string> observable;
+        private IAsyncConnectableObservable<string> observable;
         private List<string> report;
 
         public async Task Listen(Guid serverId)
         {
             report = new List<string>();
             IOrleansRxBroadcastServerGrain server = GrainFactory.GetGrain<IOrleansRxBroadcastServerGrain>(serverId);
-            observable = await Subscribe<string>(server, "Broadcast");
+            observable = Subscribe<string>(server, "Broadcast");
             await observable.ToSynchronous(UseRx);
+            await observable.Connect();
         }
 
         /// <summary>

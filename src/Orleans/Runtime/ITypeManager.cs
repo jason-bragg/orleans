@@ -1,5 +1,5 @@
-using System.Threading.Tasks;
 
+using System.Threading.Tasks;
 
 namespace Orleans.Runtime
 {
@@ -8,7 +8,17 @@ namespace Orleans.Runtime
     /// </summary>
     internal interface ITypeManager : ISystemTarget
     {
-        Task<IGrainTypeResolver> GetTypeCodeMap(SiloAddress silo);
+        /// <summary>
+        /// Acquires grain interface map for all grain types supported across the entire cluster
+        /// </summary>
+        /// <returns></returns>
+        Task<IGrainTypeResolver> GetClusterTypeCodeMap();
+
+        /// <summary>
+        /// Acquires grain interface map for all grain types supported by hosted silo.
+        /// </summary>
+        /// <returns></returns>
+        Task<GrainInterfaceMap> GetSiloTypeCodeMap();
 
         Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(SiloAddress silo);
     }

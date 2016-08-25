@@ -1,4 +1,6 @@
+
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -12,6 +14,7 @@ namespace Orleans.Runtime
     internal class GrainTypeManager
     {
         private IDictionary<string, GrainTypeData> grainTypes;
+        private readonly ConcurrentDictionary<SiloAddress, GrainInterfaceMap> grainInterfaceMapsBySilo;
         private readonly IGrainFactory grainFactory;
         private readonly Logger logger = LogManager.GetLogger("GrainTypeManager");
         private readonly GrainInterfaceMap grainInterfaceMap;
@@ -21,22 +24,26 @@ namespace Orleans.Runtime
 
         public static GrainTypeManager Instance { get; private set; }
 
-        public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData { get { return grainTypes; } }
+        public IEnumerable<KeyValuePair<string, GrainTypeData>> GrainClassTypeData => grainTypes;
 
+        public GrainInterfaceMap ClusterGrainInterfaceMap { get; private set; }
+        
         public static void Stop()
         {
             Instance = null;
         }
 
-        public GrainTypeManager(bool localTestMode, IGrainFactory grainFactory, SiloAssemblyLoader loader)
+        public GrainTypeManager(bool localTestMode, SiloAssemblyLoader loader, IGrainFactory grainFactory = null)
         {
             this.grainFactory = grainFactory;
             this.loader = loader;
             grainInterfaceMap = new GrainInterfaceMap(localTestMode);
+            ClusterGrainInterfaceMap = grainInterfaceMap;
+            grainInterfaceMapsBySilo = new ConcurrentDictionary<SiloAddress, GrainInterfaceMap>();
             lock (lockable)
             {
                 if (Instance != null)
-                    throw new InvalidOperationException("An attempt to create a second insance of GrainTypeManager.");
+                    throw new InvalidOperationException("An attempt to create a second instance of GrainTypeManager.");
                 Instance = this;
             }
         }
@@ -63,14 +70,42 @@ namespace Orleans.Runtime
             StreamingInitialize();
         }
 
-        public Dictionary<string, string> GetGrainInterfaceToClassMap()
-        {
-            return grainInterfaceMap.GetPrimaryImplementations();
-        }
-
         internal bool TryGetPrimaryImplementation(string grainInterface, out string grainClass)
         {
             return grainInterfaceMap.TryGetPrimaryImplementation(grainInterface, out grainClass);
+        }
+
+        internal ICollection<SiloAddress> GetSilosInMap()
+        {
+            return new HashSet<SiloAddress>(grainInterfaceMapsBySilo.Keys);
+        }
+
+        internal void SetSiloGrainInterfaceMap(SiloAddress siloAddress, GrainInterfaceMap interfaceMap)
+        {
+            grainInterfaceMapsBySilo.AddOrUpdate(siloAddress, interfaceMap, (k, v) => interfaceMap);
+            RebuildFullGrainInterfaceMap();
+        }
+
+        internal bool ClearSiloGrainInterfaceMap(SiloAddress siloAddress)
+        {
+            GrainInterfaceMap interfaceMap;
+            bool changed = grainInterfaceMapsBySilo.TryRemove(siloAddress, out interfaceMap);
+            if (changed)
+            {
+                RebuildFullGrainInterfaceMap();
+            }
+            return changed;
+        }
+
+        private void RebuildFullGrainInterfaceMap()
+        {
+            var newClusterGrainInterfaceMap = new GrainInterfaceMap(false);
+            newClusterGrainInterfaceMap.AddMap(grainInterfaceMap);
+            foreach (var map in grainInterfaceMapsBySilo.Values)
+            {
+                newClusterGrainInterfaceMap.AddMap(map);
+            }
+            ClusterGrainInterfaceMap = newClusterGrainInterfaceMap;
         }
 
         internal GrainTypeData this[string className]
@@ -129,17 +164,17 @@ namespace Orleans.Runtime
         internal void GetTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
             if (!grainInterfaceMap.TryGetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments))
-                throw new OrleansException(String.Format("Unexpected: Cannot find an implementation class for grain interface {0}", typeCode));
+                throw new OrleansException($"Unexpected: Cannot find an implementation class for grain interface {typeCode}");
         }
 
-        private void InitializeGrainClassData(SiloAssemblyLoader loader, bool strict)
+        private void InitializeGrainClassData(SiloAssemblyLoader assemblyLoader, bool strict)
         {
-            grainTypes = loader.GetGrainClassTypes(strict);
+            grainTypes = assemblyLoader.GetGrainClassTypes(strict);
         }
 
-        private void InitializeInvokerMap(SiloAssemblyLoader loader, bool strict)
+        private void InitializeInvokerMap(SiloAssemblyLoader assemblyLoader, bool strict)
         {
-            IEnumerable<KeyValuePair<int, Type>> types = loader.GetGrainMethodInvokerTypes(strict);
+            IEnumerable<KeyValuePair<int, Type>> types = assemblyLoader.GetGrainMethodInvokerTypes(strict);
             foreach (var i in types)
             {
                 int ifaceId = i.Key;
@@ -196,7 +231,7 @@ namespace Orleans.Runtime
             return grainTypes.TryGetValue(name, out result);
         }
 
-        internal IGrainTypeResolver GetTypeCodeMap()
+        internal GrainInterfaceMap GetTypeCodeMap()
         {
             // the map is immutable at this point
             return grainInterfaceMap;
@@ -237,7 +272,7 @@ namespace Orleans.Runtime
             var interfaceName = grainInterfaceMap.TryGetServiceInterface(interfaceId, out type) ?
                 type.FullName : "*unavailable*";
 
-            throw new OrleansException(String.Format("Cannot find an invoker for interface {0} (ID={1},0x{1, 8:X8}).",
+            throw new OrleansException(string.Format("Cannot find an invoker for interface {0} (ID={1},0x{1, 8:X8}).",
                 interfaceName, interfaceId));
         }
 
@@ -254,7 +289,7 @@ namespace Orleans.Runtime
                 if (invokerType.GetTypeInfo().IsGenericType)
                 {
                     cachedGenericInvokers = new Dictionary<string, IGrainMethodInvoker>();
-                    cachedGenericInvokersLockObj = new object(); ;
+                    cachedGenericInvokersLockObj = new object();
                 }
             }
 

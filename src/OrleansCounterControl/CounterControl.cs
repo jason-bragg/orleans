@@ -1,3 +1,4 @@
+
 using System;
 using System.Diagnostics;
 using System.IO;
@@ -7,11 +8,10 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.Counters;
 
-
 namespace Orleans.Counter.Control
 {
     using System.Collections.Generic;
-    using Orleans.Serialization;
+    using Serialization;
     /// <summary>
     /// Control Orleans Counters - Register or Unregister the Orleans counter set
     /// </summary>
@@ -20,7 +20,7 @@ namespace Orleans.Counter.Control
         public bool Unregister { get; private set; }
         public bool BruteForce { get; private set; }
         public bool NeedRunAsAdministrator { get; private set; }
-        public bool IsRunningAsAdministrator { get; private set; }
+        public bool IsRunningAsAdministrator { get; }
         public bool PauseAtEnd { get; private set; }
 
         public CounterControl()
@@ -113,7 +113,7 @@ namespace Orleans.Counter.Control
                 if (Unregister)
                 {
                     ConsoleText.WriteStatus("Unregistering Orleans performance counters with Windows");
-                    UnregisterWindowsPerfCounters(this.BruteForce);
+                    UnregisterWindowsPerfCounters(BruteForce);
                 }
                 else
                 {
@@ -173,7 +173,7 @@ namespace Orleans.Counter.Control
                 if (GrainTypeManager.Instance == null)
                 {
                     var loader = new SiloAssemblyLoader(new Dictionary<string, SearchOption>());
-                    var typeManager = new GrainTypeManager(false, null, loader); // We shouldn't need GrainFactory in this case
+                    var typeManager = new GrainTypeManager(false, loader);
                     GrainTypeManager.Instance.Start(false);
                 }
                 // Register perf counters

@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,10 +32,11 @@ namespace Orleans.Runtime
             private readonly Type iface;
             private readonly HashSet<GrainClassData> implementations;
 
-            internal Type Interface { get { return iface; } }
-            internal int InterfaceId { get; private set; }
-            internal string GrainInterface { get; private set; }
-            internal GrainClassData[] Implementations { get { return implementations.ToArray(); } }
+            internal Type Interface => iface;
+            internal int InterfaceId { get; }
+            internal string GrainInterface { get; }
+            // TODO - separate build stage from run stage.  Data modification should only occur during build stage - jbragg
+            internal IReadOnlyCollection<GrainClassData> Implementations => implementations.ToList();
             internal GrainClassData PrimaryImplementation { get; private set; }
 
             internal GrainInterfaceData(int interfaceId, Type iface, string grainInterface)
@@ -59,7 +61,7 @@ namespace Orleans.Runtime
 
             public override string ToString()
             {
-                return String.Format("{0}:{1}", GrainInterface, InterfaceId);
+                return $"{GrainInterface}:{InterfaceId}";
             }
         }
 
@@ -86,6 +88,30 @@ namespace Orleans.Runtime
             this.localTestMode = localTestMode;
             if(localTestMode) // if we are running in test mode, we'll build a list of loaded grain assemblies to help with troubleshooting deployment issue
                 loadedGrainAsemblies = new HashSet<string>();
+        }
+
+        internal void AddMap(GrainInterfaceMap map)
+        {
+            foreach (var kvp in map.typeToInterfaceData)
+            {
+                if (!typeToInterfaceData.ContainsKey(kvp.Key))
+                {
+                    typeToInterfaceData.Add(kvp.Key, kvp.Value);
+                }
+            }
+
+            foreach (var kvp in map.table)
+            {
+                if (!table.ContainsKey(kvp.Key))
+                {
+                    table.Add(kvp.Key, kvp.Value);
+                }
+            }
+
+            foreach (int grainClassTypeCode in map.unordered)
+            {
+                unordered.Add(grainClassTypeCode);
+            }
         }
 
         internal void AddEntry(int interfaceId, Type iface, int grainTypeCode, string grainInterface, string grainClass, string assembly, 
@@ -208,7 +234,7 @@ namespace Orleans.Runtime
             var typeInfo = interfaceType.GetTypeInfo();
 
             // First, try to find a non-generic grain implementation:
-            if (this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData) &&
+            if (typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, false), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
                 return true;
@@ -217,7 +243,7 @@ namespace Orleans.Runtime
             // If a concrete implementation was not found and the interface is generic, 
             // try to find a generic grain implementation:
             if (typeInfo.IsGenericType && 
-                this.typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData) &&
+                typeToInterfaceData.TryGetValue(GetTypeKey(interfaceType, true), out interfaceData) &&
                 TryGetGrainClassData(interfaceData, out implementation, grainClassNamePrefix))
             {
                 return true;
@@ -259,14 +285,15 @@ namespace Orleans.Runtime
             implementation = null;
             var implementations = interfaceData.Implementations;
 
-            if (implementations.Length == 0)
+            if (implementations.Count == 0)
                 return false;
 
+            GrainClassData first = implementations.First();
             if (String.IsNullOrEmpty(grainClassNamePrefix))
             {
-                if (implementations.Length == 1)
+                if (implementations.Count == 1)
                 {
-                    implementation = implementations[0];
+                    implementation = first;
                     return true;
                 }
 
@@ -276,19 +303,14 @@ namespace Orleans.Runtime
                     return true;
                 }
 
-                throw new OrleansException(String.Format("Cannot resolve grain interface ID={0} to a grain class because of multiple implementations of it: {1}",
-                    interfaceData.InterfaceId, Utils.EnumerableToString(implementations, d => d.GrainClass, ",", false)));
+                throw new OrleansException($"Cannot resolve grain interface ID={interfaceData.InterfaceId} to a grain class because of multiple implementations of it: {Utils.EnumerableToString(implementations, d => d.GrainClass, ",", false)}");
             }
 
-            if (implementations.Length == 1)
+            if (implementations.Count == 1)
             {
-                if (implementations[0].GrainClass.StartsWith(grainClassNamePrefix, StringComparison.Ordinal))
-                {
-                    implementation = implementations[0];
-                    return true;
-                }
-
-                return false;
+                if (!first.GrainClass.StartsWith(grainClassNamePrefix, StringComparison.Ordinal)) return false;
+                implementation = first;
+                return true;
             }
 
             var matches = implementations.Where(impl => impl.GrainClass.Equals(grainClassNamePrefix)).ToArray(); //exact match?
@@ -305,10 +327,7 @@ namespace Orleans.Runtime
                 return true;
             }
 
-            throw new OrleansException(String.Format("Cannot resolve grain interface ID={0}, grainClassNamePrefix={1} to a grain class because of multiple implementations of it: {2}",
-                interfaceData.InterfaceId,
-                grainClassNamePrefix,
-                Utils.EnumerableToString(matches, d => d.GrainClass, ",", false)));
+            throw new OrleansException($"Cannot resolve grain interface ID={interfaceData.InterfaceId}, grainClassNamePrefix={grainClassNamePrefix} to a grain class because of multiple implementations of it: {Utils.EnumerableToString(matches, d => d.GrainClass, ",", false)}");
         }
 
         public bool TryGetGrainClassData(string grainImplementationClassName, out GrainClassData implementation)
@@ -361,12 +380,12 @@ namespace Orleans.Runtime
         private readonly MultiClusterRegistrationStrategy registrationStrategy;
         private readonly bool isGeneric;
 
-        internal int GrainTypeCode { get; private set; }
-        internal string GrainClass { get; private set; }
-        internal PlacementStrategy PlacementStrategy { get { return placementStrategy; } }
-        internal GrainInterfaceMap.GrainInterfaceData InterfaceData { get { return interfaceData; } }
-        internal bool IsGeneric { get { return isGeneric; } }
-        public MultiClusterRegistrationStrategy RegistrationStrategy { get { return registrationStrategy; } }
+        internal int GrainTypeCode { get; }
+        internal string GrainClass { get; }
+        internal PlacementStrategy PlacementStrategy => placementStrategy;
+        internal GrainInterfaceMap.GrainInterfaceData InterfaceData => interfaceData;
+        internal bool IsGeneric => isGeneric;
+        public MultiClusterRegistrationStrategy RegistrationStrategy => registrationStrategy;
 
         internal GrainClassData(int grainTypeCode, string grainClass, bool isGeneric, GrainInterfaceMap.GrainInterfaceData interfaceData, PlacementStrategy placement, MultiClusterRegistrationStrategy registrationStrategy)
         {
@@ -396,7 +415,7 @@ namespace Orleans.Runtime
                     if (genericClassNames.ContainsKey(typeArguments))
                         return genericClassNames[typeArguments];
 
-                    var className = String.Format("{0}[{1}]", GrainClass, typeArguments);
+                    var className = $"{GrainClass}[{typeArguments}]";
                     genericClassNames.Add(typeArguments, className);
                     return className;
                 }
@@ -407,7 +426,7 @@ namespace Orleans.Runtime
         internal long GetTypeCode(Type interfaceType)
         {
             var typeInfo = interfaceType.GetTypeInfo();
-            if (typeInfo.IsGenericType && this.IsGeneric)
+            if (typeInfo.IsGenericType && IsGeneric)
             {
                 string args = TypeUtils.GetGenericTypeArgs(typeInfo.GetGenericArguments(), t => true);
                 int hash = Utils.CalculateIdHash(args);
@@ -421,7 +440,7 @@ namespace Orleans.Runtime
 
         public override string ToString()
         {
-            return String.Format("{0}:{1}", GrainClass, GrainTypeCode);
+            return $"{GrainClass}:{GrainTypeCode}";
         }
 
         public override int GetHashCode()
@@ -431,10 +450,7 @@ namespace Orleans.Runtime
 
         public override bool Equals(object obj)
         {
-            if(!(obj is GrainClassData))
-                return false;
-
-            return GrainTypeCode == ((GrainClassData) obj).GrainTypeCode;
+            return GrainTypeCode == (obj as GrainClassData)?.GrainTypeCode;
         }
     }
 }

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -79,8 +78,8 @@ namespace Orleans.Messaging
         private readonly WeakReference[] grainBuckets;
         private readonly Logger logger;
         private readonly object lockable;
-        public SiloAddress MyAddress { get; private set; }
-        public IMessagingConfiguration MessagingConfiguration { get; private set; }
+        public SiloAddress MyAddress { get; }
+        public IMessagingConfiguration MessagingConfiguration { get; }
         private readonly QueueTrackingStatistic queueTracking;
 
         public ProxiedMessageCenter(ClientConfiguration config, IPAddress localAddress, int gen, GrainId clientId, IGatewayListProvider gatewayListProvider)
@@ -266,7 +265,7 @@ namespace Orleans.Messaging
         {
             if (msg.TargetSilo != null)
             {
-                RejectMessage(msg, String.Format("Target silo {0} is unavailable", msg.TargetSilo));
+                RejectMessage(msg, $"Target silo {msg.TargetSilo} is unavailable");
             }
             else
             {
@@ -277,7 +276,7 @@ namespace Orleans.Messaging
         public Task<IGrainTypeResolver> GetTypeCodeMap(GrainFactory grainFactory)
         {
             var silo = GetLiveGatewaySiloAddress();
-            return GetTypeManager(silo, grainFactory).GetTypeCodeMap(silo);
+            return GetTypeManager(silo, grainFactory).GetClusterTypeCodeMap();
         }
 
         public Task<Streams.ImplicitStreamSubscriberTable> GetImplicitStreamSubscriberTable(GrainFactory grainFactory)
@@ -382,15 +381,9 @@ namespace Orleans.Messaging
 
         #region Random IMessageCenter stuff
 
-        public int SendQueueLength
-        {
-            get { return 0; }
-        }
+        public int SendQueueLength => 0;
 
-        public int ReceiveQueueLength
-        {
-            get { return 0; }
-        }
+        public int ReceiveQueueLength => 0;
 
         #endregion
 

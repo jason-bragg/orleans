@@ -9,6 +9,7 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+
 using Orleans.CodeGeneration;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
@@ -68,7 +69,8 @@ namespace Orleans.Runtime
         private readonly IncomingMessageAgent incomingSystemAgent;
         private readonly IncomingMessageAgent incomingPingAgent;
         private readonly Logger logger;
-        private readonly GrainTypeManager typeManager;
+        private readonly GrainTypeManager grainTypeManager;
+        private TypeManagerSystemTarget typeManagerSystemTarget;
         private readonly ManualResetEvent siloTerminatedEvent;
         private readonly SiloType siloType;
         private readonly SiloStatisticsManager siloStatistics;
@@ -100,7 +102,6 @@ namespace Orleans.Runtime
         internal NodeConfiguration LocalConfig { get { return nodeConfig; } }
         internal ISiloMessageCenter LocalMessageCenter { get { return messageCenter; } }
         internal OrleansTaskScheduler LocalScheduler { get { return scheduler; } }
-        internal GrainTypeManager LocalTypeManager { get { return typeManager; } }
         internal ILocalGrainDirectory LocalGrainDirectory { get { return localGrainDirectory; } }
         internal ISiloStatusOracle LocalSiloStatusOracle { get { return membershipOracle; } }
         internal IMultiClusterOracle LocalMultiClusterOracle { get { return multiClusterOracle; } }
@@ -235,10 +236,10 @@ namespace Orleans.Runtime
                 (obj, ev) => DomainUnobservedExceptionHandler(obj, (Exception)ev.ExceptionObject);
 
             grainFactory = new GrainFactory();
-            typeManager = new GrainTypeManager(
+            grainTypeManager = new GrainTypeManager(
                 here.Address.Equals(IPAddress.Loopback),
-                grainFactory, 
-                new SiloAssemblyLoader(OrleansConfig.Defaults.AdditionalAssemblyDirectories));
+                new SiloAssemblyLoader(OrleansConfig.Defaults.AdditionalAssemblyDirectories),
+                grainFactory);
 
             // Performance metrics
             siloStatistics = new SiloStatisticsManager(globalConfig, nodeConfig);
@@ -288,7 +289,8 @@ namespace Orleans.Runtime
             var grainCreator = new GrainCreator(grainRuntime, usingCustomServiceProvider ? Services : null);
 
             Action<Dispatcher> setDispatcher;
-            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, typeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);
+            catalog = new Catalog(Constants.CatalogId, SiloAddress, Name, LocalGrainDirectory, grainTypeManager, scheduler, activationDirectory, config, grainCreator, out setDispatcher);
+
             var dispatcher = new Dispatcher(scheduler, messageCenter, catalog, config);
             setDispatcher(dispatcher);
 
@@ -298,8 +300,8 @@ namespace Orleans.Runtime
                 LocalGrainDirectory, 
                 SiloAddress, 
                 config, 
-                RingProvider, 
-                typeManager,
+                RingProvider,
+                grainTypeManager,
                 grainFactory);
             messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
             messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
@@ -348,10 +350,13 @@ namespace Orleans.Runtime
             RegisterSystemTarget(LocalGrainDirectory.RemGrainDirectory);
             RegisterSystemTarget(LocalGrainDirectory.CacheValidator);
 
-            logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
+            logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar");
             clientRegistrar = new ClientObserverRegistrar(SiloAddress, LocalGrainDirectory, LocalScheduler, OrleansConfig);
             RegisterSystemTarget(clientRegistrar);
-            RegisterSystemTarget(new TypeManager(SiloAddress, LocalTypeManager));
+
+            logger.Verbose("Creating {0} System Target", "TypeManagerSystemTarget");
+            typeManagerSystemTarget = new TypeManagerSystemTarget(SiloAddress, grainTypeManager, membershipOracle, LocalScheduler);
+            RegisterSystemTarget(typeManagerSystemTarget);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");
             RegisterSystemTarget((SystemTarget) membershipOracle);
@@ -376,6 +381,8 @@ namespace Orleans.Runtime
 
             // consistentRingProvider is not a system target per say, but it behaves like the localGrainDirectory, so it is here
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents((ISiloStatusListener)RingProvider);
+
+            LocalSiloStatusOracle.SubscribeToSiloStatusEvents(typeManagerSystemTarget);
 
             LocalSiloStatusOracle.SubscribeToSiloStatusEvents(DeploymentLoadPublisher.Instance);
 
@@ -434,7 +441,7 @@ namespace Orleans.Runtime
             ConfigureThreadPoolAndServicePointSettings();
 
             // This has to start first so that the directory system target factory gets loaded before we start the router.
-            typeManager.Start();
+            grainTypeManager.Start();
             InsideRuntimeClient.Current.Start();
 
             // The order of these 4 is pretty much arbitrary.

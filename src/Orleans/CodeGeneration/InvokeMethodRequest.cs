@@ -50,5 +50,10 @@ namespace Orleans.CodeGeneration
         Unordered = 0x10,
         DelayForConsistency = 0x20,
         AlwaysInterleave = 0x100, // AlwaysInterleave is a requst type that can interleave with any other request type, including write request.
+
+        // Transactional method options. 
+        // NOTE: keep in sync with TransactionOption enum.
+        TransactionRequired = 0x200,
+        TransactionRequiresNew = 0x400,
     }
 }

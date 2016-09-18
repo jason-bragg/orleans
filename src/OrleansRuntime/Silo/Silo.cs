@@ -29,6 +29,7 @@ using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
 using Orleans.Timers;
+using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
@@ -93,6 +94,8 @@ namespace Orleans.Runtime
         private readonly IGrainRuntime grainRuntime;
         private readonly List<IProvider> allSiloProviders;
 
+        private ITransactionAgent localTransactionAgent;
+
         internal readonly string Name;
         internal readonly string SiloIdentity;
         internal ClusterConfiguration OrleansConfig { get; set; }
@@ -109,6 +112,7 @@ namespace Orleans.Runtime
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
         internal IStreamProviderManager StreamProviderManager { get { return grainRuntime.StreamProviderManager; } }
         internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
+        internal ITransactionAgent LocalTransactionAgent { get { return localTransactionAgent; } }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal static Silo CurrentSilo { get; private set; }
         internal IReadOnlyCollection<IProvider> AllSiloProviders 
@@ -277,7 +281,10 @@ namespace Orleans.Runtime
             // Now the activation directory.
             // This needs to know which router to use so that it can keep the global directory in synch with the local one.
             activationDirectory = new ActivationDirectory();
-            
+
+            // Initialize Transaction Agent
+            localTransactionAgent = new TransactionAgent(Constants.TransactionAgentSystemTargetId, SiloAddress, this.Name, grainFactory, this.globalConfig.Transactions);
+
             // Now the consistent ring provider
             RingProvider = GlobalConfig.UseVirtualBucketsConsistentRing ?
                 (IConsistentRingProvider) new VirtualBucketsRingProvider(SiloAddress, GlobalConfig.NumVirtualBucketsConsistentRing)
@@ -300,7 +307,8 @@ namespace Orleans.Runtime
                 config, 
                 RingProvider, 
                 typeManager,
-                grainFactory);
+                grainFactory,
+                localTransactionAgent);
             messageCenter.RerouteHandler = InsideRuntimeClient.Current.RerouteMessage;
             messageCenter.SniffIncomingMessage = InsideRuntimeClient.Current.SniffIncomingMessage;
 
@@ -361,6 +369,9 @@ namespace Orleans.Runtime
                 logger.Verbose("Creating {0} System Target", "MultiClusterOracle");
                 RegisterSystemTarget((SystemTarget)multiClusterOracle);
             }
+
+            logger.Verbose("Creating {0} System Target", "TransactionAgent");
+            RegisterSystemTarget((SystemTarget)localTransactionAgent);
 
             logger.Verbose("Finished creating System Targets for this silo.");
         }
@@ -473,6 +484,10 @@ namespace Orleans.Runtime
 
             // Validate the configuration.
             GlobalConfig.Application.ValidateConfiguration(logger);
+
+            ISchedulingContext transactionAgentContext = ((SystemTarget)localTransactionAgent).SchedulingContext;
+            scheduler.QueueTask(LocalTransactionAgent.Start, transactionAgentContext)
+                .WaitWithThrow(initTimeout);
 
             // ensure this runs in the grain context, wait for it to complete
             scheduler.QueueTask(CreateSystemGrains, catalog.SchedulingContext)

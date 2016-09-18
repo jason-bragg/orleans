@@ -6,6 +6,7 @@ using System.Text;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Configuration;
 using Orleans.Serialization;
+using Orleans.Transactions;
 
 namespace Orleans.Runtime
 {
@@ -48,6 +49,9 @@ namespace Orleans.Runtime
             PRIOR_MESSAGE_TIMES,
 
             REQUEST_CONTEXT,
+
+            TRANSACTION_INFO,
+            IS_TRANSACTION_REQUIRED,
             // Do not add over byte.MaxValue of these.
         }
 
@@ -148,6 +152,16 @@ namespace Orleans.Runtime
             {
                 if (value || ContainsHeader(Header.IS_UNORDERED))
                     SetHeader(Header.IS_UNORDERED, value);
+            }
+        }
+
+        public bool IsTransactionRequired
+        {
+            get { return GetScalarHeader<bool>(Header.IS_TRANSACTION_REQUIRED); }
+            set
+            {
+                if (value || ContainsHeader(Header.IS_TRANSACTION_REQUIRED))
+                    SetHeader(Header.IS_TRANSACTION_REQUIRED, value);
             }
         }
 
@@ -300,7 +314,16 @@ namespace Orleans.Runtime
             // don't set expiration for one way, system target and system grain messages.
             return Direction != Directions.OneWay && !id.IsSystemTarget && !Constants.IsSystemGrain(id);
         }
-        
+
+        public TransactionInfo TransactionInfo
+        {
+            get { return (TransactionInfo)GetHeader(Header.TRANSACTION_INFO); }
+            set
+            {
+                SetHeader(Header.TRANSACTION_INFO, value);
+            }
+        }
+
         public string DebugContext
         {
             get { return GetStringHeader(Header.DEBUG_CONTEXT); }
@@ -532,6 +555,10 @@ namespace Orleans.Runtime
             if (this.ContainsHeader(Header.EXPIRATION))
             {
                 response.SetHeader(Header.EXPIRATION, this.GetHeader(Header.EXPIRATION));
+            }
+            if (this.ContainsHeader(Header.TRANSACTION_INFO))
+            {
+                response.SetHeader(Header.TRANSACTION_INFO, this.GetHeader(Header.TRANSACTION_INFO));
             }
 
             var contextData = RequestContext.Export();

@@ -17,6 +17,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.Transactions;
 
 
 namespace Orleans.Runtime
@@ -40,6 +41,8 @@ namespace Orleans.Runtime
         private readonly GrainTypeManager typeManager;
         private IGrainTypeResolver grainInterfaceMap;
 
+        private readonly ITransactionAgent transactionAgent;
+
         internal readonly IConsistentRingProvider ConsistentRingProvider;
         
         
@@ -51,7 +54,8 @@ namespace Orleans.Runtime
             ClusterConfiguration config,
             IConsistentRingProvider ring,
             GrainTypeManager typeManager,
-            GrainFactory grainFactory)
+            GrainFactory grainFactory,
+            ITransactionAgent transactionAgent)
         {
             this.dispatcher = dispatcher;
             MySilo = silo;
@@ -65,6 +69,7 @@ namespace Orleans.Runtime
             RuntimeClient.Current = this;
             this.typeManager = typeManager;
             this.InternalGrainFactory = grainFactory;
+            this.transactionAgent = transactionAgent;
         }
 
         public static InsideRuntimeClient Current { get { return (InsideRuntimeClient)RuntimeClient.Current; } }
@@ -100,6 +105,11 @@ namespace Orleans.Runtime
             string genericArguments = null)
         {
             var message = Message.CreateMessage(request, options);
+            if ((options & InvokeMethodOptions.TransactionRequired) != 0 && TransactionContext.GetTransactionInfo() != null)
+            {
+                TransactionContext.GetTransactionInfo().PendingCalls++;
+                message.TransactionInfo = new TransactionInfo(TransactionContext.GetTransactionInfo());
+            }
             SendRequestMessage(target, message, context, callback, debugContext, options, genericArguments);
         }
 
@@ -332,6 +342,21 @@ namespace Orleans.Runtime
                     // in RuntimeClient.CreateMessage -> RequestContext.ExportToMessage(message);
                 }
 
+                bool startNewTransaction = false;
+                var transactionInfo = message.TransactionInfo;
+
+                if (message.IsTransactionRequired && message.TransactionInfo == null)
+                {
+                    // Start a new transaction
+                    transactionInfo = await transactionAgent.StartTransaction(message.IsReadOnly, TimeSpan.FromSeconds(10));
+                    startNewTransaction = true;
+                }
+
+                if (transactionInfo != null)
+                {
+                    TransactionContext.SetTransactionInfo(transactionInfo);
+                }
+
                 object resultObject;
                 try
                 {
@@ -372,11 +397,39 @@ namespace Orleans.Runtime
                         invokeExceptionLogger.Warn(ErrorCode.GrainInvokeException,
                             "Exception during Grain method call of message: " + message, exc1);
                     }
+
+                    if (TransactionContext.GetTransactionInfo() != null)
+                    {
+                        // Must abort the transaction on exceptions
+                        transactionAgent.Abort(TransactionContext.GetTransactionInfo());
+                        TransactionContext.GetTransactionInfo().IsAborted = true;
+                    }
+
                     if (message.Direction != Message.Directions.OneWay)
                     {
                         SafeSendExceptionResponse(message, exc1);
                     }
                     return;
+                }
+
+                if (transactionInfo != null && transactionInfo.PendingCalls > 0)
+                {
+                    // Can't exit before the transaction completes.
+                    transactionAgent.Abort(TransactionContext.GetTransactionInfo());
+                    TransactionContext.GetTransactionInfo().IsAborted = true;
+
+                    if (message.Direction != Message.Directions.OneWay)
+                    {
+                        SafeSendExceptionResponse(message, new OrleansOrphanCallException(transactionInfo.TransactionId));
+                    }
+
+                    return;
+                }
+
+                if (startNewTransaction)
+                {
+                    // This request started the transaction, so we try to commit before returning.
+                    await transactionAgent.Commit(transactionInfo);
                 }
 
                 if (message.Direction == Message.Directions.OneWay) return;
@@ -387,7 +440,22 @@ namespace Orleans.Runtime
             {
                 logger.Warn(ErrorCode.Runtime_Error_100329, "Exception during Invoke of message: " + message, exc2);
                 if (message.Direction != Message.Directions.OneWay)
-                    SafeSendExceptionResponse(message, exc2);             
+                    SafeSendExceptionResponse(message, exc2);
+
+                if (exc2 is OrleansTransactionInDoubtException)
+                {
+                    // TODO: log an error message?
+                }
+                else if (TransactionContext.GetTransactionInfo() != null)
+                {
+                    // Must abort the transaction on exceptions
+                    transactionAgent.Abort(TransactionContext.GetTransactionInfo());
+                    TransactionContext.GetTransactionInfo().IsAborted = true;
+                }
+            }
+            finally
+            {
+                TransactionContext.Clear();
             }
         }
 
@@ -554,6 +622,12 @@ namespace Orleans.Runtime
             bool found = callbacks.TryGetValue(message.Id, out callbackData);
             if (found)
             {
+                if (message.TransactionInfo != null)
+                {
+                    // NOTE: Not clear if thread-safe, revise
+                    callbackData.TransactionInfo.Union(message.TransactionInfo);
+                    callbackData.TransactionInfo.PendingCalls--;
+                }
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 
                 callbackData.DoCallback(message);

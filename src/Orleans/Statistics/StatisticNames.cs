@@ -330,6 +330,16 @@ namespace Orleans.Runtime
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_NUM_SENT_MESSAGES = new StatisticNameFormat("Streams.PersistentStream.{0}.NumSentMessages");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_PUBSUB_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.PubSubCacheSize");
         public static readonly StatisticNameFormat STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE = new StatisticNameFormat("Streams.PersistentStream.{0}.QueueCacheSize");
+
+        // Transactions
+        public static readonly StatisticName TRANSACTIONS_START_QUEUE_LENGTH = new StatisticName("Transactions.Start.QueueLength");
+        public static readonly StatisticName TRANSACTIONS_START_REQUEST = new StatisticName("Transactions.Start.Request");
+        public static readonly StatisticName TRANSACTIONS_START_COMPLETED = new StatisticName("Transactions.Start.Completed");
+        public static readonly StatisticName TRANSACTIONS_COMMIT_QUEUE_LENGTH = new StatisticName("Transactions.Commit.QueueLength");
+        public static readonly StatisticName TRANSACTIONS_COMMIT_REQUEST = new StatisticName("Transactions.Commit.Request");
+        public static readonly StatisticName TRANSACTIONS_COMMIT_COMPLETED = new StatisticName("Transactions.Commit.Completed");
+        public static readonly StatisticName TRANSACTIONS_COMMIT_IN_DOUBT = new StatisticName("Transactions.Commit.InDoubt");
+        public static readonly StatisticName TRANSACTIONS_ABORT_TOTAL = new StatisticName("Transactions.Abort.Total");
     }
 }
  

@@ -10,6 +10,7 @@ using Orleans.GrainDirectory;
 using Orleans.Providers;
 using Orleans.Storage;
 using Orleans.Streams;
+using Orleans.Transactions;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -117,6 +118,8 @@ namespace Orleans.Runtime.Configuration
         }
 
         public ApplicationConfiguration Application { get; private set; }
+
+        public TransactionsConfiguration Transactions { get; private set; }
 
         /// <summary>
         /// SeedNodes are only used in local development setting with LivenessProviderType.MembershipTableGrain
@@ -488,6 +491,7 @@ namespace Orleans.Runtime.Configuration
             : base(true)
         {
             Application = new ApplicationConfiguration();
+            Transactions = new TransactionsConfiguration();
             SeedNodes = new List<IPEndPoint>();
             livenessServiceType = LivenessProviderType.NotSpecified;
             LivenessEnabled = true;
@@ -870,6 +874,10 @@ namespace Orleans.Runtime.Configuration
 
                     case "Application":
                         Application.Load(child, logger);
+                        break;
+
+                    case "Transactions":
+                        Transactions.Load(child);
                         break;
 
                     case "PlacementStrategy":

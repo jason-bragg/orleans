@@ -13,6 +13,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost.Extensions;
 using Orleans.TestingHost.Utils;
+using Orleans.Transactions;
 
 namespace Orleans.TestingHost
 {
@@ -41,6 +42,7 @@ namespace Orleans.TestingHost
         public SiloHandle Secondary { get; private set; }
         protected readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         protected readonly Dictionary<string, byte[]> additionalAssemblies = new Dictionary<string, byte[]>();
+        protected TransactionService TransactionService { get; private set; }
 
         protected TestingSiloOptions siloInitOptions { get; private set; }
         protected TestingClientOptions clientInitOptions { get; private set; }
@@ -426,6 +428,15 @@ namespace Orleans.TestingHost
             return null;
         }
 
+        public void StopTransactionService()
+        {
+            if (TransactionService != null)
+            {
+                TransactionService.Stop();
+                TransactionService = null;
+            }
+        }
+
         public static void AdjustForTest(ClusterConfiguration config, TestingSiloOptions options)
         {
             if (options.AdjustConfig != null) {
@@ -575,11 +586,14 @@ namespace Orleans.TestingHost
         {
             bool doStartPrimary = false;
             bool doStartSecondary = false;
+            bool doStartTransactionService = false;
 
             if (options.StartFreshOrleans)
             {
                 // the previous test was !startFresh, so we need to cleanup after it.
                 StopAllSilosIfRunning();
+
+                StopTransactionService();
 
                 if (options.StartPrimary)
                 {
@@ -588,6 +602,10 @@ namespace Orleans.TestingHost
                 if (options.StartSecondary)
                 {
                     doStartSecondary = true;
+                }
+                if (options.StartTransactionService)
+                {
+                    doStartTransactionService = true;
                 }
             }
             else
@@ -607,6 +625,7 @@ namespace Orleans.TestingHost
                     {
                         this.additionalAssemblies.Add(additionalAssembly.Key, additionalAssembly.Value);
                     }
+                    this.TransactionService = runningInstance.TransactionService;
                 }
 
                 if (options.StartPrimary && Primary == null)
@@ -617,6 +636,10 @@ namespace Orleans.TestingHost
                 if (options.StartSecondary && Secondary == null)
                 {
                     doStartSecondary = true;
+                }
+                if (options.StartTransactionService && TransactionService == null)
+                {
+                    doStartTransactionService = true;
                 }
             }
             if (options.PickNewDeploymentId && String.IsNullOrEmpty(DeploymentId))
@@ -664,6 +687,12 @@ namespace Orleans.TestingHost
             if (!GrainClient.IsInitialized && options.StartClient)
             {
                 InitializeClient(clientOptions, options.LargeMessageWarningThreshold);
+            }
+
+            if (doStartTransactionService)
+            {
+                TransactionService = new TransactionService(new TransactionsConfiguration());
+                TransactionService.Start();
             }
         }
 

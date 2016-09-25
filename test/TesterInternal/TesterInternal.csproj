@@ -222,6 +222,7 @@
     <Compile Include="TimerTests\ReminderTests_TableGrain.cs" />
     <Compile Include="TimerTests\ReminderTests_SqlServer.cs" />
     <Compile Include="TimerTests\ReminderTests_Base.cs" />
+    <Compile Include="TransactionsTests\TransactionManagerTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\ClientGenerator\ClientGenerator.csproj">
@@ -263,6 +264,10 @@
     <ProjectReference Include="..\..\src\OrleansTestingHost\OrleansTestingHost.csproj">
       <Project>{40ee3b00-d381-485f-9c69-ff706837deed}</Project>
       <Name>OrleansTestingHost</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\OrleansTransactionManager\OrleansTransactionManager.csproj">
+      <Project>{eb6c8208-2ad0-4c8b-840e-92c7b9e69d19}</Project>
+      <Name>OrleansTransactionManager</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\OrleansZooKeeperUtils\OrleansZooKeeperUtils.csproj">
       <Project>{45918dd2-53d9-4b27-bc6b-17c197dbc645}</Project>

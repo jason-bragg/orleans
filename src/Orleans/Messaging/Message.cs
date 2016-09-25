@@ -485,6 +485,9 @@ namespace Orleans.Runtime
             if ((options & InvokeMethodOptions.AlwaysInterleave) != 0)
                 message.IsAlwaysInterleave = true;
 
+            if ((options & InvokeMethodOptions.TransactionRequiresNew) != 0 || (options & InvokeMethodOptions.TransactionRequired) != 0)
+                message.IsTransactionRequired = true;
+
             var contextData = RequestContext.Export();
             if (contextData != null)
             {

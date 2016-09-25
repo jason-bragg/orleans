@@ -30,6 +30,7 @@ namespace Orleans.TestingHost
             this.InitialSilosCount = initialSilosCount;
             this.BaseSiloPort = ThreadSafeRandom.Next(22300, 30000);
             this.BaseGatewayPort = ThreadSafeRandom.Next(40000, 50000);
+            this.EnableTransactions = false;
         }
 
         public static short DefaultInitialSilosCount { get; set; } = 2;
@@ -41,6 +42,8 @@ namespace Orleans.TestingHost
         public int BaseSiloPort { get; set; }
 
         public short InitialSilosCount { get; set; }
+
+        public bool EnableTransactions { get; set; }
 
         public ClusterConfiguration ClusterConfiguration
         {

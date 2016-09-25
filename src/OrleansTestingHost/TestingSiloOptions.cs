@@ -13,6 +13,7 @@ namespace Orleans.TestingHost
         public bool StartPrimary { get; set; }
         public bool StartSecondary { get; set; }
         public bool StartClient { get; set; }
+        public bool StartTransactionService { get; set; }
 
         public FileInfo SiloConfigFile { get; set; }
 
@@ -35,6 +36,7 @@ namespace Orleans.TestingHost
             StartPrimary = true;
             StartSecondary = true;
             StartClient = true;
+            StartTransactionService = false;
             PickNewDeploymentId = true;
             // BasePort = -1; // use default from configuration file
             BasePort = ThreadSafeRandom.Next(2000, 9999);
@@ -54,6 +56,7 @@ namespace Orleans.TestingHost
                 StartPrimary = StartPrimary,
                 StartSecondary = StartSecondary,
                 StartClient = StartClient,
+                StartTransactionService = StartTransactionService,
                 SiloConfigFile = SiloConfigFile,
                 PickNewDeploymentId = PickNewDeploymentId,
                 BasePort = BasePort,

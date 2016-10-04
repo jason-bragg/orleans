@@ -42,6 +42,8 @@ namespace Orleans.Transactions
         private Thread checkpointThread;
         private AutoResetEvent checkpointEvent;
 
+        private long checkpointedLSN;
+
         private Timer gcTimer;
 
         private readonly Logger logger;
@@ -75,6 +77,7 @@ namespace Orleans.Transactions
             commitThread = new Thread(GroupCommit);
             checkpointThread = new Thread(Checkpoint);
 
+            checkpointedLSN = 0;
 
             gcTimer = new Timer(GC);
             
@@ -87,6 +90,7 @@ namespace Orleans.Transactions
         {
             log.Initialize();
             CommitRecord record = log.GetFirstCommitRecord().Result;
+            long prevLSN = 0;
             while (record != null)
             {
                 Transaction tx = new Transaction(record.TransactionId) 
@@ -95,6 +99,17 @@ namespace Orleans.Transactions
                     LSN = record.LSN,
                     Info = new TransactionInfo(record.TransactionId)
                 };
+
+                if (prevLSN == 0)
+                {
+                    checkpointedLSN = record.LSN - 1;
+                }
+                else
+                {
+                    // There should be no gaps in the log
+                    Debug.Assert(prevLSN == record.LSN - 1);
+                }
+                prevLSN = record.LSN;
 
                 foreach (var grain in record.Grains)
                 {
@@ -409,19 +424,30 @@ namespace Orleans.Transactions
                     }
                 }
 
-                try
+                if (transactions.Count > 0)
                 {
-                    log.TruncateLog(lsn).Wait();
-                }
-                catch (Exception e)
-                {
-                    logger.Error(0, string.Format("Failed to truncate log. LSN: {0}", lsn), e);
+                    Debug.Assert(lsn > this.checkpointedLSN);
+                    this.checkpointedLSN = lsn;
                 }
             }
         }
 
         private void GC(object args)
         {
+            //
+            // Truncate log
+            //
+            if (checkpointedLSN > 0)
+            {
+                try
+                {
+                    log.TruncateLog(checkpointedLSN - 1).Wait();
+                }
+                catch (Exception e)
+                {
+                    logger.Error(0, string.Format("Failed to truncate log. LSN: {0}", checkpointedLSN), e);
+                }
+            }
 
             //
             // Timeout expired transactions

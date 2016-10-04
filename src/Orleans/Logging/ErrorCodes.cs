@@ -1088,6 +1088,10 @@ namespace Orleans
         Transactions_ReceivedTMResponse = TransactionsBase + 2,
         Transactions_TMError = TransactionsBase + 3,
         Transactions_GetTMProxy = TransactionsBase + 4,
+
+        TransactionManagerBase = Runtime + 4200,
+        TransactionManager_TMEndpointConfigError = TransactionManagerBase + 1,
+        TransactionManager_TMFailedToStart = TransactionManagerBase + 2
     }
 }
 // ReSharper restore InconsistentNaming

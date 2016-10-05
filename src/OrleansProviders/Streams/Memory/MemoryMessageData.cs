@@ -14,7 +14,7 @@ namespace Orleans.Providers
         /// </summary>
         public Guid StreamGuid;
         /// <summary>
-        /// Stream namespace. Stores hash for fast and efficient storage.
+        /// Stream namespace.
         /// </summary>
         public string StreamNamespace;
         /// <summary>

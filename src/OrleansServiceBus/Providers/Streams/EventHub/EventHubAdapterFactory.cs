@@ -79,6 +79,10 @@ namespace Orleans.ServiceBus.Providers
         /// Create a queue mapper to map EventHub partitions to queues
         /// </summary>
         protected Func<string[], IEventHubQueueMapper> QueueMapperFactory { get; set; }
+        /// <summary>
+        /// Create a receiver monitor to report performance metrics.
+        /// </summary>
+        protected Func<string, string, Logger, IEventHubReceiverMonitor> ReceiverMonitorFactory { get; set; }
 
         /// <summary>
         /// Factory initialization.
@@ -126,6 +130,11 @@ namespace Orleans.ServiceBus.Providers
             if (QueueMapperFactory == null)
             {
                 QueueMapperFactory = partitions => new EventHubQueueMapper(partitionIds, adapterSettings.StreamProviderName);
+            }
+
+            if (ReceiverMonitorFactory == null)
+            {
+                ReceiverMonitorFactory = (hubPath, partition, receiverLogger) => new DefaultEventHubReceiverMonitor(hubPath, partition, receiverLogger.GetSubLogger("monitor", "-"));
             }
 
             logger = log.GetLogger($"EventHub.{hubSettings.Path}");
@@ -227,7 +236,7 @@ namespace Orleans.ServiceBus.Providers
                 Partition = streamQueueMapper.QueueToPartition(queueId),
             };
             Logger recieverLogger = logger.GetSubLogger($"{config.Partition}");
-            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger);
+            return new EventHubAdapterReceiver(config, CacheFactory, CheckpointerFactory, recieverLogger, ReceiverMonitorFactory(config.Hub.Path, config.Partition, recieverLogger));
         }
 
         private async Task<string[]> GetPartitionIdsAsync()

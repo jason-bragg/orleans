@@ -46,18 +46,19 @@ namespace Orleans.ServiceBus.Providers
             Func<string, IStreamQueueCheckpointer<string>, Logger,IEventHubQueueCache> cacheFactory,
             Func<string, Task<IStreamQueueCheckpointer<string>>> checkpointerFactory,
             Logger baseLogger,
-            IEventHubReceiverMonitor monitor = null)
+            IEventHubReceiverMonitor monitor)
         {
             if (settings == null) throw new ArgumentNullException(nameof(settings));
             if (cacheFactory == null) throw new ArgumentNullException(nameof(cacheFactory));
             if (checkpointerFactory == null) throw new ArgumentNullException(nameof(checkpointerFactory));
             if (baseLogger == null) throw new ArgumentNullException(nameof(baseLogger));
+            if (monitor == null) throw new ArgumentNullException(nameof(monitor));
             this.settings = settings;
             this.cacheFactory = cacheFactory;
             this.checkpointerFactory = checkpointerFactory;
             this.baseLogger = baseLogger;
             this.logger = baseLogger.GetSubLogger("receiver", "-");
-            this.monitor = monitor ?? new DefaultEventHubReceiverMonitor(settings.Hub.Path, settings.Partition, baseLogger.GetSubLogger("monitor", "-"));
+            this.monitor = monitor;
         }
 
         public Task Initialize(TimeSpan timeout)

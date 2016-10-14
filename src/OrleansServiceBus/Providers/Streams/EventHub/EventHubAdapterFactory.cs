@@ -61,7 +61,7 @@ namespace Orleans.ServiceBus.Providers
         /// Direction of this queue adapter: Read, Write or ReadWrite.
         /// </summary>
         /// <returns>The direction in which this adapter provides data.</returns>
-        public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
+        public StreamProviderDirection Direction { get; protected set; } = StreamProviderDirection.ReadWrite;
 
         /// <summary>
         /// Creates a message cache for an eventhub partition.

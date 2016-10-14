@@ -44,6 +44,30 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubMessage
     {
         /// <summary>
+        /// Contructor
+        /// </summary>
+        /// <param name="streamIdentity"></param>
+        /// <param name="partitionKey"></param>
+        /// <param name="offset"></param>
+        /// <param name="sequenceNumber"></param>
+        /// <param name="enqueueTimeUtc"></param>
+        /// <param name="dequeueTimeUtc"></param>
+        /// <param name="properties"></param>
+        /// <param name="payload"></param>
+        public EventHubMessage(IStreamIdentity streamIdentity, string partitionKey, string offset, long sequenceNumber,
+            DateTime enqueueTimeUtc, DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
+        {
+            StreamIdentity = streamIdentity;
+            PartitionKey = partitionKey;
+            Offset = offset;
+            SequenceNumber = sequenceNumber;
+            EnqueueTimeUtc = enqueueTimeUtc;
+            DequeueTimeUtc = dequeueTimeUtc;
+            Properties = properties;
+            Payload = payload;
+        }
+
+        /// <summary>
         /// Duplicate of EventHub's EventData class.
         /// </summary>
         /// <param name="cachedMessage"></param>

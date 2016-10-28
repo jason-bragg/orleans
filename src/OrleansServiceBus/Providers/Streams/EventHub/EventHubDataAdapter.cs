@@ -121,18 +121,33 @@ namespace Orleans.ServiceBus.Providers
     /// <summary>
     /// Default eventhub data comparer.  Implements comparisions against CachedEventHubMessage
     /// </summary>
-    internal class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
+    public class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
     {
+        /// <summary>
+        /// Singleton instance, since type is stateless using this will reduce allocations.
+        /// </summary>
         public static readonly ICacheDataComparer<CachedEventHubMessage> Instance = new EventHubDataComparer();
 
-        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken token)
+        /// <summary>
+        /// Compare a cached message with a sequence token to determine if it message is before or after the token
+        /// </summary>
+        /// <param name="cachedMessage"></param>
+        /// <param name="streamToken"></param>
+        /// <returns></returns>
+        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken streamToken)
         {
-            var realToken = (EventSequenceToken)token;
+            var realToken = (EventSequenceToken)streamToken;
             return cachedMessage.SequenceNumber != realToken.SequenceNumber
                 ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
                 : 0 - realToken.EventIndex;
         }
 
+        /// <summary>
+        /// Checks to see if the cached message is part of the provided stream
+        /// </summary>
+        /// <param name="cachedMessage"></param>
+        /// <param name="streamIdentity"></param>
+        /// <returns></returns>
         public bool Equals(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
         {
             int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);

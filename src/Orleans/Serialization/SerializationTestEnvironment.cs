@@ -1,6 +1,6 @@
+
 using System.Collections.Generic;
 using System.Reflection;
-
 using Orleans.Runtime;
 
 namespace Orleans.Serialization
@@ -9,9 +9,9 @@ namespace Orleans.Serialization
     {
         public SerializationTestEnvironment()
         {
-            this.TypeMetadataCache = new TypeMetadataCache();
-            this.AssemblyProcessor = new AssemblyProcessor(this.TypeMetadataCache);
-            this.GrainFactory = new GrainFactory(null, this.TypeMetadataCache);
+            var sharedGrainTypeMetadataPublisher = new SharedGrainTypeMetadataPublisher();
+            this.AssemblyProcessor = new AssemblyProcessor(sharedGrainTypeMetadataPublisher);
+            this.GrainFactory = new GrainFactory(null, sharedGrainTypeMetadataPublisher);
         }
 
         public void InitializeForTesting(List<TypeInfo> serializationProviders = null, TypeInfo fallbackType = null)
@@ -28,7 +28,6 @@ namespace Orleans.Serialization
         }
 
         internal AssemblyProcessor AssemblyProcessor { get; set; }
-        internal TypeMetadataCache TypeMetadataCache { get; set; }
         public IGrainFactory GrainFactory { get; set; }
     }
 }

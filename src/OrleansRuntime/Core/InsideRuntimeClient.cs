@@ -45,9 +45,10 @@ namespace Orleans.Runtime
             ClusterConfiguration config,
             IConsistentRingProvider ring,
             GrainTypeManager typeManager,
-            TypeMetadataCache typeMetadataCache,
             Func<ISiloStatusOracle> siloStatusOracle,
-            OrleansTaskScheduler scheduler)
+            OrleansTaskScheduler scheduler,
+            ISharedGrainTypeMetadata grainTypeMetadata
+            )
         {
             this.dispatcher = dispatcher;
             MySilo = catalog.LocalSilo;
@@ -62,7 +63,7 @@ namespace Orleans.Runtime
             this.typeManager = typeManager;
             this.Scheduler = scheduler;
             this.siloStatusOracle = new Lazy<ISiloStatusOracle>(siloStatusOracle);
-            this.ConcreteGrainFactory = new GrainFactory(this, typeMetadataCache);
+            this.ConcreteGrainFactory = new GrainFactory(this, grainTypeMetadata);
             RuntimeClient.Current = this;
         }
 

@@ -80,6 +80,8 @@
     <Compile Include="CodeGeneration\GeneratedAssembly.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
+    <Compile Include="Core\GrainTypeMetadata.cs" />
+    <Compile Include="Core\ISharedGrainTypeMetadata.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
     <Compile Include="Logging\LoggerImpl.cs" />
     <Compile Include="Logging\LogFormatter.cs" />
@@ -318,6 +320,7 @@
     <Compile Include="Configuration\LimitManager.cs" />
     <Compile Include="Timers\SafeTimerBase.cs" />
     <Compile Include="Timers\SafeTimer.cs" />
+    <Compile Include="Utils\ISharedStatePublisher.cs" />
     <Compile Include="Utils\StandardExtensions.cs" />
     <Compile Include="Runtime\GrainReferenceCache.cs" />
     <Compile Include="Runtime\RequestContext.cs" />

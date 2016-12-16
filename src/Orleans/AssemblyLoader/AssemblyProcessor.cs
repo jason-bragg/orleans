@@ -4,6 +4,7 @@ namespace Orleans.Runtime
     using System.Collections.Generic;
     using System.Linq;
     using System.Reflection;
+    using Orleans;
     using Orleans.CodeGeneration;
     using Orleans.Serialization;
 
@@ -28,25 +29,26 @@ namespace Orleans.Runtime
         private readonly object initializationLock = new object();
 
         /// <summary>
-        /// The type metadata cache.
+        /// The grain type metadata.
         /// </summary>
-        private readonly TypeMetadataCache typeCache;
+        private GrainTypeMetadata grainTypeMetadata;
 
         /// <summary>
         /// Whether or not this class has been initialized.
         /// </summary>
         private bool initialized;
 
+        private readonly ISharedGrainTypeMetadataPublisher grainTypeMetadataPublisher;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="AssemblyProcessor"/> class.
         /// </summary>
-        /// <param name="typeCache">
-        /// The type cache.
-        /// </param>
-        public AssemblyProcessor(TypeMetadataCache typeCache)
+        /// <param name="grainTypeMetadataPublisher">Grain type metadata publisher</param>
+        public AssemblyProcessor(ISharedGrainTypeMetadataPublisher grainTypeMetadataPublisher)
         {
+            this.grainTypeMetadataPublisher = grainTypeMetadataPublisher;
             this.logger = LogManager.GetLogger("AssemblyProcessor");
-            this.typeCache = typeCache;
+            this.grainTypeMetadata = new GrainTypeMetadata();
         }
 
         /// <summary>
@@ -105,16 +107,28 @@ namespace Orleans.Runtime
         /// <param name="args">The event arguments.</param>
         private void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
         {
-            this.ProcessAssembly(args.LoadedAssembly);
+            ProcessAssembly(args.LoadedAssembly);
+        }
+
+        private void ProcessAssembly(Assembly assembly)
+        {
+            TypeMetadataCache typeCache;
+            if (!this.TryProcessAssembly(assembly, out typeCache)) return;
+            if (typeCache.GrainToInvokerMapping.Count == 0 && typeCache.GrainToReferenceMapping.Count == 0) return;
+            this.grainTypeMetadata = this.grainTypeMetadata.Append(typeCache);
+            this.grainTypeMetadataPublisher.Publish(this.grainTypeMetadata.Append(typeCache));
         }
 
         /// <summary>
         /// Processes the provided assembly.
         /// </summary>
         /// <param name="assembly">The assembly to process.</param>
-        private void ProcessAssembly(Assembly assembly)
+        /// <param name="typeCache">resulting type cache</param>
+        /// <param name="current">staring type cache</param>
+        private bool TryProcessAssembly(Assembly assembly, out TypeMetadataCache typeCache, TypeMetadataCache current = null)
         {
-            if (assembly == null) return;
+            typeCache = current;
+            if (assembly == null) return typeCache != null;
              
             string assemblyName = assembly.GetName().Name;
             if (this.logger.IsVerbose3)
@@ -126,7 +140,7 @@ namespace Orleans.Runtime
             // If the assembly is loaded for reflection only avoid processing it.
             if (assembly.ReflectionOnly)
             {
-                return;
+                return typeCache != null;
             }
 #endif
 
@@ -135,7 +149,7 @@ namespace Orleans.Runtime
             {
                 if (!this.processedAssemblies.Add(assembly))
                 {
-                    return;
+                    return typeCache != null;
                 }
             }
 
@@ -144,7 +158,7 @@ namespace Orleans.Runtime
             {
                 // Code generation occurs in a self-contained assembly, so invoke it separately.
                 var generated = CodeGeneratorManager.GenerateAndCacheCodeForAssembly(assembly);
-                this.ProcessAssembly(generated?.Assembly);
+                this.TryProcessAssembly(generated?.Assembly, out typeCache, typeCache);
             }
 
             // Process each type in the assembly.
@@ -163,14 +177,15 @@ namespace Orleans.Runtime
                     }
 
                     SerializationManager.FindSerializationInfo(type);
-    
-                    this.typeCache.FindSupportClasses(type);
+                    typeCache = typeCache ?? new TypeMetadataCache();
+                    typeCache.FindSupportClasses(type);
                 }
                 catch (Exception exception)
                 {
                     this.logger.Error(ErrorCode.SerMgr_TypeRegistrationFailure, "Failed to load type " + typeInfo.FullName + " in assembly " + assembly.FullName + ".", exception);
                 }
             }
+            return typeCache != null;
         }
 
         /// <summary>

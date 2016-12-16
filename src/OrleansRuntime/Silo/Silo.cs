@@ -221,7 +221,6 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<GrainFactory>(sp => sp.GetService<InsideRuntimeClient>().ConcreteGrainFactory);
                     services.TryAddExisting<IGrainFactory, GrainFactory>();
                     services.TryAddExisting<IInternalGrainFactory, GrainFactory>();
-                    services.TryAddSingleton<TypeMetadataCache>();
                     services.TryAddSingleton<AssemblyProcessor>();
                     services.TryAddSingleton<ActivationDirectory>();
                     services.TryAddSingleton<LocalGrainDirectory>();
@@ -270,6 +269,10 @@ namespace Orleans.Runtime
                     
                     services.TryAddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
                     services.TryAddSingleton<GrainCreator>();
+
+                    services.TryAddSingleton<SharedGrainTypeMetadataPublisher>();
+                    services.TryAddSingleton<ISharedGrainTypeMetadata>(sp => sp.GetRequiredService<SharedGrainTypeMetadataPublisher>());
+                    services.TryAddSingleton<ISharedGrainTypeMetadataPublisher>(sp => sp.GetRequiredService<SharedGrainTypeMetadataPublisher>());
 
                     if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
                     {

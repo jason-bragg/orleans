@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Runtime;
 
 namespace Orleans
@@ -34,7 +35,7 @@ namespace Orleans
         /// <summary>
         /// The cache of type metadata.
         /// </summary>
-        private readonly TypeMetadataCache typeCache;
+        private readonly ISharedGrainTypeMetadata sharedGrainTypeMetadata;
 
         /// <summary>
         /// The runtime client.
@@ -43,10 +44,10 @@ namespace Orleans
 
         // Make this internal so that client code is forced to access the IGrainFactory using the 
         // GrainClient (to make sure they don't forget to initialize the client).
-        public GrainFactory(IRuntimeClient runtimeClient, TypeMetadataCache typeCache)
+        public GrainFactory(IRuntimeClient runtimeClient, ISharedGrainTypeMetadata sharedGrainTypeMetadata)
         {
             this.runtimeClient = runtimeClient;
-            this.typeCache = typeCache;
+            this.sharedGrainTypeMetadata = sharedGrainTypeMetadata;
         }
 
         /// <summary>
@@ -221,7 +222,7 @@ namespace Orleans
 
         private IGrainMethodInvoker MakeInvoker(Type interfaceType)
         {
-            var invokerType = this.typeCache.GetGrainMethodInvokerType(interfaceType);
+            var invokerType = this.sharedGrainTypeMetadata.State.GetGrainMethodInvokerType(interfaceType);
             return (IGrainMethodInvoker)Activator.CreateInstance(invokerType);
         }
 
@@ -266,7 +267,7 @@ namespace Orleans
         /// <returns>A new grain reference caster.</returns>
         private GrainReferenceCaster MakeCaster(Type interfaceType)
         {
-            var grainReferenceType = this.typeCache.GetGrainReferenceType(interfaceType);
+            var grainReferenceType = this.sharedGrainTypeMetadata.State.GetGrainReferenceType(interfaceType);
             return GrainCasterFactory.CreateGrainReferenceCaster(interfaceType, grainReferenceType);
         }
 

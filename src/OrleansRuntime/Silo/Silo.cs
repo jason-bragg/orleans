@@ -274,6 +274,10 @@ namespace Orleans.Runtime
                     services.TryAddSingleton<ISharedGrainTypeMetadata>(sp => sp.GetRequiredService<SharedGrainTypeMetadataPublisher>());
                     services.TryAddSingleton<ISharedGrainTypeMetadataPublisher>(sp => sp.GetRequiredService<SharedGrainTypeMetadataPublisher>());
 
+                    services.TryAddSingleton<SharedAssemblyManifestPublisher>();
+                    services.TryAddSingleton(sp => sp.GetRequiredService<SharedAssemblyManifestPublisher>()?.State);
+                    services.TryAddSingleton<ISharedAssemblyManifestPublisher>(sp => sp.GetRequiredService<SharedAssemblyManifestPublisher>());
+
                     if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
                     {
                         services.TryAddSingleton<IConsistentRingProvider>(
@@ -350,9 +354,20 @@ namespace Orleans.Runtime
             incomingPingAgent = new IncomingMessageAgent(Message.Categories.Ping, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
             incomingAgent = new IncomingMessageAgent(Message.Categories.Application, messageCenter, activationDirectory, scheduler, catalog.Dispatcher);
 
-            membershipFactory = Services.GetRequiredService<MembershipFactory>();
             membershipOracle = Services.GetRequiredService<IMembershipOracle>();
-            
+
+            typeManager = new TypeManager(
+                this.SiloAddress,
+                this.grainTypeManager,
+                this.membershipOracle,
+                this.LocalScheduler,
+                this.GlobalConfig.TypeMapRefreshInterval,
+                this.Services.GetRequiredService<ImplicitStreamSubscriberTable>(),
+                this.Services.GetRequiredService<ISharedAssemblyManifest>(),
+                this.Services.GetRequiredService<ISharedGrainTypeMetadataPublisher>());
+
+            membershipFactory = Services.GetRequiredService<MembershipFactory>();
+
             SystemStatus.Current = SystemStatus.Created;
 
             StringValueStatistic.FindOrCreate(StatisticNames.SILO_START_TIME,
@@ -386,8 +401,6 @@ namespace Orleans.Runtime
             logger.Verbose("Creating {0} System Target", "ClientObserverRegistrar + TypeManager");
 
             this.RegisterSystemTarget(this.Services.GetRequiredService<ClientObserverRegistrar>());
-            var implicitStreamSubscriberTable = Services.GetRequiredService<ImplicitStreamSubscriberTable>();
-            typeManager = new TypeManager(SiloAddress, this.grainTypeManager, membershipOracle, LocalScheduler, GlobalConfig.TypeMapRefreshInterval, implicitStreamSubscriberTable);
             this.RegisterSystemTarget(typeManager);
 
             logger.Verbose("Creating {0} System Target", "MembershipOracle");

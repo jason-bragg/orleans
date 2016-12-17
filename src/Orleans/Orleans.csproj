@@ -64,6 +64,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AssemblyLoader\SharedAssemblyManifest.cs" />
     <Compile Include="AssemblyLoader\TypeMetadataCache.cs" />
     <Compile Include="AssemblyLoader\AssemblyProcessor.cs" />
     <Compile Include="Async\AsyncBatchedContinuationQueue.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="Async\TaskExtensions.cs" />
     <Compile Include="CodeGeneration\GeneratedAssembly.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
+    <Compile Include="Core\GrainTypeMetadataAssemblyProcessor.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
     <Compile Include="Core\GrainTypeMetadata.cs" />
     <Compile Include="Core\ISharedGrainTypeMetadata.cs" />
@@ -146,6 +148,7 @@
     <Compile Include="Serialization\ILDelegateBuilder.cs" />
     <Compile Include="Serialization\OrleansJsonSerializer.cs" />
     <Compile Include="Serialization\BinaryFormatterSerializer.cs" />
+    <Compile Include="Utils\SharedState.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Serialization\SerializationTestEnvironment.cs" />
@@ -321,6 +324,7 @@
     <Compile Include="Timers\SafeTimerBase.cs" />
     <Compile Include="Timers\SafeTimer.cs" />
     <Compile Include="Utils\ISharedStatePublisher.cs" />
+    <Compile Include="Utils\SharedStatePublisherBase.cs" />
     <Compile Include="Utils\StandardExtensions.cs" />
     <Compile Include="Runtime\GrainReferenceCache.cs" />
     <Compile Include="Runtime\RequestContext.cs" />

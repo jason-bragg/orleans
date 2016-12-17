@@ -64,6 +64,7 @@ namespace Orleans
         private static readonly Object staticLock = new Object();
 
         private readonly AssemblyProcessor assemblyProcessor;
+        private GrainTypeMetadataPublisherBridge grainTypeMetadataPublisherBridge;
 
         Logger IRuntimeClient.AppLogger
         {
@@ -105,9 +106,11 @@ namespace Orleans
             Justification = "MessageCenter is IDisposable but cannot call Dispose yet as it lives past the end of this method call.")]
         public OutsideRuntimeClient(ClientConfiguration cfg, bool secondary = false)
         {
-            var sharedGrainTypeMetatdataPublisher = new SharedGrainTypeMetadataPublisher();
-            this.assemblyProcessor = new AssemblyProcessor(sharedGrainTypeMetatdataPublisher);
-            this.grainFactory = new GrainFactory(this, sharedGrainTypeMetatdataPublisher);
+            var sharedGrainTypeMetadataPublisher = new SharedGrainTypeMetadataPublisher();
+            var sharedAssemblyManifestPublisher = new SharedAssemblyManifestPublisher();
+            this.grainTypeMetadataPublisherBridge = new GrainTypeMetadataPublisherBridge(sharedAssemblyManifestPublisher.State, sharedGrainTypeMetadataPublisher);
+            this.assemblyProcessor = new AssemblyProcessor(sharedAssemblyManifestPublisher);
+            this.grainFactory = new GrainFactory(this, sharedGrainTypeMetadataPublisher);
 
             if (cfg == null)
             {
@@ -889,6 +892,9 @@ namespace Orleans
 
         public void Dispose()
         {
+            this.grainTypeMetadataPublisherBridge?.Dispose();
+            this.grainTypeMetadataPublisherBridge = null;
+
             if (listeningCts != null)
             {
                 listeningCts.Dispose();

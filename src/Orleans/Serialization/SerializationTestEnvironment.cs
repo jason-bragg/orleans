@@ -7,10 +7,14 @@ namespace Orleans.Serialization
 {
     public class SerializationTestEnvironment
     {
+        private GrainTypeMetadataPublisherBridge grainTypeMetadataPublisherBridge;
+
         public SerializationTestEnvironment()
         {
             var sharedGrainTypeMetadataPublisher = new SharedGrainTypeMetadataPublisher();
-            this.AssemblyProcessor = new AssemblyProcessor(sharedGrainTypeMetadataPublisher);
+            var sharedAssemblyManifestPublisher = new SharedAssemblyManifestPublisher();
+            this.grainTypeMetadataPublisherBridge = new GrainTypeMetadataPublisherBridge(sharedAssemblyManifestPublisher.State, sharedGrainTypeMetadataPublisher);
+            this.AssemblyProcessor = new AssemblyProcessor(sharedAssemblyManifestPublisher);
             this.GrainFactory = new GrainFactory(null, sharedGrainTypeMetadataPublisher);
         }
 

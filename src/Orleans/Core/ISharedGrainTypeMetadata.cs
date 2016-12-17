@@ -1,4 +1,8 @@
 ﻿
+using System;
+using System.Threading.Tasks;
+using Orleans.Runtime;
+
 namespace Orleans
 {
     /// <summary>
@@ -21,6 +25,38 @@ namespace Orleans
         public void Publish(GrainTypeMetadata state)
         {
             State = state;
+        }
+    }
+
+    /// <summary>
+    /// AssemblyManifest to GrainTypeMetadata bridge for client and test.
+    /// </summary>
+    internal class GrainTypeMetadataPublisherBridge : IDisposable
+    {
+        private bool disposed = false;
+
+        public GrainTypeMetadataPublisherBridge(
+            ISharedAssemblyManifest assemblyManifest,
+            ISharedGrainTypeMetadataPublisher metadataPublisher)
+        {
+            PublishGrainTypeMetadata(assemblyManifest, metadataPublisher).Ignore();
+        }
+
+        private async Task PublishGrainTypeMetadata(ISharedAssemblyManifest assemblyManifest, ISharedGrainTypeMetadataPublisher metadataPublisher)
+        {
+            var assemblyProcessor = new GrainTypeMetadataAssemblyProcessor(LogManager.GetLogger("GrainTypeMetadataAssemblyProcessor"), assemblyManifest);
+            while (!disposed)
+            {
+                if (await assemblyProcessor.TryProcessNextAssemblies())
+                {
+                    metadataPublisher.Publish(assemblyProcessor.GrainTypeMetadata);
+                }
+            }
+        }
+
+        public void Dispose()
+        {
+            disposed = true;
         }
     }
 }

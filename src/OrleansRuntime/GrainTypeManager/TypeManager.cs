@@ -14,8 +14,9 @@ namespace Orleans.Runtime
         private readonly ISiloStatusOracle statusOracle;
         private readonly ImplicitStreamSubscriberTable implicitStreamSubscriberTable;
         private readonly OrleansTaskScheduler scheduler;
-        private bool hasToRefreshClusterGrainInterfaceMap;
         private readonly AsyncTaskSafeTimer refreshClusterGrainInterfaceMapTimer;
+        private bool hasToRefreshClusterGrainInterfaceMap;
+        private bool running = true;
 
         internal TypeManager(
             SiloAddress myAddr,
@@ -23,7 +24,9 @@ namespace Orleans.Runtime
             ISiloStatusOracle oracle,
             OrleansTaskScheduler scheduler,
             TimeSpan refreshClusterMapTimeout,
-            ImplicitStreamSubscriberTable implicitStreamSubscriberTable)
+            ImplicitStreamSubscriberTable implicitStreamSubscriberTable,
+            ISharedAssemblyManifest assemblyManifest,
+            ISharedGrainTypeMetadataPublisher grainTypeMetadataPublisher)
             : base(Constants.TypeManagerId, myAddr)
         {
             if (grainTypeManager == null)
@@ -34,6 +37,10 @@ namespace Orleans.Runtime
                 throw new ArgumentNullException(nameof(scheduler));
             if (implicitStreamSubscriberTable == null)
                 throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
+            if (assemblyManifest == null)
+                throw new ArgumentNullException(nameof(assemblyManifest));
+            if (grainTypeMetadataPublisher == null)
+                throw new ArgumentNullException(nameof(grainTypeMetadataPublisher));
 
             this.grainTypeManager = grainTypeManager;
             this.statusOracle = oracle;
@@ -44,9 +51,23 @@ namespace Orleans.Runtime
                     OnRefreshClusterMapTimer,
                     null,
                     TimeSpan.Zero,  // Force to do it once right now
-                    refreshClusterMapTimeout); 
+                    refreshClusterMapTimeout);
+            var assemblyProcessor = new GrainTypeMetadataAssemblyProcessor(LogManager.GetLogger("GrainTypeMetadataAssemblyProcessor"), assemblyManifest);
+            grainTypeMetadataPublisher.Publish(assemblyProcessor.GrainTypeMetadata);
+            scheduler.QueueTask(() => this.PublishGrainTypeMetadata(assemblyProcessor, grainTypeMetadataPublisher), SchedulingContext).Ignore();
         }
-        
+
+        private async Task PublishGrainTypeMetadata(GrainTypeMetadataAssemblyProcessor assemblyProcessor, ISharedGrainTypeMetadataPublisher grainTypeMetadataPublisher)
+        {
+            while (running)
+            {
+                if (await assemblyProcessor.TryProcessNextAssemblies())
+                {
+                    grainTypeMetadataPublisher.Publish(assemblyProcessor.GrainTypeMetadata);
+                }
+            }
+        }
+
         public Task<IGrainTypeResolver> GetClusterTypeCodeMap()
         {
             return Task.FromResult<IGrainTypeResolver>(grainTypeManager.ClusterGrainInterfaceMap);

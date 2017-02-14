@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
+using Orleans.Transactions;
 
 namespace Orleans.TestingHost
 {
@@ -39,6 +40,8 @@ namespace Orleans.TestingHost
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
 
         private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
+
+        protected TransactionService TransactionService { get; private set; }
 
         /// <summary>
         /// Client configuration to use when initializing the client
@@ -91,6 +94,11 @@ namespace Orleans.TestingHost
         public TestCluster(TestClusterOptions options)
             : this(options.ClusterConfiguration, options.ClientConfiguration)
         {
+            // TODO: enable passing transaction configuration similar to cluster and client config.
+            if (options.EnableTransactions)
+            {
+                TransactionService = new TransactionService(new TransactionsConfiguration());
+            }
         }
 
         /// <summary>
@@ -161,6 +169,7 @@ namespace Orleans.TestingHost
             catch (Exception ex)
             {
                 StopAllSilos();
+                StopTransactionService();
 
                 Exception baseExc = ex.GetBaseException();
                 FlushLogToConsole();
@@ -402,6 +411,18 @@ namespace Orleans.TestingHost
             return newInstance;
         }
 
+        /// <summary>
+        /// Stops the Transaction Service if running.
+        /// </summary>
+        public void StopTransactionService()
+        {
+            if (TransactionService != null)
+            {
+                TransactionService.Stop();
+                TransactionService = null;
+            }
+        }
+
         #region Private methods
 
         /// <summary>
@@ -468,6 +489,11 @@ namespace Orleans.TestingHost
             {
                 InitializeClient();
             }
+
+            if (TransactionService != null)
+            {
+                TransactionService.Start();
+            }    
         }
 
         private SiloHandle StartOrleansSilo(Silo.SiloType type, ClusterConfiguration clusterConfig, NodeConfiguration nodeConfig)

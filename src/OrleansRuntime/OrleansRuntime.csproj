@@ -201,6 +201,11 @@
     <Compile Include="Streams\QueueBalancer\DeploymentBasedQueueBalancer.cs" />
     <Compile Include="Streams\QueueBalancer\StreamQueueBalancerFactory.cs" />
     <Compile Include="Streams\StreamProviderManagerAgent.cs" />
+    <Compile Include="Transactions\LogRecord.cs" />
+    <Compile Include="Transactions\TMProxyDirectoryGrain.cs" />
+    <Compile Include="Transactions\TransactionAgent.cs" />
+    <Compile Include="Transactions\TransactionAgentTest.cs" />
+    <Compile Include="Transactions\TransactionalGrain.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

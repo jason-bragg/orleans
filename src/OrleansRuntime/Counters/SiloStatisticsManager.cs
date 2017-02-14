@@ -20,6 +20,7 @@ namespace Orleans.Runtime.Counters
             ApplicationRequestsStatisticsGroup.Init(initializationParams.GlobalConfig.ResponseTimeout);
             SchedulerStatisticsGroup.Init();
             StorageStatisticsGroup.Init();
+            TransactionsStatisticsGroup.Init();
             runtimeStats = new RuntimeStatisticsGroup();
             this.logStatistics = new LogStatistics(initializationParams.NodeConfig.StatisticsLogWriteInterval, true);
             this.MetricsTable = new SiloPerformanceMetrics(this.runtimeStats, initializationParams.NodeConfig);

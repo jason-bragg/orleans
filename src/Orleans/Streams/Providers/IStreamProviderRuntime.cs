@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using Orleans.Core;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
@@ -193,4 +194,93 @@ namespace Orleans.Streams
 
         Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId);
     }
+
+    public interface IStreamSubscriptionManager
+    {
+        Task<StreamSubscription> AddSubscription<TGrainInterface>(string streamProviderName, IStreamIdentity streamId, GrainReference grainRef);
+        Task RemoveSubscription(Guid subscriptionId);
+        IEnumerable<StreamSubscription> GetSubscriptions(string streamProviderName = null, IStreamIdentity StreamId = null);
+    }
+
+    public static class IStreamSubscriptionManagerExtensions
+    {
+        public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
+            this IStreamSubscriptionManager manager,
+            string streamProviderName,
+            IStreamIdentity streamId,
+            Guid primaryKey,
+            string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithGuidKey
+        {
+            // placeholder
+            return Task.FromResult<StreamSubscription>(null);
+        }
+
+        public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
+            this IStreamSubscriptionManager manager,
+            string streamProviderName,
+            IStreamIdentity streamId,
+            long primaryKey,
+            string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithIntegerKey
+        {
+            // placeholder
+            return Task.FromResult<StreamSubscription>(null);
+        }
+
+        public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
+            this IStreamSubscriptionManager manager,
+            string streamProviderName,
+            IStreamIdentity streamId,
+            string primaryKey,
+            string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithStringKey
+        {
+            // placeholder
+            return Task.FromResult<StreamSubscription>(null);
+        }
+
+        public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
+            this IStreamSubscriptionManager manager,
+            string streamProviderName,
+            IStreamIdentity streamId,
+            Guid primaryKey,
+            string keyExtension,
+            string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithGuidCompoundKey
+        {
+            // placeholder
+            return Task.FromResult<StreamSubscription>(null);
+        }
+
+        public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
+            this IStreamSubscriptionManager manager,
+            string streamProviderName,
+            IStreamIdentity streamId,
+            long primaryKey,
+            string keyExtension,
+            string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithIntegerCompoundKey
+        {
+            // placeholder
+            return Task.FromResult<StreamSubscription>(null);
+        }
+    }
+
+    public class StreamSubscription
+    {
+        StreamSubscription(Guid subscriptionId, string streamProviderName, IStreamIdentity streamId, IGrainIdentity grainId)
+        {
+            this.SubscriptionId = subscriptionId;
+            this.StreamProviderName = streamProviderName;
+            this.StreamId = streamId;
+            this.GrainId = grainId;
+        }
+        public Guid SubscriptionId;
+        public string StreamProviderName;
+        public IStreamIdentity StreamId;
+        public IGrainIdentity GrainId;
+    }
+
+
 }

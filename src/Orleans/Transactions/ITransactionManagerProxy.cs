@@ -6,7 +6,7 @@ using Orleans.Runtime;
 
 namespace Orleans.Transactions
 {
-    public interface ITransactionManagerProxy : IGrain
+    public interface ITransactionManagerProxy : IGrainWithIntegerKey
     {
         Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions);
         Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts);

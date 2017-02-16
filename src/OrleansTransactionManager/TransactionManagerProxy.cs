@@ -14,6 +14,10 @@ namespace Orleans.Transactions
     {
         private ITransactionManager tm;
 
+        public TransactionManagerProxy()
+        {
+        }
+
         public TransactionManagerProxy(ITransactionManager tm)
         {
             this.tm = tm;

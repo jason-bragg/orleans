@@ -419,7 +419,7 @@ namespace Orleans.Runtime
 
                     if (message.Direction != Message.Directions.OneWay)
                     {
-                        SafeSendExceptionResponse(message, new OrleansOrphanCallException(transactionInfo.TransactionId));
+                        SafeSendExceptionResponse(message, new OrleansOrphanCallException(transactionInfo.TransactionId, transactionInfo.PendingCalls));
                     }
 
                     return;

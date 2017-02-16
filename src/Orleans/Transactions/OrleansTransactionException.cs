@@ -96,8 +96,9 @@ namespace Orleans.Transactions
     [Serializable]
     public class OrleansOrphanCallException : OrleansTransactionAbortedException
     {
-        public OrleansOrphanCallException(long transactionId)
-            : base(transactionId, string.Format("Transaction {0} aborted because method did not await all its outstanding calls", transactionId)) {}
+        public OrleansOrphanCallException(long transactionId, int pendingCalls)
+            : base(transactionId,
+                $"Transaction {transactionId} aborted because method did not await all its outstanding calls ({pendingCalls})") {}
 
         public OrleansOrphanCallException(SerializationInfo info, StreamingContext context)
             : base(info, context)

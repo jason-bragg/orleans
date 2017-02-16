@@ -51,6 +51,7 @@ namespace Orleans.Providers.Streams.Common
         public string Name { get; private set; }
 
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
+        public IStreamSubscriptionManager SubscriptionManager { get; }
 
         // this is a workaround until an IServiceProvider instance is used in the Orleans client
         private class GrainFactoryServiceProvider : IServiceProvider

@@ -197,16 +197,28 @@ namespace Orleans.Streams
 
     public interface IStreamSubscriptionManager
     {
-        Task<StreamSubscription> AddSubscription<TGrainInterface>(string streamProviderName, IStreamIdentity streamId, GrainReference grainRef);
+        Task<StreamSubscription> AddSubscription(IStreamIdentity streamId, GrainReference grainRef);
         Task RemoveSubscription(Guid subscriptionId);
-        IEnumerable<StreamSubscription> GetSubscriptions(string streamProviderName = null, IStreamIdentity StreamId = null);
+        Task<IEnumerable<StreamSubscription>> GetSubscriptions(IStreamIdentity StreamId);
+    }
+
+    public interface IStreamSubscriptionManagerImpl : IStreamSubscriptionManager
+    {
+        IGrainFactory GrainFactory { get; }
+    }
+
+
+    public interface IMasterStreamSubscriptionManager : IStreamSubscriptionManager
+    {
+        Task<StreamSubscription> AddSubscription(string streamProviderName, IStreamIdentity streamId, GrainReference grainRef);
+        Task RemoveSubscription(string streamProviderName,  Guid subscriptionId);
+        Task<IEnumerable<StreamSubscription>> GetSubscriptions(string streamProviderName, IStreamIdentity StreamId);
     }
 
     public static class IStreamSubscriptionManagerExtensions
     {
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
-            string streamProviderName,
             IStreamIdentity streamId,
             Guid primaryKey,
             string grainClassNamePrefix = null)
@@ -218,7 +230,6 @@ namespace Orleans.Streams
 
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
-            string streamProviderName,
             IStreamIdentity streamId,
             long primaryKey,
             string grainClassNamePrefix = null)
@@ -230,7 +241,6 @@ namespace Orleans.Streams
 
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
-            string streamProviderName,
             IStreamIdentity streamId,
             string primaryKey,
             string grainClassNamePrefix = null)
@@ -242,7 +252,6 @@ namespace Orleans.Streams
 
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
-            string streamProviderName,
             IStreamIdentity streamId,
             Guid primaryKey,
             string keyExtension,
@@ -255,7 +264,6 @@ namespace Orleans.Streams
 
         public static Task<StreamSubscription> AddSubscription<TGrainInterface>(
             this IStreamSubscriptionManager manager,
-            string streamProviderName,
             IStreamIdentity streamId,
             long primaryKey,
             string keyExtension,
@@ -281,6 +289,4 @@ namespace Orleans.Streams
         public IStreamIdentity StreamId;
         public IGrainIdentity GrainId;
     }
-
-
 }

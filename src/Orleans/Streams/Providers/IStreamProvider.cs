@@ -15,5 +15,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns>True if this is a rewindable provider, false otherwise.</returns>
         bool IsRewindable { get; }
+
+        IStreamSubscriptionManager SubscriptionManager { get; }
     }
 }

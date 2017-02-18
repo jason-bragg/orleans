@@ -2,7 +2,8 @@
 
 namespace Orleans.Core
 {
-    public interface IStorage
+    public interface IStorage<TState> : IStorageBridge<TState>
+        where TState : class, new()
     {
         /// <summary>
         /// Async method to cause the current grain state data to be cleared and reset. 

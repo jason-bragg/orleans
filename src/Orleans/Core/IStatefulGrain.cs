@@ -1,11 +1,19 @@
-﻿using Orleans.Core;
+﻿
+using System.Threading.Tasks;
 
 namespace Orleans
 {
-    internal interface IStatefulGrain
+    public interface IStorageBridge<TState>
+        where TState : class, new()
     {
-        IGrainState GrainState { get; }
+        TState State { get; set; }
+        Task Initialize();
+    }
 
-        void SetStorage(IStorage storage);
+    internal interface IStatefulGrain<TState, TBridge>
+        where TBridge : IStorageBridge<TState>
+        where TState : class, new()
+    {
+        TBridge Bridge { get; set; }
     }
 }

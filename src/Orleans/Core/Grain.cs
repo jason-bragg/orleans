@@ -265,30 +265,17 @@ namespace Orleans
     /// Base class for a Grain with declared persistent state.
     /// </summary>
     /// <typeparam name="TGrainState">The class of the persistent state object</typeparam>
-    public class Grain<TGrainState> : Grain, IStatefulGrain where TGrainState : new()
+    public class Grain<TGrainState> : Grain, IStatefulGrain<TGrainState,IStorage<TGrainState>> where TGrainState : class, new()
     {
-        private readonly GrainState<TGrainState> grainState;
-
-        private IStorage storage;
-
-        /// <summary>
-        /// This constructor should never be invoked. We expose it so that client code (subclasses of this class) do not have to add a constructor.
-        /// Client code should use the GrainFactory to get a reference to a Grain.
-        /// </summary>
-        protected Grain()
-        {
-            grainState = new GrainState<TGrainState>();
-        }
-
+        private IStorage<TGrainState> storage;
         /// <summary>
         /// Grain implementers do NOT have to expose this constructor but can choose to do so.
         /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
         /// the IGrainIdentity, IGrainRuntime and State with test doubles (mocks/stubs).
         /// </summary>
-        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage storage) 
+        protected Grain(IGrainIdentity identity, IGrainRuntime runtime, TGrainState state, IStorage<TGrainState> storage) 
             : base(identity, runtime)
         {
-            grainState = new GrainState<TGrainState>(state);
             this.storage = storage;
         }
 
@@ -297,18 +284,21 @@ namespace Orleans
         /// </summary>
         protected TGrainState State
         {
-            get { return grainState.State; }
-            set { grainState.State = value; }
+            get { return storage.State; }
+            set { storage.State = value; }
         }
         
-        void IStatefulGrain.SetStorage(IStorage storage)
+        IStorage<TGrainState> IStatefulGrain<TGrainState, IStorage<TGrainState>>.Bridge
         {
-            this.storage = storage;
-        }
+            get
+            {
+                return storage;
+            }
 
-        IGrainState IStatefulGrain.GrainState
-        {
-            get { return grainState; }
+            set
+            {
+                storage = value;
+            }
         }
 
         /// <summary>Clear the current grain state data from backing store.</summary>

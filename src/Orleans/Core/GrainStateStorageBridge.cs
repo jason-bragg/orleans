@@ -9,14 +9,21 @@ using Orleans.Storage;
 
 namespace Orleans.Core
 {
-    internal class GrainStateStorageBridge : IStorage
+    internal class GrainStateStorageBridge<TState> : IStorage<TState>
+        where TState : class, new()
     {
         private readonly IStorageProvider store;
-        private IStatefulGrain statefulGrain;
-        private Grain baseGrain;
         private readonly string grainTypeName;
+        private readonly GrainReference grainRef;
+        private readonly GrainState<TState> grainState;
 
-        public GrainStateStorageBridge(string grainTypeName, IStorageProvider store)
+        public TState State
+        {
+            get { return grainState.State; }
+            set { grainState.State = value; }
+        }
+
+        public GrainStateStorageBridge(GrainReference grainRef, IStorageProvider store)
         {
             if (grainTypeName == null)
             {
@@ -27,24 +34,8 @@ namespace Orleans.Core
                 throw new ArgumentNullException("store", "No storage provider supplied");
             }
            
-            this.grainTypeName = grainTypeName;
+            this.grainRef = grainRef;
             this.store = store;
-        }
-
-        internal void SetGrain(Grain grain)
-        {
-            if(grain == null)
-                throw new ArgumentNullException(nameof(grain));
-
-            statefulGrain = grain as IStatefulGrain;
-
-            if(statefulGrain == null)
-                throw new ArgumentException("Attempt to configure storage bridge for a non-perisstent grain.", nameof(grain));
-
-            if (statefulGrain.GrainState == null)
-                throw new ArgumentException("No grain state object supplied", nameof(grain));
-            
-            this.baseGrain = grain;
         }
 
         /// <summary>
@@ -55,10 +46,9 @@ namespace Orleans.Core
         {
             const string what = "ReadState";
             Stopwatch sw = Stopwatch.StartNew();
-            GrainReference grainRef = baseGrain.GrainReference;
             try
             {
-                await store.ReadStateAsync(grainTypeName, grainRef, statefulGrain.GrainState);
+                await store.ReadStateAsync(grainTypeName, grainRef, grainState);
 
                 StorageStatisticsGroup.OnStorageRead(store, grainTypeName, grainRef, sw.Elapsed);
             }
@@ -83,11 +73,10 @@ namespace Orleans.Core
         {
             const string what = "WriteState";
             Stopwatch sw = Stopwatch.StartNew();
-            GrainReference grainRef = baseGrain.GrainReference;
             Exception errorOccurred;
             try
             {
-                await store.WriteStateAsync(grainTypeName, grainRef, statefulGrain.GrainState);
+                await store.WriteStateAsync(grainTypeName, grainRef, grainState);
                 StorageStatisticsGroup.OnStorageWrite(store, grainTypeName, grainRef, sw.Elapsed);
                 errorOccurred = null;
             }
@@ -141,14 +130,12 @@ namespace Orleans.Core
         {
             const string what = "ClearState";
             Stopwatch sw = Stopwatch.StartNew();
-            GrainReference grainRef = baseGrain.GrainReference;
             try
             {
                 // Clear (most likely Delete) state from external storage
-                await store.ClearStateAsync(grainTypeName, grainRef, statefulGrain.GrainState);
-
+                await store.ClearStateAsync(grainTypeName, grainRef, grainState);
                 // Reset the in-memory copy of the state
-                statefulGrain.GrainState.State = Activator.CreateInstance(statefulGrain.GrainState.State.GetType());
+                grainState.State = new TState();
 
                 // Update counters
                 StorageStatisticsGroup.OnStorageDelete(store, grainTypeName, grainRef, sw.Elapsed);
@@ -176,9 +163,13 @@ namespace Orleans.Core
             if(decoder != null)
                 decoder.DecodeException(exc, out httpStatusCode, out errorCode, true);
 
-            GrainReference grainReference = baseGrain.GrainReference;
             return string.Format("Error from storage provider during {0} for grain Type={1} Pk={2} Id={3} Error={4}" + Environment.NewLine + " {5}",
-                what, grainTypeName, grainReference.GrainId.ToDetailedString(), grainReference, errorCode, LogFormatter.PrintException(exc));
+                what, grainTypeName, grainRef.GrainId.ToDetailedString(), grainRef, errorCode, LogFormatter.PrintException(exc));
+        }
+
+        public Task Initialize()
+        {
+            throw new NotImplementedException();
         }
     }
 }

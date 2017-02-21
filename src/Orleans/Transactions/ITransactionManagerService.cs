@@ -6,11 +6,32 @@ using Orleans.Runtime;
 
 namespace Orleans.Transactions
 {
-    public interface ITransactionManagerProxy : IGrainWithIntegerKey
+    public interface ITransactionStartService
+    {
+        Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts);
+    }
+
+    public interface ITransactionCommitService
     {
         Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions);
-        Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts);
+    }
 
+    public interface ITransactionManagerService : ITransactionStartService , ITransactionCommitService
+    {
+    }
+
+    public interface ITransactionManagerProxy : ITransactionManagerService, IGrainWithIntegerKey
+    {
+    }
+
+    public interface ITransactionManagerGrain : ITransactionManagerService, IGrainWithIntegerKey
+    {
+    }
+
+    public interface ITransactionServiceFactory
+    {
+        Task<ITransactionStartService> GetTransactionStartService();
+        Task<ITransactionCommitService> GetTransactionCommitService();
     }
 
     [Serializable]

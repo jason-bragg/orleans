@@ -1,9 +1,7 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
-using Orleans;
 
 namespace Orleans.Transactions
 {
@@ -31,7 +29,7 @@ namespace Orleans.Transactions
     ///         This is the normal mode of operation in which the caller can modify the log by
     ///         appending entries and removing entries that are no longer necessary.
     /// </summary>
-    internal abstract class TransactionLog
+    public abstract class TransactionLog
     {
         /// <summary>
         /// Initialize the log (in Recovery Mode). This method must be called before any other method

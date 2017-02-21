@@ -69,17 +69,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="ActiveTransactionsTracker.cs" />
-    <Compile Include="ITransactionManager.cs" />
-    <Compile Include="Log\AzureTransactionLog.cs" />
-    <Compile Include="Log\MemoryTransactionLog.cs" />
-    <Compile Include="Log\TrasactionLog.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Transaction.cs" />
     <Compile Include="TransactionManager.cs" />
     <Compile Include="TransactionManagerHost.cs" />
     <Compile Include="TransactionManagerProxy.cs" />
-    <Compile Include="TransactionService.cs" />
+    <Compile Include="OrleansClientTransactionService.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Orleans\Orleans.csproj">

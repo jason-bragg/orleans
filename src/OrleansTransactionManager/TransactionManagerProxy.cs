@@ -1,7 +1,6 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions
@@ -12,13 +11,49 @@ namespace Orleans.Transactions
     /// </summary>
     public class TransactionManagerProxy : ITransactionManagerProxy
     {
-        private ITransactionManager tm;
+        private readonly ITransactionManagerService transactionManagerService;
 
-        public TransactionManagerProxy()
+        public TransactionManagerProxy(ITransactionManager transactionManager)
         {
+            this.transactionManagerService = new TransactionManagerService(transactionManager);
         }
 
-        public TransactionManagerProxy(ITransactionManager tm)
+        public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
+        {
+            return this.transactionManagerService.StartTransactions(timeouts);
+        }
+
+        public Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions)
+        {
+            return this.transactionManagerService.CommitTransactions(transactions);
+        }
+    }
+
+    public class TransactionManagerGrain : Grain, ITransactionManagerGrain
+    {
+        private readonly ITransactionManagerService transactionManagerService;
+
+        public TransactionManagerGrain(ITransactionManager transactionManager)
+        {
+            this.transactionManagerService = new TransactionManagerService(transactionManager);
+        }
+
+        public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
+        {
+            return this.transactionManagerService.StartTransactions(timeouts);
+        }
+
+        public Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions)
+        {
+            return this.transactionManagerService.CommitTransactions(transactions);
+        }
+    }
+
+    public class TransactionManagerService : ITransactionManagerService
+    {
+        private ITransactionManager tm;
+
+        public TransactionManagerService(ITransactionManager tm)
         {
             this.tm = tm;
         }

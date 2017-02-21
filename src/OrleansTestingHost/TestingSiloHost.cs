@@ -48,7 +48,7 @@ namespace Orleans.TestingHost
         
         private readonly List<SiloHandle> additionalSilos = new List<SiloHandle>();
         private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
-        protected TransactionService TransactionService { get; private set; }
+        protected OrleansClientTransactionService TransactionService { get; private set; }
 
         private TestingSiloOptions siloInitOptions { get; set; }
 
@@ -674,7 +674,7 @@ namespace Orleans.TestingHost
 
             if (doStartTransactionService)
             {
-                TransactionService = new TransactionService(new TransactionsConfiguration());
+                TransactionService = new OrleansClientTransactionService(new TransactionsConfiguration());
                 TransactionService.Start();
             }
         }

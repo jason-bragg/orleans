@@ -1,4 +1,4 @@
-/*
+﻿/*
 Project Orleans Cloud Service SDK ver. 1.0
  
 Copyright (c) Microsoft Corporation
@@ -21,7 +21,7 @@ OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHE
 TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
 
-﻿using System;
+ using System;
 using System.IO;
 using System.Net;
 using System.Runtime;
@@ -78,7 +78,7 @@ namespace Orleans.Transactions.Host
         /// <summary> Whether this TM started successfully and is currently running. </summary>
         public bool IsStarted { get; private set; }
 
-        private TransactionService orleans;
+        private OrleansClientTransactionService orleans;
         private EventWaitHandle startupEvent;
         private bool disposed;
 
@@ -113,7 +113,7 @@ namespace Orleans.Transactions.Host
             {
                 if (!ConfigLoaded) LoadOrleansConfig();
                 
-                orleans = new TransactionService(Config.Globals.Transactions);
+                orleans = new OrleansClientTransactionService(Config.Globals.Transactions);
             }
             catch (Exception exc)
             {

@@ -1,11 +1,12 @@
-﻿using Microsoft.WindowsAzure.Storage.Table;
-using Orleans.Serialization;
+﻿
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.WindowsAzure.Storage.Table;
+using Orleans.Serialization;
 using CloudStorageAccount = Microsoft.WindowsAzure.Storage.CloudStorageAccount;
 
 namespace Orleans.Transactions
@@ -17,14 +18,14 @@ namespace Orleans.Transactions
         private const long StartPartitionKey = 1;
 
         private LogMode mode;
-        private bool clearOnInitialize = false;
+        private readonly bool clearOnInitialize;
         private long logSequenceNumber = 1;
-        private long startedTransactionsCount = 0;
+        private long startedTransactionsCount;
 
         // Azure Tables objects for persistent storage
-        private string tableName;
-        private CloudStorageAccount storageAccount;
-        private CloudTableClient azTableClient;
+        private readonly string tableName;
+        private readonly CloudStorageAccount storageAccount;
+        private readonly CloudTableClient azTableClient;
 
         // Log iteration indexes
         private TableQuerySegment<CommitRow> currentLogQuerySegment;
@@ -61,8 +62,8 @@ namespace Orleans.Transactions
 
             TableQuery<StartRow> query =
                 new TableQuery<StartRow>().Where(TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.Equal, "0"));
-            var continuationToken = new TableContinuationToken();
-            var result = table.ExecuteQuerySegmented(query, continuationToken);
+            var continuation = new TableContinuationToken();
+            var result = table.ExecuteQuerySegmented(query, continuation);
 
             if (result.Results.Count == 0)
             {
@@ -81,7 +82,7 @@ namespace Orleans.Transactions
             mode = LogMode.RecoveryMode;
         }
 
-        public async override Task<CommitRecord> GetFirstCommitRecord()
+        public override async Task<CommitRecord> GetFirstCommitRecord()
         {
             ThrowIfNotInMode(LogMode.RecoveryMode);
 
@@ -208,7 +209,7 @@ namespace Orleans.Transactions
             ThrowIfNotInMode(LogMode.AppendMode);
 
             CloudTable table = azTableClient.GetTableReference(tableName);
-            TableContinuationToken token = null;
+            TableContinuationToken token;
             do
             {
                 TableQuery<CommitRow> query =
@@ -271,10 +272,10 @@ namespace Orleans.Transactions
             continuationToken = currentLogQuerySegment.ContinuationToken;
         }
 
-        private void ThrowIfNotInMode(LogMode mode)
+        private void ThrowIfNotInMode(LogMode logMode)
         {
-            if (this.mode != mode)
-                throw new InvalidOperationException("Log has to be in {0}" + mode.ToString());
+            if (this.mode != logMode)
+                throw new InvalidOperationException($"Log has to be in {logMode} mode");
         }
 
         private class CommitRow : TableEntity
@@ -307,7 +308,7 @@ namespace Orleans.Transactions
             {
             }
 
-            public long TransactionCount { get; set; }
+            public long TransactionCount { get; }
         }
 
         private string SerializeCommitRecords(List<CommitRecord> records)
@@ -322,12 +323,12 @@ namespace Orleans.Transactions
             var sw = new BinaryTokenStreamWriter();
             SerializationManager.Serialize(serializableList, sw);
 
-            return System.Convert.ToBase64String(sw.ToByteArray());
+            return Convert.ToBase64String(sw.ToByteArray());
         }
 
         private List<CommitRecord> DeserializeCommitRecords(string base64)
         {
-            var bytes = System.Convert.FromBase64String(base64);
+            var bytes = Convert.FromBase64String(base64);
             var sr = new BinaryTokenStreamReader(bytes);
             var l = SerializationManager.Deserialize<List<Tuple<long, long, HashSet<ITransactionalGrain>>>>(sr);
             var list = new List<CommitRecord>();

@@ -1,28 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿
+using System;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.Transactions
 {
-    public class TransactionService : MarshalByRefObject
+    public class OrleansClientTransactionService : MarshalByRefObject
     {
-        private TransactionManager tm;
-        private TransactionManagerProxy[] proxy;
-        private ITransactionManagerProxy[] proxyRef;
+        private readonly TransactionManager tm;
+        private readonly TransactionManagerProxy[] proxy;
+        private readonly ITransactionManagerProxy[] proxyRef;
 
-        private Timer proxyPublisher;
+        private readonly Timer proxyPublisher;
         private volatile bool running;
         private readonly ManualResetEvent serviceTerminatedEvent;
 
         /// <summary>
         /// Termination event used to signal shutdown of this service.
         /// </summary>
-        public WaitHandle ServiceTerminatedEvent { get { return serviceTerminatedEvent; } }
+        public WaitHandle ServiceTerminatedEvent => serviceTerminatedEvent;
 
-        public TransactionService(TransactionsConfiguration config)
+        public OrleansClientTransactionService(TransactionsConfiguration config)
         {
             tm = new TransactionManager(config);
             proxy = new TransactionManagerProxy[config.TransactionManagerProxyCount];

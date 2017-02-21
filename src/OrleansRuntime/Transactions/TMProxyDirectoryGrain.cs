@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions
@@ -10,15 +7,15 @@ namespace Orleans.Transactions
     {
         private ITransactionManagerProxy reference;
 
-        public Task SetReference(ITransactionManagerProxy reference)
+        public Task SetReference(ITransactionManagerProxy proxyReference)
         {
-            this.reference = reference;
+            this.reference = proxyReference;
             return TaskDone.Done;
         }
 
         public Task<ITransactionManagerProxy> GetReference()
         {
-            return Task.FromResult<ITransactionManagerProxy>(reference);
+            return Task.FromResult(reference);
         }
     }
 }

@@ -41,7 +41,7 @@ namespace Orleans.TestingHost
 
         private readonly Dictionary<string, GeneratedAssembly> additionalAssemblies = new Dictionary<string, GeneratedAssembly>();
 
-        protected TransactionService TransactionService { get; private set; }
+        protected OrleansClientTransactionService TransactionService { get; private set; }
 
         /// <summary>
         /// Client configuration to use when initializing the client
@@ -97,7 +97,7 @@ namespace Orleans.TestingHost
             // TODO: enable passing transaction configuration similar to cluster and client config.
             if (options.EnableTransactions)
             {
-                TransactionService = new TransactionService(new TransactionsConfiguration());
+                TransactionService = new OrleansClientTransactionService(new TransactionsConfiguration());
             }
         }
 

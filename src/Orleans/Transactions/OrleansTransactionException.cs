@@ -5,11 +5,30 @@ using System.Runtime.Serialization;
 namespace Orleans.Transactions
 {
     /// <summary>
+    /// Base class for all transaction exceptions
+    /// </summary>
+    [Serializable]
+    public class OrleansTransactionException : OrleansException
+    {
+        public OrleansTransactionException() : base("Orleans transaction error.") { }
+
+        public OrleansTransactionException(string message) : base(message) { }
+
+        public OrleansTransactionException(string message, Exception innerException) : base(message, innerException) { }
+#if !NETSTANDARD
+        protected OrleansTransactionException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+#endif
+    }
+
+    /// <summary>
     /// Signifies that the runtime is unable to determine whether a transaction
     /// has committed.
     /// </summary>
     [Serializable]
-    public class OrleansTransactionInDoubtException : OrleansException
+    public class OrleansTransactionInDoubtException : OrleansTransactionException
     {
         public long TransactionId { get; private set; }
 
@@ -28,7 +47,7 @@ namespace Orleans.Transactions
     /// Signifies that the executing transaction has aborted.
     /// </summary>
     [Serializable]
-    public class OrleansTransactionAbortedException : OrleansException
+    public class OrleansTransactionAbortedException : OrleansTransactionException
     {
         public long TransactionId { get; private set; }
 
@@ -176,6 +195,19 @@ namespace Orleans.Transactions
             : base(transactionId, string.Format("Transaction {0} aborted because it required reading an old version of a grain that is no longer available", transactionId)) { }
 
         public OrleansTransactionVersionDeletedException(SerializationInfo info, StreamingContext context)
+            : base(info, context)
+        {
+        }
+    }
+
+    [Serializable]
+    public class OrleansTransactionServiceNotAvailableException : OrleansTransactionException
+    {
+        public OrleansTransactionServiceNotAvailableException() : base("Transaction service not available")
+        {
+        }
+
+        public OrleansTransactionServiceNotAvailableException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
         }

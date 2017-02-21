@@ -1,56 +1,102 @@
-﻿using Orleans.Concurrency;
-using Orleans.Runtime;
+﻿
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
+using Orleans.Runtime.Configuration;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
-    [Reentrant]
-    internal class TransactionAgent : SystemTarget, ITransactionAgent, ITransactionAgentSystemTarget /*, ISiloShutdownParticipant*/
+    internal class TransactionServiceProxyFactory : ITransactionServiceFactory
     {
-        public long ReadOnlyTransactionId { get; private set; }
+        private static readonly IBackoffProvider BackoffPolicy = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(1));
 
-        private ITransactionManagerProxy tmStartProxy;
-        private ITransactionManagerProxy tmCommitProxy;
-
+        private readonly Logger logger;
+        private readonly IGrainFactory grainFactory;
         private readonly int startDirectoryGrainId;
         private readonly int commitDirectoryGrainId;
 
+        public TransactionServiceProxyFactory(GlobalConfiguration globalConfiguration, NodeConfiguration nodeConfig, IGrainFactory grainFactory)
+        {
+            logger = LogManager.GetLogger("TransactionServiceProxyFactory");
+            this.grainFactory = grainFactory;
+            startDirectoryGrainId = nodeConfig.SiloName.GetHashCode() % globalConfiguration.Transactions.TransactionManagerProxyCount;
+            commitDirectoryGrainId = (startDirectoryGrainId + 1) % globalConfiguration.Transactions.TransactionManagerProxyCount;
+
+        }
+
+        public async Task<ITransactionStartService> GetTransactionStartService()
+        {
+            return await GetTMProxyWithRetry(startDirectoryGrainId);
+        }
+
+        public async Task<ITransactionCommitService> GetTransactionCommitService()
+        {
+            return await GetTMProxyWithRetry(commitDirectoryGrainId);
+        }
+
+        private async Task<ITransactionManagerService> GetTMProxy(int directoryGrainId)
+        {
+            ITMProxyDirectoryGrain directory = this.grainFactory.GetGrain<ITMProxyDirectoryGrain>(directoryGrainId);
+
+            logger.Info(ErrorCode.Transactions_GetTMProxy, "Retrieving TM Proxy reference from directory");
+            ITransactionManagerService tmProxy = await directory.GetReference();
+
+            if (tmProxy == null)
+            {
+                throw new OrleansTransactionServiceNotAvailableException();
+            }
+            return tmProxy;
+        }
+
+        private Task<ITransactionManagerService> GetTMProxyWithRetry(int directoryGrainId)
+        {
+            return AsyncExecutorWithRetries.ExecuteWithRetries(
+                i => GetTMProxy(directoryGrainId),
+                AsyncExecutorWithRetries.INFINITE_RETRIES,
+                (e, i) => true,
+                Constants.INFINITE_TIMESPAN,
+                BackoffPolicy);
+        }
+    }
+
+    [Reentrant]
+    internal class TransactionAgent : SystemTarget, ITransactionAgent, ITransactionAgentSystemTarget /*, ISiloShutdownParticipant*/
+    {
+        private readonly ITransactionServiceFactory serviceFactory;
+
+        private ITransactionStartService tmStartProxy;
+        private ITransactionCommitService tmCommitProxy;
+
         //private long abortSequenceNumber;
         private long abortLowerBound;
-        private ConcurrentDictionary<long, long> abortedTransactions;
+        private readonly ConcurrentDictionary<long, long> abortedTransactions;
 
-        private ConcurrentQueue<Tuple<TransactionInfo, TaskCompletionSource<bool>>> transactionCommitQueue;
-        private ConcurrentQueue<Tuple<TimeSpan, TaskCompletionSource<long>>> transactionStartQueue;
+        private readonly ConcurrentQueue<Tuple<TransactionInfo, TaskCompletionSource<bool>>> transactionCommitQueue;
+        private readonly ConcurrentQueue<Tuple<TimeSpan, TaskCompletionSource<long>>> transactionStartQueue;
+
+        private readonly Logger logger;
 
         private IGrainTimer requestProcessor;
-        private readonly Logger logger;
-        private readonly TransactionsConfiguration config;
-        private readonly GrainFactory grainFactory;
-
         private Task startTransactionsTask = TaskDone.Done;
         private Task commitTransactionsTask = TaskDone.Done;
 
-        public TransactionAgent(GrainId grain, SiloAddress currentSilo, string siloName, GrainFactory grainFactory, TransactionsConfiguration config)
+        public long ReadOnlyTransactionId { get; private set; }
+
+        public TransactionAgent(GrainId grain, SiloAddress currentSilo, ITransactionServiceFactory serviceFactory)
             : base(grain, currentSilo)
         {
             logger = LogManager.GetLogger("TransactionAgent");
-            this.config = config;
-            this.grainFactory = grainFactory;
+            this.serviceFactory = serviceFactory;
             tmStartProxy = null;
             tmCommitProxy = null;
             ReadOnlyTransactionId = 0;
             //abortSequenceNumber = 0;
             abortLowerBound = 0;
 
-            startDirectoryGrainId = siloName.GetHashCode() % config.TransactionManagerProxyCount;
-            commitDirectoryGrainId = (startDirectoryGrainId + 1) % config.TransactionManagerProxyCount;
 
             abortedTransactions = new ConcurrentDictionary<long, long>();
             transactionCommitQueue = new ConcurrentQueue<Tuple<TransactionInfo, TaskCompletionSource<bool>>>();
@@ -159,12 +205,12 @@ namespace Orleans.Transactions
             {
                 if (tmStartProxy == null)
                 {
-                    tmStartProxy = await GetTMProxy(startDirectoryGrainId);
+                    tmStartProxy = await this.serviceFactory.GetTransactionStartService();
                 }
 
                 if (tmCommitProxy == null)
                 {
-                    tmCommitProxy = await GetTMProxy(commitDirectoryGrainId);
+                    tmCommitProxy = await this.serviceFactory.GetTransactionCommitService();
                 }
 
                 await WaitForWork();
@@ -312,27 +358,6 @@ namespace Orleans.Transactions
             return Task.WhenAny(toWait);
         }
 
-        private async Task<ITransactionManagerProxy> GetTMProxy(int directoryGrainId)
-        {
-            ITransactionManagerProxy tmProxy = null;
-            ITMProxyDirectoryGrain directory = this.grainFactory.GetGrain<ITMProxyDirectoryGrain>(directoryGrainId);
-
-            int waitTimeMs = 1 * 1000;
-            int maxWaitTimeMs = 30 * 1000;
-            while (true)
-            {
-                logger.Info(ErrorCode.Transactions_GetTMProxy, "Retrieving TM Proxy reference from directory");
-                tmProxy = await directory.GetReference();
-
-                if (tmProxy != null)
-                {
-                    return tmProxy;
-                }
-
-                await Task.Delay(waitTimeMs);
-                waitTimeMs = Math.Min(waitTimeMs * 2, maxWaitTimeMs);
-            }
-        }
 
         public Task Start()
         {

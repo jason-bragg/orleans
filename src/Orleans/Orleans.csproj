@@ -164,6 +164,12 @@
     <Compile Include="Serialization\RemoteNonDeserializableException.cs" />
     <Compile Include="Serialization\TypeSerializer.cs" />
     <Compile Include="Streams\Providers\StreamProviderManagerExtensions.cs" />
+    <Compile Include="Transactions\ActiveTransactionsTracker.cs" />
+    <Compile Include="Transactions\ITransactionManager.cs" />
+    <Compile Include="Transactions\MemoryTransactionLog.cs" />
+    <Compile Include="Transactions\Transaction.cs" />
+    <Compile Include="Transactions\TransactionManager.cs" />
+    <Compile Include="Transactions\TrasactionLog.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />
     <Compile Include="Statistics\TransactionsStatisticsGroup.cs" />
@@ -408,7 +414,7 @@
     <Compile Include="Transactions\ITMProxyDirectoryGrain.cs" />
     <Compile Include="Transactions\ITransactionAgent.cs" />
     <Compile Include="Transactions\ITransactionalGrain.cs" />
-    <Compile Include="Transactions\ITransactionManagerProxy.cs" />
+    <Compile Include="Transactions\ITransactionManagerService.cs" />
     <Compile Include="Transactions\OrleansTransactionException.cs" />
     <Compile Include="Transactions\TransactionContext.cs" />
     <Compile Include="..\Build\GlobalAssemblyInfo.cs">

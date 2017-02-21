@@ -280,6 +280,9 @@ namespace Orleans.Runtime
             services.AddSingleton<Func<IGrainRuntime>>(sp => () => sp.GetRequiredService<IGrainRuntime>());
             services.AddSingleton<GrainCreator>();
 
+            // transactions
+            services.AddSingleton<ITransactionServiceFactory,TransactionServiceProxyFactory>();
+
             if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
             {
                 services.AddSingleton<IConsistentRingProvider>(
@@ -341,7 +344,7 @@ namespace Orleans.Runtime
             activationDirectory = Services.GetRequiredService<ActivationDirectory>();
 
             // Initialize Transaction Agent
-            localTransactionAgent = new TransactionAgent(Constants.TransactionAgentSystemTargetId, SiloAddress, this.Name, grainFactory, this.GlobalConfig.Transactions);
+            localTransactionAgent = new TransactionAgent(Constants.TransactionAgentSystemTargetId, SiloAddress, Services.GetRequiredService<ITransactionServiceFactory>());
             runtimeClient.TransactionAgent = localTransactionAgent;
 
             // Now the consistent ring provider

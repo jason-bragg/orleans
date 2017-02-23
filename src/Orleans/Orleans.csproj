@@ -68,6 +68,7 @@
     <Compile Include="AssemblyLoader\AssemblyProcessor.cs" />
     <Compile Include="Async\AsyncBatchedContinuationQueue.cs" />
     <Compile Include="Async\BatchWorker.cs" />
+    <Compile Include="Async\InterlockedExchangeLock.cs" />
     <Compile Include="Async\MultiTaskCompletionSource.cs" />
     <Compile Include="Async\AsyncSerialExecutor.cs" />
     <Compile Include="Async\AsyncExecutorWithRetries.cs" />
@@ -82,6 +83,10 @@
     <Compile Include="Configuration\GrainServiceConfiguration.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
+    <Compile Include="Factory\FactoryBuilder.cs" />
+    <Compile Include="Factory\FactoryExtensions.cs" />
+    <Compile Include="Factory\IFactory.cs" />
+    <Compile Include="Factory\IFactoryBuilder.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Configuration\TransactionsConfiguration.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
@@ -169,6 +174,7 @@
     <Compile Include="Transactions\MemoryTransactionLog.cs" />
     <Compile Include="Transactions\Transaction.cs" />
     <Compile Include="Transactions\TransactionManager.cs" />
+    <Compile Include="Transactions\TransactionManagerService.cs" />
     <Compile Include="Transactions\TrasactionLog.cs" />
     <Compile Include="Utils\ReferenceEqualsComparer.cs" />
     <Compile Include="Serialization\ReflectedSerializationMethodInfo.cs" />

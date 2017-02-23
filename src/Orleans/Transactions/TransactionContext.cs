@@ -59,6 +59,7 @@ namespace Orleans.Transactions
         }
     }
 
+    [Serializable]
     public class TransactionInfo
     {
         public TransactionInfo(long id, bool readOnly = false)

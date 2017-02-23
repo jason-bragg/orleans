@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
+using Orleans.Factory;
 using Orleans.GrainDirectory;
 using Orleans.LogConsistency;
 using Orleans.Providers;
@@ -281,7 +282,12 @@ namespace Orleans.Runtime
             services.AddSingleton<GrainCreator>();
 
             // transactions
-            services.AddSingleton<ITransactionServiceFactory,TransactionServiceProxyFactory>();
+            services.AddSingleton(sp => sp.GetRequiredService<GlobalConfiguration>().Transactions);
+            services.AddSingleton<IFactoryBuilder<string, ITransactionServiceFactory>, TransactionServiceFactoryBuilder>();
+            services.AddSingleton(sp => sp.GetRequiredService<IFactoryBuilder<string, ITransactionServiceFactory>>().Build());
+            services.AddSingleton(sp => sp.GetRequiredService<IFactory<string, ITransactionServiceFactory>>().Create(sp.GetRequiredService<TransactionsConfiguration>().TransactionManagerType) );
+            services.AddSingleton(sp => sp.GetRequiredService<GlobalConfiguration>().Transactions);
+            services.AddTransient<InClusterTransactionManager>();
 
             if (initializationParams.GlobalConfig.UseVirtualBucketsConsistentRing)
             {

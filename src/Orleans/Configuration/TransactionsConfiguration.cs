@@ -26,6 +26,24 @@ namespace Orleans.Transactions
         }
 
         /// <summary>
+        /// Orleans framework supported transaction manager types
+        /// </summary>
+        public enum OrleansTransactionManagerType
+        {
+            /// <summary>
+            /// Transaction manager hosted in a grain.  Viable for test, development, and services with low transactional performance requirements
+            /// If not specificed Transaction Manager type will default to GrainBased
+            /// </summary>
+            GrainBased,
+            /// <summary>
+            /// Transaction manager hosted in an Orleans client service.
+            /// </summary>
+            ClientService,
+        }
+
+        public static readonly string DefaultOrleansTransactionManagerType = OrleansTransactionManagerType.GrainBased.ToString();
+
+        /// <summary>
         /// The LogType attribute controls the persistent storage used for the transaction log.
         /// </summary>
         public TransactionLogType LogType { get; set; }
@@ -58,6 +76,8 @@ namespace Orleans.Transactions
         /// </summary>
         public string DataConnectionString { get; set; }
 
+        public string TransactionManagerType { get; set; } = DefaultOrleansTransactionManagerType;
+
         /// <summary>
         /// TransactionsConfiguration constructor.
         /// </summary>
@@ -73,7 +93,7 @@ namespace Orleans.Transactions
         /// <summary>
         /// Load this configuration from xml element.
         /// </summary>
-        /// <param name="xmlElement"></param>
+        /// <param name="child"></param>
         public void Load(XmlElement child)
         {
             if (child.HasAttribute("LogType"))
@@ -108,6 +128,11 @@ namespace Orleans.Transactions
             if (child.HasAttribute("DataConnectionString"))
             {
                 this.DataConnectionString = child.GetAttribute("DataConnectionString");
+            }
+
+            if (child.HasAttribute("TransactionManagerType"))
+            {
+                this.TransactionManagerType = child.GetAttribute("TransactionManagerType");
             }
         }
 

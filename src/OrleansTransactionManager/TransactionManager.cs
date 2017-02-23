@@ -1,4 +1,4 @@
-﻿using Orleans.Runtime;
+﻿
 using System.Collections.Generic;
 using System.Threading;
 
@@ -15,12 +15,6 @@ namespace Orleans.Transactions
         private readonly Thread checkpointThread;
         private readonly AutoResetEvent checkpointEvent;
 
-        private long checkpointedLSN;
-
-        private readonly Timer gcTimer;
-
-        private readonly Logger logger;
-
         public TransactionManager(TransactionsConfiguration config)
             : base(config)
         {
@@ -33,13 +27,6 @@ namespace Orleans.Transactions
             checkpointThread = new Thread(CheckpointLoop);
         }
 
-        public override void Start()
-        {
-            CancellationTokenSource cts = new CancellationTokenSource();
-            this.StartAsync().Wait(cts.Token);
-        }
-
-
         protected override void BeginDependencyCompletionLoop()
         {
             dependencyThread.Start();
@@ -50,7 +37,7 @@ namespace Orleans.Transactions
             commitThread.Start();
         }
 
-        protected override void BeingCheckpointLoop()
+        protected override void BeginCheckpointLoop()
         {
             checkpointThread.Start();
         }
@@ -96,7 +83,7 @@ namespace Orleans.Transactions
             {
                 // Maybe impose a max per batch to decrease latency?
                 checkpointEvent.WaitOne();
-                base.Checkpoint(grains, transactions);
+                base.Checkpoint(grains, transactions).Wait();
             }
         }
     }

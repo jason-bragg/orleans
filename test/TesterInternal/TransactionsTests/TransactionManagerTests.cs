@@ -16,7 +16,8 @@ namespace UnitTests.TransactionsTests
         public TransactionManagerTests()
         {
             tm = new TransactionManager(new TransactionsConfiguration());
-            tm.Start();
+            CancellationTokenSource cts = new CancellationTokenSource();
+            tm.StartAsync().Wait(cts.Token);
         }
 
         [Fact, TestCategory("Transactions")]

@@ -20,14 +20,6 @@ namespace Orleans.Transactions
     {
     }
 
-    public interface ITransactionManagerProxy : ITransactionManagerService, IGrainWithIntegerKey
-    {
-    }
-
-    public interface ITransactionManagerGrain : ITransactionManagerService, IGrainWithIntegerKey
-    {
-    }
-
     public interface ITransactionServiceFactory
     {
         Task<ITransactionStartService> GetTransactionStartService();

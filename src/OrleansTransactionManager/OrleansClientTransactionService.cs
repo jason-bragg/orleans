@@ -39,7 +39,8 @@ namespace Orleans.Transactions
 
         public void Start()
         {
-            tm.Start();
+            CancellationTokenSource cts = new CancellationTokenSource();
+            tm.StartAsync().Wait(cts.Token);
             running = true;
             proxyPublisher.Change(TimeSpan.FromMilliseconds(0), TimeSpan.FromMilliseconds(-1));
         }

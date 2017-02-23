@@ -1,7 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions
@@ -14,7 +12,7 @@ namespace Orleans.Transactions
         /// <remarks>
         /// This must be called before any other method.
         /// </remarks>
-        void Start();
+        Task StartAsync();
 
         /// <summary>
         /// Start a new transaction.

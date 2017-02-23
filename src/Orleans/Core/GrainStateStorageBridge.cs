@@ -23,7 +23,7 @@ namespace Orleans.Core
             set { grainState.State = value; }
         }
 
-        public GrainStateStorageBridge(GrainReference grainRef, IStorageProvider store)
+        public GrainStateStorageBridge(string grainTypeName, GrainReference grainRef, IStorageProvider store)
         {
             if (grainTypeName == null)
             {
@@ -33,9 +33,11 @@ namespace Orleans.Core
             {
                 throw new ArgumentNullException("store", "No storage provider supplied");
             }
-           
+
+            this.grainTypeName = grainTypeName;
             this.grainRef = grainRef;
             this.store = store;
+            this.grainState = new GrainState<TState>();
         }
 
         /// <summary>

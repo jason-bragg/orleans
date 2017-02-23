@@ -81,6 +81,7 @@
     <Compile Include="CodeGeneration\GenericMethodInvoker.cs" />
     <Compile Include="Configuration\GrainServiceConfiguration.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
+    <Compile Include="Core\IGrainFeature.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />

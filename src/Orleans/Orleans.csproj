@@ -82,6 +82,10 @@
     <Compile Include="Configuration\GrainServiceConfiguration.cs" />
     <Compile Include="Core\GrainCasterFactory.cs" />
     <Compile Include="Core\IInternalGrainFactory.cs" />
+    <Compile Include="Factory\FactoryBuilder.cs" />
+    <Compile Include="Factory\FactoryExtensions.cs" />
+    <Compile Include="Factory\IFactory.cs" />
+    <Compile Include="Factory\IFactoryBuilder.cs" />
     <Compile Include="LogConsistency\ILogConsistencyDiagnostics.cs" />
     <Compile Include="Logging\LoggerExtensions.cs" />
     <Compile Include="Logging\LoggerImpl.cs" />

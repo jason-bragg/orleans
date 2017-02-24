@@ -4,13 +4,9 @@ using System;
 namespace Orleans.Facet
 {
     [AttributeUsage(AttributeTargets.Parameter | AttributeTargets.Field)]
-    public class FacetAttribute : Attribute
+    public abstract class FacetAttribute : Attribute
     {
-        public string Name { get; }
-        public FacetAttribute(string facetTypeName)
-        {
-            this.Name = facetTypeName;
-        }
+        public abstract object Create(IServiceProvider serviceProvider);
     }
 
     [AttributeUsage(AttributeTargets.Constructor)]

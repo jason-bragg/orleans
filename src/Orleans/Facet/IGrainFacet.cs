@@ -1,7 +1,7 @@
 ﻿
 namespace Orleans.Facet
 {
-    interface IGrainFacet
+    public interface IGrainFacet
     {
     }
 }

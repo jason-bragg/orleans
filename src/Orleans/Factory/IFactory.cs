@@ -10,11 +10,10 @@ namespace Orleans.Factory
         TType Create();
     }
 
-    internal interface IFactory<TKey, out TType>
+    internal interface IFactory<in TKey, out TType>
         where TKey : IComparable<TKey>
         where TType : class
     {
-        IEnumerable<TKey> Keys { get; }
         TType Create(TKey key);
     }
 }

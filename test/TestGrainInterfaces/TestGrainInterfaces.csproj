@@ -51,6 +51,8 @@
     <Compile Include="EventSourcing\IChatGrain.cs" />
     <Compile Include="EventSourcing\ICountersGrain.cs" />
     <Compile Include="EventSourcing\ISeatReservationGrain.cs" />
+    <Compile Include="Facet\INamedFacet.cs" />
+    <Compile Include="Facet\INamedFacetGrain.cs" />
     <Compile Include="GetGrainInterfaces.cs" />
     <Compile Include="IActivateDeactivateTestGrain.cs" />
     <Compile Include="IChainedGrain.cs" />

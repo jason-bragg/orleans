@@ -54,6 +54,7 @@
     <Compile Include="EventSourcingTests\CountersGrainTests.cs" />
     <Compile Include="EventSourcingTests\EventSourcingClusterFixture.cs" />
     <Compile Include="EventSourcingTests\PersonGrainTests.cs" />
+    <Compile Include="Facet\UserFacetTests.cs" />
     <Compile Include="FakeSerializer.cs" />
     <Compile Include="Forwarding\ShutdownSiloTests.cs" />
     <Compile Include="HeterogeneousSilosTests\HeterogeneousTests.cs" />

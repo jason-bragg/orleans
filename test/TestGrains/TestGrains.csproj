@@ -70,6 +70,7 @@
     <Compile Include="EventSourcing\CountersGrain.cs" />
     <Compile Include="EventSourcing\CountersGrainVariations.cs" />
     <Compile Include="EventSourcing\SeatReservationGrain.cs" />
+    <Compile Include="Facet\NamedFacetGrain.cs" />
     <Compile Include="GrainService\CustomGrainService.cs" />
     <Compile Include="GrainService\GrainServiceTestGrain.cs" />
     <Compile Include="RoundtripSerializationGrain.cs" />

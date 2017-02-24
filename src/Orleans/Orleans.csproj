@@ -90,6 +90,7 @@
     <Compile Include="Core\IInternalClusterClient.cs" />
     <Compile Include="Core\IClusterClient.cs" />
     <Compile Include="Core\ClusterClient.cs" />
+    <Compile Include="Facet\FacetAttribute.cs" />
     <Compile Include="Facet\IGrainFacet.cs" />
     <Compile Include="Factory\FactoryBuilder.cs" />
     <Compile Include="Factory\FactoryExtensions.cs" />

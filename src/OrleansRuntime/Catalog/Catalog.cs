@@ -709,7 +709,7 @@ namespace Orleans.Runtime
                 Grain grain;
 
                 //Create a new instance of the given grain type
-                grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
+                grain = grainCreator.CreateGrainInstance(grainTypeData, data.Identity);
 
                 //for stateful grains, install storage bridge
                 if (grain is IStatefulGrain)
@@ -718,7 +718,7 @@ namespace Orleans.Runtime
 
                     var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
 
-                    grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, storage);
+                    grain = grainCreator.CreateGrainInstance(grainTypeData, data.Identity, stateObjectType, storage);
 
                     storage.SetGrain(grain);
                 }

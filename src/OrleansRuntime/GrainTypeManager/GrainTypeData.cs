@@ -7,6 +7,7 @@ using System.Reflection;
 using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Concurrency;
+using Orleans.Facet;
 using Orleans.GrainDirectory;
 using Orleans.MultiCluster;
 using Orleans.Placement;
@@ -28,6 +29,10 @@ namespace Orleans.Runtime
         internal Func<InvokeMethodRequest, bool> MayInterleave { get; private set; }
         internal MultiClusterRegistrationStrategy MultiClusterRegistrationStrategy { get; private set; }
    
+        [NonSerialized]
+        internal FacetedConstructorInfo constructorInfo;
+        internal FacetedConstructorInfo ConstructorInfo => constructorInfo;
+
         public GrainTypeData(Type type, Type stateObjectType, MultiClusterRegistrationStrategyManager registrationManager)
         {
             var typeInfo = type.GetTypeInfo();
@@ -40,6 +45,7 @@ namespace Orleans.Runtime
             StateObjectType = stateObjectType;
             MayInterleave = GetMayInterleavePredicate(typeInfo) ?? (_ => false);
             MultiClusterRegistrationStrategy = registrationManager?.GetMultiClusterRegistrationStrategy(type);
+            constructorInfo = new FacetedConstructorInfo(type);
         }
 
         /// <summary>

@@ -19,7 +19,7 @@ namespace Orleans.Runtime
 
         private readonly IServiceProvider services;
 
-        private readonly Func<Type, ObjectFactory> createFactory;
+        private readonly Func<GrainTypeData, ObjectFactory> createFactory;
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
 
@@ -39,7 +39,7 @@ namespace Orleans.Runtime
             this.serializationManager = serializationManager;
             this.grainFactory = grainFactory;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
-            this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
+            this.createFactory = type => ActivatorUtilities.CreateFactory(type.Type, type.ConstructorInfo.FacetParameters);
         }
 
         /// <summary>
@@ -48,10 +48,10 @@ namespace Orleans.Runtime
         /// <param name="grainType">The grain type.</param>
         /// <param name="identity">Identity for the new grain</param>
         /// <returns>The newly created grain.</returns>
-        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity)
+        public Grain CreateGrainInstance(GrainTypeData grainType, IGrainIdentity identity)
         {
-            var activator = this.typeActivatorCache.GetOrAdd(grainType, this.createFactory);
-            var grain = (Grain)activator(this.services, arguments: null);
+            var activator = this.typeActivatorCache.GetOrAdd(grainType.Type, this.createFactory(grainType));
+            var grain = (Grain)activator(this.services, grainType.ConstructorInfo.CreateConstructorParameterFacets(services));
 
             // Inject runtime hooks into grain instance
             grain.Runtime = this.grainRuntime.Value;
@@ -68,7 +68,7 @@ namespace Orleans.Runtime
         /// <param name="stateType">If the grain is a stateful grain, the type of the state it persists.</param>
         /// <param name="storage">If the grain is a stateful grain, the storage used to persist the state.</param>
         /// <returns></returns>
-        public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity, Type stateType, IStorage storage)
+        public Grain CreateGrainInstance(GrainTypeData grainType, IGrainIdentity identity, Type stateType, IStorage storage)
 		{
             //Create a new instance of the grain
             var grain = CreateGrainInstance(grainType, identity);

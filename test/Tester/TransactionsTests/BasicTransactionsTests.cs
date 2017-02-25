@@ -14,7 +14,7 @@ namespace UnitTests.TransactionsTests
     {
         public override TestCluster CreateTestCluster()
         {
-            var options = new TestClusterOptions(1);
+            var options = new TestClusterOptions(2);
             options.ClusterConfiguration.AddMemoryStorageProvider("Default");
             options.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore");
             options.EnableTransactions = true;

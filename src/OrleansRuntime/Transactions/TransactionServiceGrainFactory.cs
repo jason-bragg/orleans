@@ -1,6 +1,4 @@
 ﻿
-using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions
@@ -16,32 +14,12 @@ namespace Orleans.Transactions
 
         public Task<ITransactionStartService> GetTransactionStartService()
         {
-            return Task.FromResult<ITransactionStartService>(new TransactionManagerServiceWrapper(this.grainFactory.GetGrain<ITransactionManagerGrain>(0)));
+            return Task.FromResult<ITransactionStartService>(this.grainFactory.GetGrain<ITransactionManagerGrain>(0));
         }
 
         public Task<ITransactionCommitService> GetTransactionCommitService()
         {
-            return Task.FromResult<ITransactionCommitService>(new TransactionManagerServiceWrapper(this.grainFactory.GetGrain<ITransactionManagerGrain>(0)));
-        }
-
-        private class TransactionManagerServiceWrapper : ITransactionManagerService
-        {
-            private readonly ITransactionManagerGrain transactionManagerGrain;
-
-            public TransactionManagerServiceWrapper(ITransactionManagerGrain transactionManagerGrain)
-            {
-                this.transactionManagerGrain = transactionManagerGrain;
-            }
-
-            public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
-            {
-                return transactionManagerGrain.StartTransactions(timeouts);
-            }
-
-            public Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions)
-            {
-                return transactionManagerGrain.CommitTransactions(transactions);
-            }
+            return Task.FromResult<ITransactionCommitService>(this.grainFactory.GetGrain<ITransactionManagerGrain>(0));
         }
     }
 }

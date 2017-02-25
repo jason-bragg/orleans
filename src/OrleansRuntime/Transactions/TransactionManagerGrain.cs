@@ -7,10 +7,8 @@ using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
-    public interface ITransactionManagerGrain : IGrainWithIntegerKey
+    public interface ITransactionManagerGrain : ITransactionManagerService, IGrainWithIntegerKey
     {
-        Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts);
-        Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions);
     }
 
     [Reentrant]

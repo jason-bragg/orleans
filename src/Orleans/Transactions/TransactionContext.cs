@@ -1,9 +1,8 @@
-﻿using System;
+﻿
+using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Remoting.Messaging;
-using System.Text;
-using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Transactions
 {
@@ -62,6 +61,8 @@ namespace Orleans.Transactions
     [Serializable]
     public class TransactionInfo
     {
+        private Logger log = LogManager.GetLogger("AssemblyProcessor");
+
         public TransactionInfo(long id, bool readOnly = false)
         {
             TransactionId = id;
@@ -97,7 +98,13 @@ namespace Orleans.Transactions
 
         public bool IsAborted { get; set; }
 
-        public int PendingCalls { get; set; }
+        private int pendingCalls;
+
+        public int PendingCalls
+        {
+            get { return pendingCalls; }
+            set { pendingCalls = value; log.Info($"PendingCalls. TransactionId: {TransactionId}, PendingCalls: {pendingCalls}"); }
+        }
 
         public Dictionary<ITransactionalGrain, GrainVersion> ReadSet { get; private set; }
         public Dictionary<ITransactionalGrain, int> WriteSet { get; private set; }

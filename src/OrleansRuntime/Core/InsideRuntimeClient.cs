@@ -657,7 +657,6 @@ namespace Orleans.Runtime
                     // NOTE: Not clear if thread-safe, revise
                     callbackData.TransactionInfo.Union(message.TransactionInfo);
                     callbackData.TransactionInfo.PendingCalls--;
-                    logger.Info($"Decremented PendingCalls: TransactionId: {callbackData.TransactionInfo.TransactionId}, PendingCalls: {callbackData.TransactionInfo.PendingCalls}");
                 }
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items. 

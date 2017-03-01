@@ -52,7 +52,7 @@ namespace Orleans.Runtime
                 IsReadOnly = request.IsReadOnly,
                 IsAlwaysInterleave = request.IsAlwaysInterleave,
                 TargetSilo = request.SendingSilo,
-                IsTransactionRequired = request.IsTransactionRequired
+                TransactionInfo = request.TransactionInfo
             };
 
             if (request.SendingGrain != null)
@@ -90,13 +90,6 @@ namespace Orleans.Runtime
             if (contextData != null)
             {
                 response.RequestContextData = contextData;
-            }
-
-            TransactionInfo transactionInfo = response.IsTransactionRequired ? TransactionContext.GetTransactionInfo() : null;
-            if (transactionInfo != null)
-            {
-                transactionInfo.PendingCalls++;
-                response.TransactionInfo = new TransactionInfo(transactionInfo);
             }
 
             return response;

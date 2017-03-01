@@ -1,10 +1,10 @@
-﻿using Orleans.Runtime;
+﻿
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Runtime;
 
 namespace Orleans.Transactions
 {
@@ -91,11 +91,6 @@ namespace Orleans.Transactions
                 {
                     checkpointedLSN = record.LSN - 1;
                 }
-                else
-                {
-                    // There should be no gaps in the log
-                    Debug.Assert(prevLSN == record.LSN - 1);
-                }
                 prevLSN = record.LSN;
 
                 foreach (var grain in record.Grains)
@@ -139,12 +134,9 @@ namespace Orleans.Transactions
 
         public void AbortTransaction(long transactionId, OrleansTransactionAbortedException reason)
         {
-            logger.Info("AbortTransaction : {0}", transactionId);
             Transaction tx;
             if (transactionsTable.TryGetValue(transactionId, out tx))
             {
-                logger.Info("AbortTransaction state : {0}", tx.State);
-
                 bool justAborted = false;
                 lock (tx)
                 {
@@ -160,7 +152,6 @@ namespace Orleans.Transactions
                 {
                     foreach (var waiting in tx.WaitingTransactions)
                     {
-                        logger.Info("AbortTransaction aboring WaitingTransaction : {0}", waiting.TransactionId);
                         var cascading = new OrleansCascadingAbortException(waiting.Info.TransactionId, tx.TransactionId);
                         AbortTransaction(waiting.Info.TransactionId, cascading);
                     }
@@ -172,8 +163,6 @@ namespace Orleans.Transactions
 
         public Task CommitTransaction(TransactionInfo transactionInfo)
         {
-            logger.Info("CommitTransaction : {0}", transactionInfo.TransactionId);
-
             Transaction tx;
             if (transactionsTable.TryGetValue(transactionInfo.TransactionId, out tx))
             {
@@ -186,7 +175,6 @@ namespace Orleans.Transactions
                 {
                     if (tx.State == TransactionState.Started)
                     {
-                        logger.Info("Started transaction : {0}", transactionInfo.TransactionId );
                         tx.Info = transactionInfo;
 
                         // Check our dependent transactions.
@@ -199,13 +187,10 @@ namespace Orleans.Transactions
                             Transaction dependentTx;
                             if (!transactionsTable.TryGetValue(dependentId, out dependentTx))
                             {
-                                logger.Info("Missing dependent : {0}", dependentId);
                                 abort = true;
                                 cascadingDependentId = dependentId;
                                 break;
                             }
-
-                            logger.Info("dependent state : {0}", dependentTx.State);
 
                             // NOTE: our deadlock prevention mechanism ensures that we are acquiring
                             // the locks in proper order and there is no risk of deadlock.
@@ -213,7 +198,6 @@ namespace Orleans.Transactions
                             {
                                 if (dependentTx.State == TransactionState.Aborted)
                                 {
-                                    logger.Info("Aborted dependent : {0}", dependentTx.TransactionId);
                                     abort = true;
                                     cascadingDependentId = dependentId;
                                     break;
@@ -222,7 +206,6 @@ namespace Orleans.Transactions
                                 if (dependentTx.State == TransactionState.Started ||
                                     dependentTx.State == TransactionState.PendingDependency)
                                 {
-                                    logger.Info("dependent state : {0}", dependentTx.State);
                                     pending = true;
                                     dependentTx.WaitingTransactions.Add(tx);
                                     tx.PendingCount++;
@@ -236,12 +219,10 @@ namespace Orleans.Transactions
                         }
                         else if (pending)
                         {
-                            logger.Info("Setting PendingDependency state : {0}", tx.TransactionId);
                             tx.State = TransactionState.PendingDependency;
                         }
                         else
                         {
-                            logger.Info("Setting invalid state : {0}", tx.TransactionId);
                             tx.State = TransactionState.Validated;
                             dependencyQueue.Enqueue(tx);
                             signal = true;
@@ -282,8 +263,6 @@ namespace Orleans.Transactions
 
         protected bool CheckDependenciesCompleted()
         {
-            logger.Info("CheckDependenciesCompleted");
-
             bool processed = false;
             Transaction tx;
             while (dependencyQueue.TryDequeue(out tx))
@@ -323,15 +302,12 @@ namespace Orleans.Transactions
                     }
                 }
             }
-            logger.Info("CheckDependenciesCompleted : {0}", processed);
 
             return processed;
         }
 
         protected bool GroupCommit()
         {
-            logger.Info("GroupCommit");
-
             bool processed = false;
             int batchSize = groupCommitQueue.Count;
             List<CommitRecord> records = new List<CommitRecord>(batchSize);
@@ -348,9 +324,7 @@ namespace Orleans.Transactions
 
             try
             {
-                logger.Verbose("Group Commit: Writing {0} transactions to log", transactions.Count);
                 log.Append(records).Wait();
-                logger.Verbose("Group Commit: Successfully written {0} transactions to log", transactions.Count);
             }
             catch (Exception e)
             {
@@ -374,14 +348,12 @@ namespace Orleans.Transactions
                 checkpointQueue.Enqueue(transaction);
                 this.SignalCheckpointEnqueued();
             }
-            logger.Info("GroupCommit : {0}", processed);
 
             return processed;
         }
 
         internal async Task<bool> Checkpoint(Dictionary<ITransactionalGrain, long> grains, List<Transaction> transactions)
         {
-            logger.Info("Checkpoint");
             bool processed = false;
             int batchSize = checkpointQueue.Count;
             long lsn = 0;
@@ -411,10 +383,8 @@ namespace Orleans.Transactions
 
             try
             {
-                logger.Verbose("Checkpoint: Calling Commit on grains for {0} transactions", transactions.Count);
                 // Note: These waits can be moved to a separate step in the pipeline if need be.
                 await Task.WhenAll(tasks);
-                logger.Verbose("Checkpoint: Successfully called Commit on grains for {0} transactions", transactions.Count);
             }
             catch (Exception e)
             {
@@ -433,10 +403,8 @@ namespace Orleans.Transactions
 
             if (transactions.Count > 0)
             {
-                Debug.Assert(lsn > this.checkpointedLSN);
                 this.checkpointedLSN = lsn;
             }
-            logger.Info("Checkpoint : {0}", processed);
             return processed;
         }
 

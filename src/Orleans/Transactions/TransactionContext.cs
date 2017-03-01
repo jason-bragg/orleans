@@ -2,7 +2,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.Remoting.Messaging;
-using Orleans.Runtime;
 
 namespace Orleans.Transactions
 {
@@ -61,8 +60,6 @@ namespace Orleans.Transactions
     [Serializable]
     public class TransactionInfo
     {
-        private Logger log = LogManager.GetLogger("AssemblyProcessor");
-
         public TransactionInfo(long id, bool readOnly = false)
         {
             TransactionId = id;
@@ -98,13 +95,7 @@ namespace Orleans.Transactions
 
         public bool IsAborted { get; set; }
 
-        private int pendingCalls;
-
-        public int PendingCalls
-        {
-            get { return pendingCalls; }
-            set { pendingCalls = value; log.Info($"PendingCalls. TransactionId: {TransactionId}, PendingCalls: {pendingCalls}"); }
-        }
+        public int PendingCalls { get; set; }
 
         public Dictionary<ITransactionalGrain, GrainVersion> ReadSet { get; private set; }
         public Dictionary<ITransactionalGrain, int> WriteSet { get; private set; }

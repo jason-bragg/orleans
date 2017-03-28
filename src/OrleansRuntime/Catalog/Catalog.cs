@@ -712,11 +712,11 @@ namespace Orleans.Runtime
                 grain = grainCreator.CreateGrainInstance(grainType, data.Identity);
 
                 //for stateful grains, install storage bridge
-                if (grain is IStatefulGrain)
+                if (grain is IPersistentGrain)
                 {
-                    SetupStorageProvider(grainType, data);
+                    SetupStorageProvider(grain, grainType, data);
 
-                    var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
+//                    var storage = new GrainStateStorageBridge(grainType.FullName, data.StorageProvider);
 
                     grain = grainCreator.CreateGrainInstance(grainType, data.Identity, stateObjectType, storage);
 
@@ -742,7 +742,7 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
 
-        private void SetupStorageProvider(Type grainType, ActivationData data)
+        private void SetupStorageProvider(IPersistentGrain persistentGrain, Type grainType, ActivationData data)
         {
             var grainTypeName = grainType.FullName;
 
@@ -784,6 +784,8 @@ namespace Orleans.Runtime
                     storageProviderName, grainTypeName);
                 logger.Verbose2(ErrorCode.Provider_CatalogStorageProviderAllocated, msg);
             }
+
+            persistentGrain.SetStorageProvider(StorageProvider);
         }
 
         private ILogViewAdaptorFactory SetupLogConsistencyProvider(Grain grain, Type grainType, ActivationData data)

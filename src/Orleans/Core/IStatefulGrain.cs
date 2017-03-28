@@ -1,5 +1,6 @@
 ﻿
 using System.Threading.Tasks;
+using Orleans.Storage;
 
 namespace Orleans
 {
@@ -10,7 +11,12 @@ namespace Orleans
         Task Initialize();
     }
 
-    internal interface IStatefulGrain<TState, TBridge>
+    internal interface IPersistentGrain
+    {
+        void SetStorageProvider(IStorageProvider storageProvider);
+    }
+
+    internal interface IStatefulGrain<TState, TBridge> : IPersistentGrain
         where TBridge : IStorageBridge<TState>
         where TState : class, new()
     {

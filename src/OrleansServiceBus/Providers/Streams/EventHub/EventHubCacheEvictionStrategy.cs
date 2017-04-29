@@ -9,15 +9,13 @@ namespace Orleans.ServiceBus.Providers
     /// </summary>
     public class EventHubCacheEvictionStrategy : ChronologicalEvictionStrategy<CachedEventHubMessage>
     {
-        private static readonly string LogName = typeof(EventHubCacheEvictionStrategy).Namespace;
-
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="timePurage"></param>
         public EventHubCacheEvictionStrategy(Logger logger, TimePurgePredicate timePurage)
-            : base(logger.GetLogger(LogName), timePurage)
+            : base(logger.GetLogger(typeof(EventHubCacheEvictionStrategy).Name), timePurage)
         {
         }
 

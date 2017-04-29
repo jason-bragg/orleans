@@ -49,12 +49,14 @@
   <ItemGroup>
     <Compile Include="BuiltInProvidersConfigurationExtensions.cs" />
     <Compile Include="Streams\Common\EventSequenceTokenV2.cs" />
+    <Compile Include="Streams\Common\PooledCache\CacheReporting.cs" />
+    <Compile Include="Streams\Common\PooledCache\ChronologicalEvictionStrategy.cs" />
     <Compile Include="Streams\Common\PooledCache\IEvictionStrategy.cs" />
+    <Compile Include="Streams\Common\PooledCache\TimePurgePredicate.cs" />
     <Compile Include="Streams\Memory\IMemoryStreamQueueGrain.cs" />
     <Compile Include="Streams\Memory\MemoryAdapterConfig.cs" />
     <Compile Include="Streams\Memory\MemoryAdapterFactory.cs" />
     <Compile Include="Streams\Common\PooledCache\CachedMessageBlock.cs" />
-    <Compile Include="Streams\Common\PooledCache\FixedSizeObjectPool.cs" />
     <Compile Include="Streams\Common\PooledCache\FixedSizeBuffer.cs" />
     <Compile Include="Streams\Common\PooledCache\ICacheDataAdapter.cs" />
     <Compile Include="Streams\Common\PooledCache\IObjectPool.cs" />

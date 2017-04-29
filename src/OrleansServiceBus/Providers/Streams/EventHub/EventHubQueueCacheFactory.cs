@@ -52,8 +52,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual IObjectPool<FixedSizeBuffer> CreateBufferPool(EventHubStreamProviderSettings providerSettings)
         {
-            return _bufferPool ?? (_bufferPool = new FixedSizeObjectPool<FixedSizeBuffer>(providerSettings.CacheSizeMb,
-                () => new FixedSizeBuffer(1 << 20)));
+            return _bufferPool ?? (_bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), providerSettings.CacheSizeMb));
         }
 
         /// <summary>

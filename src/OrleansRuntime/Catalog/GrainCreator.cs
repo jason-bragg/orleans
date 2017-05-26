@@ -6,9 +6,6 @@ using Orleans.LogConsistency;
 using Orleans.Storage;
 using Orleans.Runtime.LogConsistency;
 using Orleans.GrainDirectory;
-using Orleans.Serialization;
-using Orleans.Runtime.MultiClusterNetwork;
-using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime
 {
@@ -21,7 +18,7 @@ namespace Orleans.Runtime
 
         private readonly IServiceProvider services;
 
-        private readonly Func<Type, ObjectFactory> createFactory;
+        private readonly Factory<Type, Type[], ObjectFactory> createFactory;
 
         private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
         
@@ -41,7 +38,7 @@ namespace Orleans.Runtime
             this.services = services;
             this.protocolServicesFactory = protocolServicesFactory;
             this.grainRuntime = new Lazy<IGrainRuntime>(getGrainRuntime);
-            this.createFactory = type => ActivatorUtilities.CreateFactory(type, Type.EmptyTypes);
+            this.createFactory = this.services.GetService<Factory<Type, Type[], ObjectFactory>>() ?? DefaultCreateFactory;
         }
 
         /// <summary>
@@ -52,7 +49,7 @@ namespace Orleans.Runtime
         /// <returns>The newly created grain.</returns>
         public Grain CreateGrainInstance(Type grainType, IGrainIdentity identity)
         {
-            var activator = this.typeActivatorCache.GetOrAdd(grainType, this.createFactory);
+            var activator = this.typeActivatorCache.GetOrAdd(grainType, this.CreateFactory);
             var grain = (Grain)activator(this.services, arguments: null);
 
             // Inject runtime hooks into grain instance
@@ -108,6 +105,16 @@ namespace Orleans.Runtime
             var state = Activator.CreateInstance(stateType);
 
             ((ILogConsistentGrain)grain).InstallAdaptor(factory, state, grainType.FullName, storageProvider, svc);
+        }
+
+        private static ObjectFactory DefaultCreateFactory(Type grainType, Type[] argumentTypes)
+        {
+            return ActivatorUtilities.CreateFactory(grainType, argumentTypes);
+        }
+
+        private ObjectFactory CreateFactory(Type grainType)
+        {
+            return this.createFactory(grainType, Type.EmptyTypes);
         }
     }
 }

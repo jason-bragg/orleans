@@ -10,17 +10,26 @@ namespace Orleans.Runtime
     /// </summary>
     public class DefaultGrainActivator : IGrainActivator
     {
-        private readonly GrainConstructorFacetArguementsFactory arguementsFactory = new GrainConstructorFacetArguementsFactory();
-        private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
+        private readonly GrainConstructorFacetArguementsFactory arguementsFactory;
+        private readonly ConcurrentDictionary<Type, ObjectFactory> typeActivatorCache;
 
-        /// <inheritdoc />
-        public virtual object Create(IGrainActivationContext context)
+        /// <summary>
+        /// Public constructor
+        /// </summary>
+        /// <param name="service"></param>
+        public DefaultGrainActivator(IServiceProvider service)
+        {
+            this.arguementsFactory = new GrainConstructorFacetArguementsFactory(service);
+            this.typeActivatorCache = new ConcurrentDictionary<Type, ObjectFactory>();
+        }
+
+    /// <inheritdoc />
+    public virtual object Create(IGrainActivationContext context)
         {
             if (context == null)
             {
                 throw new ArgumentNullException(nameof(context));
             }
-
 
             var grainType = context.GrainType;
 

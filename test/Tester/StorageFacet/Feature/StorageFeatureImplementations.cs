@@ -25,7 +25,7 @@ namespace Tester
 
         public string GetExtendedInfo()
         {
-            return $"Blob:{this.Name}";
+            return $"Blob:{this.Name}, StateType:{typeof(TState).Name}";
         }
 
         // factory function for grain activation
@@ -58,7 +58,7 @@ namespace Tester
 
         public string GetExtendedInfo()
         {
-            return $"Table:{this.Name}-ActivateCalled:{this.activateCalled}";
+            return $"Table:{this.Name}-ActivateCalled:{this.activateCalled}, StateType:{typeof(TState).Name}";
         }
 
         public Task LoadState()

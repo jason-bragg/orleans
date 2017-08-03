@@ -9,6 +9,16 @@ namespace Tester
         string StateName { get; }
     }
 
+    public class StorageFeatureConfig : IStorageFeatureConfig
+    {
+        public StorageFeatureConfig(string stateName)
+        {
+            this.StateName = stateName;
+        }
+
+        public string StateName { get; }
+    }
+
     public interface IStorageFeature<TState>
     {
         string Name { get; }

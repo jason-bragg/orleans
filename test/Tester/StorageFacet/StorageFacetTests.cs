@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 using Orleans.Runtime.Configuration;
@@ -26,6 +27,7 @@ namespace Tester
                 public IServiceProvider ConfigureServices(IServiceCollection services)
                 {
                     services.AddSingleton(typeof(IStorageFeatureFactoryCollection<>), typeof(StorageFeatureFactoryCollection<>));
+                    services.AddSingleton(typeof(IParamiterFacetFactory<StorageFeatureAttribute>), typeof(StorageFeatureParamiterFacetFactory));
                     return services.BuildServiceProvider();
                 }
             }
@@ -52,8 +54,8 @@ namespace Tester
             IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<IStorageFacetGrain>(0);
             string[] info = await grain.GetExtendedInfo();
             Assert.Equal(2, info.Length);
-            Assert.Equal("Blob:FirstState", info[0]);
-            Assert.Equal("Table:second-ActivateCalled:True", info[1]);
+            Assert.Equal("Blob:FirstState, StateType:String", info[0]);
+            Assert.Equal("Table:second-ActivateCalled:True, StateType:String", info[1]);
         }
     }
 }

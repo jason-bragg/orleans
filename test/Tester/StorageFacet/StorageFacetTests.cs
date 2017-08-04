@@ -26,8 +26,11 @@ namespace Tester
             {
                 public IServiceProvider ConfigureServices(IServiceCollection services)
                 {
-                    services.AddSingleton(typeof(IStorageFeatureFactoryCollection<>), typeof(StorageFeatureFactoryCollection<>));
                     services.AddSingleton(typeof(IParamiterFacetFactory<StorageFeatureAttribute>), typeof(StorageFeatureParamiterFacetFactory));
+                    services.AddTransient(typeof(INamedStorageFeatureFactory<>), typeof(NamedStorageFeatureFactory<>));
+                    services.AddTransient(typeof(IStorageFeatureFactory<>), typeof(BlobStorageFeatureFactory<>));
+                    services.AddTransient(typeof(BlobStorageFeatureFactory<>));
+                    services.AddTransient(typeof(TableStorageFeatureFactory<>));
                     return services.BuildServiceProvider();
                 }
             }

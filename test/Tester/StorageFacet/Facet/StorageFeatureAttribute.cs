@@ -30,8 +30,9 @@ namespace Tester
                 config = new StorageFeatureConfig(parameter.Name);
             }
             // use generic type args to define collection type.
-            Type factorySelectorType = typeof(IStorageFeatureFactoryCollection<>).MakeGenericType(parameter.ParameterType.GetGenericArguments());
-            return context => Create(factorySelectorType, attribute.StorageProviderName, config, context);
+            Type factorySelectorType = typeof(INamedStorageFeatureFactory<>).MakeGenericType(parameter.ParameterType.GetGenericArguments());
+            IFactoryBridge bridge = Activator.CreateInstance(typeof(FactoryBridge<>).MakeGenericType(parameter.ParameterType.GetGenericArguments())) as IFactoryBridge;
+            return context => Create(factorySelectorType, bridge, attribute.StorageProviderName, config, context);
         }
 
         public Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, FacetAttribute attribute)
@@ -39,12 +40,26 @@ namespace Tester
             return Create(parameter, attribute as StorageFeatureAttribute);
         }
 
-        private object Create(Type factorySelectorType, string name, IStorageFeatureConfig config, IGrainActivationContext context)
+        private object Create(Type factorySelectorType, IFactoryBridge bridge, string name, IStorageFeatureConfig config, IGrainActivationContext context)
         {
-            var factorySelector = context.ActivationServices.GetService(factorySelectorType) as IStorageFeatureFactoryCollection;
-            Factory<IGrainActivationContext, IStorageFeatureConfig, object> factory = factorySelector?.GetService(name);
-            // if container was not scoped, we could cache the factory, but it is...
-            return factory?.Invoke(context, config);
+            bridge.Factory = context.ActivationServices.GetService(factorySelectorType);
+            return bridge.Create(name, config);
+        }
+
+        private interface IFactoryBridge
+        {
+            object Factory { set; }
+            object Create(string name, IStorageFeatureConfig config);
+        }
+
+        private class FactoryBridge<TState> : IFactoryBridge
+        {
+            public object Factory { private get; set; }
+
+            public object Create(string name, IStorageFeatureConfig config)
+            {
+                return (Factory as INamedStorageFeatureFactory<TState>)?.Create(name, config);
+            }
         }
     }
 }

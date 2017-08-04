@@ -1,10 +1,76 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Runtime;
 
 namespace Tester
 {
+    public interface IStorageFeatureFactory<TState>
+    {
+        IStorageFeature<TState> Create(IStorageFeatureConfig config);
+    }
+
+    public interface INamedStorageFeatureFactory<TState>
+    {
+        IStorageFeature<TState> Create(string name, IStorageFeatureConfig config);
+    }
+
+    public class BlobStorageFeatureFactory<TState> : IStorageFeatureFactory<TState>
+    {
+        private readonly IGrainActivationContext context;
+
+        public BlobStorageFeatureFactory(IGrainActivationContext context)
+        {
+            this.context = context;
+        }
+
+        public IStorageFeature<TState> Create(IStorageFeatureConfig config)
+        {
+            IStorageFeature<TState> storage = new BlobStorageFeature<TState>(config);
+            storage.ParticipateInLifecycle(context.ObservableLifeCycle);
+            return storage;
+        }
+    }
+
+    public class TableStorageFeatureFactory<TState> : IStorageFeatureFactory<TState>
+    {
+        private readonly IGrainActivationContext context;
+
+        public TableStorageFeatureFactory(IGrainActivationContext context)
+        {
+            this.context = context;
+        }
+
+        public IStorageFeature<TState> Create(IStorageFeatureConfig config)
+        {
+            IStorageFeature<TState> storage = new TableStorageFeature<TState>(config);
+            storage.ParticipateInLifecycle(context.ObservableLifeCycle);
+            return storage;
+        }
+    }
+
+    public class NamedStorageFeatureFactory<TState> : INamedStorageFeatureFactory<TState>
+    {
+        public readonly Dictionary<string, IStorageFeatureFactory<TState>> factories;
+
+        public NamedStorageFeatureFactory(BlobStorageFeatureFactory<TState> blobFactory, TableStorageFeatureFactory<TState> tableFactory)
+        {
+            this.factories = new Dictionary<string, IStorageFeatureFactory<TState>>()
+            {
+                {"Blob", blobFactory},
+                {"Table", tableFactory}
+            };
+        }
+
+        public IStorageFeature<TState> Create(string name, IStorageFeatureConfig config)
+        {
+            IStorageFeatureFactory<TState> factory;
+            if (this.factories.TryGetValue(name, out factory)) return factory.Create(config);
+            throw new InvalidOperationException($"Provider with name {name} not found.");
+        }
+    }
+
     public class BlobStorageFeature<TState> : IStorageFeature<TState>
     {
         private readonly IStorageFeatureConfig config;
@@ -26,14 +92,6 @@ namespace Tester
         public string GetExtendedInfo()
         {
             return $"Blob:{this.Name}, StateType:{typeof(TState).Name}";
-        }
-
-        // factory function for grain activation
-        public static IStorageFeature<TState> Create(IGrainActivationContext context, IStorageFeatureConfig config)
-        {
-            IStorageFeature<TState> storage = new BlobStorageFeature<TState>(config);
-            storage.ParticipateInLifecycle(context.ObservableLifeCycle);
-            return storage;
         }
     }
 
@@ -78,32 +136,6 @@ namespace Tester
             IStorageFeature<TState> storage = new TableStorageFeature<TState>(config);
             storage.ParticipateInLifecycle(context.ObservableLifeCycle);
             return storage;
-        }
-    }
-
-    public class StorageFeatureFactoryCollection<TState> : IStorageFeatureFactoryCollection<TState>
-    {
-        public Factory<IGrainActivationContext, IStorageFeatureConfig, IStorageFeature<TState>> GetService(string key)
-        {
-            // default
-            if (string.IsNullOrEmpty(key))
-            {
-                return TableStorageFeature<TState>.Create;
-            }
-            if (key.StartsWith("Blob"))
-            {
-                return BlobStorageFeature<TState>.Create;
-            }
-            if (key.StartsWith("Table"))
-            {
-                return TableStorageFeature<TState>.Create;
-            }
-            throw new InvalidOperationException($"Provider with name {key} not found.");
-        }
-
-        Factory<IGrainActivationContext, IStorageFeatureConfig, object> IKeyedServiceCollection<string, Factory<IGrainActivationContext, IStorageFeatureConfig, object>>.GetService(string key)
-        {
-            return GetService(key);
         }
     }
 }

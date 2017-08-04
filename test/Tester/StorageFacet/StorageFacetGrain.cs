@@ -1,5 +1,7 @@
 ﻿using Orleans;
 using System.Threading.Tasks;
+// Note that for a feature exposed to a grain as a facet, only it's abstractions should be necessary.
+using Tester.StorageFacet.Abstractions;
 
 namespace Tester
 {
@@ -15,8 +17,89 @@ namespace Tester
         private readonly IStorageFeature<string> second;
 
         public StorageFacetGrain(
-            [StorageFeature("Blob", stateName: "FirstState")] IStorageFeature<string> first,
+            [StorageFeature("Blob", "FirstState")] IStorageFeature<string> first,
             [StorageFeature("Table")] IStorageFeature<string> second)
+        {
+            this.first = first;
+            this.second = second;
+        }
+
+        public Task<string[]> GetNames()
+        {
+            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+        }
+
+        public Task<string[]> GetExtendedInfo()
+        {
+            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+        }
+    }
+
+    public interface IStorageFactoryGrain : IStorageFacetGrain
+    {
+    }
+    public class StorageFactoryGrain : Grain, IStorageFactoryGrain
+    {
+        private readonly IStorageFeature<string> first;
+        private readonly IStorageFeature<string> second;
+
+        public StorageFactoryGrain(
+            INamedStorageFeatureFactory<string> namedStorageFeatureFactory)
+        {
+            this.first = namedStorageFeatureFactory.Create("Blob", new StorageFeatureConfig("FirstState"));
+            this.second = namedStorageFeatureFactory.Create("Table", new StorageFeatureConfig("second")); ;
+        }
+
+        public Task<string[]> GetNames()
+        {
+            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+        }
+
+        public Task<string[]> GetExtendedInfo()
+        {
+            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+        }
+    }
+
+    public interface IStorageDefaultFactoryGrain : IStorageFacetGrain
+    {
+    }
+
+    public class StorageDefaultFactoryGrain : Grain, IStorageDefaultFactoryGrain
+    {
+        private readonly IStorageFeature<string> first;
+        private readonly IStorageFeature<string> second;
+
+        public StorageDefaultFactoryGrain(
+            IStorageFeatureFactory<string> StorageFeatureFactory)
+        {
+            this.first = StorageFeatureFactory.Create(new StorageFeatureConfig("FirstState"));
+            this.second = StorageFeatureFactory.Create(new StorageFeatureConfig("second"));
+        }
+
+        public Task<string[]> GetNames()
+        {
+            return Task.FromResult(new[] { this.first.Name, this.second.Name });
+        }
+
+        public Task<string[]> GetExtendedInfo()
+        {
+            return Task.FromResult(new[] { this.first.GetExtendedInfo(), this.second.GetExtendedInfo() });
+        }
+    }
+
+    public interface IStorageDefaultFacetGrain : IStorageFacetGrain
+    {
+    }
+
+    public class StorageDefaultFacetGrain : Grain, IStorageDefaultFacetGrain
+    {
+        private readonly IStorageFeature<string> first;
+        private readonly IStorageFeature<string> second;
+
+        public StorageDefaultFacetGrain(
+            [StorageFeature(stateName: "FirstState")] IStorageFeature<string> first,
+            [StorageFeature] IStorageFeature<string> second)
         {
             this.first = first;
             this.second = second;

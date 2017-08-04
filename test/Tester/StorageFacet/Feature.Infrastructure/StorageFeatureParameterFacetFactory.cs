@@ -2,24 +2,11 @@
 using System.Reflection;
 using Orleans;
 using Orleans.Runtime;
+using Tester.StorageFacet.Abstractions;
 
-namespace Tester
+namespace Tester.StorageFacet.Infrastructure
 {
-    [AttributeUsage(AttributeTargets.Parameter)]
-    public class StorageFeatureAttribute : FacetAttribute, IStorageFeatureConfig
-    {
-        public string StorageProviderName { get; }
-
-        public string StateName { get; }
-
-        public StorageFeatureAttribute(string storageProviderName = null, string stateName = null)
-        {
-            this.StorageProviderName = storageProviderName;
-            this.StateName = stateName;
-        }
-    }
-
-    public class StorageFeatureParamiterFacetFactory : IParamiterFacetFactory<StorageFeatureAttribute>
+    public class StorageFeatureParameterFacetFactory : IParameterFacetFactory<StorageFeatureAttribute>
     {
         public Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, StorageFeatureAttribute attribute)
         {
@@ -62,4 +49,5 @@ namespace Tester
             }
         }
     }
+
 }

@@ -1,11 +1,13 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
+using Tester.StorageFacet.Infrastructure;
+using Tester.StorageFacet.Implementations;
 
 namespace Tester
 {
@@ -26,11 +28,31 @@ namespace Tester
             {
                 public IServiceProvider ConfigureServices(IServiceCollection services)
                 {
-                    services.AddSingleton(typeof(IParamiterFacetFactory<StorageFeatureAttribute>), typeof(StorageFeatureParamiterFacetFactory));
-                    services.AddTransient(typeof(INamedStorageFeatureFactory<>), typeof(NamedStorageFeatureFactory<>));
-                    services.AddTransient(typeof(IStorageFeatureFactory<>), typeof(BlobStorageFeatureFactory<>));
-                    services.AddTransient(typeof(BlobStorageFeatureFactory<>));
-                    services.AddTransient(typeof(TableStorageFeatureFactory<>));
+                    // Setup storage feature infrastructure.
+                    // - Setup infrastructure with configured features.
+                    // - Set default feature implementation.
+                    // Maybe add builders to make this easyer and less error prone..?
+
+                    // Configure infrastructure
+                    services.UseStorageFeature(new Dictionary<string, Type>
+                        {
+                            {"Blob", typeof(BlobStorageFeatureFactory<>) },
+                            {"Table", typeof(TableStorageFeatureFactory<>) }
+                        });
+                    // Default storage feature factory - optional
+                    services.UseAsDefaultStorageFeature(typeof(TableStorageFeatureFactory<>));
+
+
+                    // Service will need to add types they want to use to collection
+                    // - Call extension functions from each implementation assembly to register it's classes.
+
+                    // Blob - from blob extension assembly
+                    services.UseBlobStorageFeature();
+                    // Table - from table extension assembly
+                    services.UseTableStorageFeature();
+                    // Blarg - from blarg extension assembly
+                    // services.UseBlargStorageFeature();
+
                     return services.BuildServiceProvider();
                 }
             }
@@ -42,22 +64,54 @@ namespace Tester
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
-        public async Task UserActivationServiceHappyPath()
+        public Task StorageFeatureFacetHappyPath()
         {
-            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<IStorageFacetGrain>(0);
-            string[] names = await grain.GetNames();
-            Assert.Equal(2, names.Length);
-            Assert.Equal("FirstState", names[0]);
-            Assert.Equal("second", names[1]);
+            return StorageFeatureHappyPath<IStorageFacetGrain>();
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
-        public async Task GetExtendedInfoFromActivationServices()
+        public Task StorageFeatureFactoryHappyPath()
         {
-            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<IStorageFacetGrain>(0);
+            return StorageFeatureHappyPath<IStorageFactoryGrain>();
+        }
+
+        public async Task StorageFeatureHappyPath<TGrainInterface>()
+            where TGrainInterface : IStorageFacetGrain
+        {
+            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);
+            string[] names = await grain.GetNames();
             string[] info = await grain.GetExtendedInfo();
+            Assert.Equal(2, names.Length);
+            Assert.Equal("FirstState", names[0]);
+            Assert.Equal("second", names[1]);
             Assert.Equal(2, info.Length);
             Assert.Equal("Blob:FirstState, StateType:String", info[0]);
+            Assert.Equal("Table:second-ActivateCalled:True, StateType:String", info[1]);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
+        public Task StorageFeatureFacetDefaultPath()
+        {
+            return StorageFeatureDefaultPath<IStorageDefaultFacetGrain>();
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Facet")]
+        public Task StorageFeatureFactoryDefaultPath()
+        {
+            return StorageFeatureDefaultPath<IStorageDefaultFactoryGrain>();
+        }
+
+        public async Task StorageFeatureDefaultPath<TGrainInterface>()
+            where TGrainInterface : IStorageFacetGrain
+        {
+            IStorageFacetGrain grain = this.fixture.GrainFactory.GetGrain<TGrainInterface>(0);
+            string[] names = await grain.GetNames();
+            string[] info = await grain.GetExtendedInfo();
+            Assert.Equal(2, names.Length);
+            Assert.Equal("FirstState", names[0]);
+            Assert.Equal("second", names[1]);
+            Assert.Equal(2, info.Length);
+            Assert.Equal("Table:FirstState-ActivateCalled:True, StateType:String", info[0]);
             Assert.Equal("Table:second-ActivateCalled:True, StateType:String", info[1]);
         }
     }

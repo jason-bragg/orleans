@@ -9,7 +9,7 @@ namespace Orleans.Runtime
 {
     internal class GrainConstructorFacetArguementsFactory
     {
-        private static readonly Type facetFactoryType = typeof(IParamiterFacetFactory<>);
+        private static readonly Type facetFactoryType = typeof(IParameterFacetFactory<>);
         /// <summary>
         /// Cached constructor arguement factorys by type
         /// TODO: consider storing in grain type data and constructing at startup to avoid runtime errors. - jbragg
@@ -54,7 +54,7 @@ namespace Orleans.Runtime
                     var attribute = parameter.GetCustomAttribute<FacetAttribute>();
                     if (attribute == null) continue;
                     types.Add(parameter.ParameterType);
-                    IParamiterFacetFactory facetFactory = services.GetRequiredService(facetFactoryType.MakeGenericType(attribute.GetType())) as IParamiterFacetFactory;
+                    IParameterFacetFactory facetFactory = services.GetRequiredService(facetFactoryType.MakeGenericType(attribute.GetType())) as IParameterFacetFactory;
                     if (facetFactory == null) continue;
                     this.arguementFactorys.Add(facetFactory.Create(parameter, attribute));
                 }

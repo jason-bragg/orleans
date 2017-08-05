@@ -15,7 +15,7 @@ namespace Tester.StorageFacet.Infrastructure
             services.AddSingleton(sp => new NamedStorageFeatureConfig(storageFeatureFactoryTypeMap));
 
             // storage feature factory infrastructure
-            services.AddTransient(typeof(INamedStorageFeatureFactory<>), typeof(NamedStorageFeatureFactory<>));
+            services.AddScoped(typeof(INamedStorageFeatureFactory<>), typeof(NamedStorageFeatureFactory<>));
 
             // storage feature facet attribute
             services.AddSingleton(typeof(IParameterFacetFactory<StorageFeatureAttribute>), typeof(StorageFeatureParameterFacetFactory));
@@ -24,7 +24,7 @@ namespace Tester.StorageFacet.Infrastructure
         public static void UseAsDefaultStorageFeature(this IServiceCollection services, Type factoryType)
         {
             if (factoryType.GetInterface(typeof(IStorageFeatureFactory<>).Name)==null) throw new ArgumentException(nameof(factoryType));
-            services.AddTransient(typeof(IStorageFeatureFactory<>), factoryType);
+            services.AddScoped(typeof(IStorageFeatureFactory<>), factoryType);
         }
     }
 }

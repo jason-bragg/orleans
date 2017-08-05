@@ -22,11 +22,6 @@ namespace Tester.StorageFacet.Infrastructure
             return context => Create(factorySelectorType, bridge, attribute.StorageProviderName, config, context);
         }
 
-        public Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, FacetAttribute attribute)
-        {
-            return Create(parameter, attribute as StorageFeatureAttribute);
-        }
-
         private object Create(Type factorySelectorType, IFactoryBridge bridge, string name, IStorageFeatureConfig config, IGrainActivationContext context)
         {
             bridge.Factory = context.ActivationServices.GetService(factorySelectorType);

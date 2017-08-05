@@ -53,10 +53,11 @@ namespace Orleans.Runtime
                 {
                     var attribute = parameter.GetCustomAttribute<FacetAttribute>();
                     if (attribute == null) continue;
+                    IFactoryBridge bridge = Activator.CreateInstance(typeof(FactoryBridge<>).MakeGenericType(parameter.ParameterType.GetGenericArguments())) as IFactoryBridge;
+                    if (bridge == null) continue;
+                    bridge.Factory = services.GetRequiredService(facetFactoryType.MakeGenericType(attribute.GetType()));
                     types.Add(parameter.ParameterType);
-                    IParameterFacetFactory facetFactory = services.GetRequiredService(facetFactoryType.MakeGenericType(attribute.GetType())) as IParameterFacetFactory;
-                    if (facetFactory == null) continue;
-                    this.arguementFactorys.Add(facetFactory.Create(parameter, attribute));
+                    this.arguementFactorys.Add(bridge.Create(parameter, attribute));
                 }
                 this.ArguementTypes = types.ToArray();
             }
@@ -72,6 +73,22 @@ namespace Orleans.Runtime
                     results[i++] = arguementFactory(grainContext);
                 }
                 return results;
+            }
+        }
+
+        private interface IFactoryBridge
+        {
+            object Factory { set; }
+            Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, FacetAttribute attribute);
+        }
+
+        private class FactoryBridge<TAttribute> : IFactoryBridge
+            where TAttribute : FacetAttribute
+        {
+            public object Factory { private get; set; }
+            public Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, FacetAttribute attribute)
+            {
+                return (Factory as IParameterFacetFactory<TAttribute>)?.Create(parameter, attribute as TAttribute);
             }
         }
     }

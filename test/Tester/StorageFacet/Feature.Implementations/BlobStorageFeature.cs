@@ -1,5 +1,4 @@
-﻿
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Tester.StorageFacet.Abstractions;
@@ -41,7 +40,7 @@ namespace Tester.StorageFacet.Implementations
     {
         public static void UseBlobStorageFeature(this IServiceCollection services)
         {
-            services.AddTransient(typeof(BlobStorageFeatureFactory<>));
+            services.AddScoped(typeof(BlobStorageFeatureFactory<>));
             services.AddTransient(typeof(BlobStorageFeature<>));
         }
     }

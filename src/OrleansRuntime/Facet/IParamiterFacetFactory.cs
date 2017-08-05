@@ -2,14 +2,17 @@
 
 namespace Orleans.Runtime
 {
-    public interface IParameterFacetFactory
-    {
-        Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, FacetAttribute attribute);
-    }
-
-    public interface IParameterFacetFactory<in TAttribute> : IParameterFacetFactory
+    /// <summary>
+    /// Responsible for creating a cachable facet factory using the information from the parameter
+    ///   and it's facet attribute.
+    /// </summary>
+    public interface IParameterFacetFactory<in TAttribute>
         where TAttribute : FacetAttribute
     {
+        /// <summary>
+        /// Responsible for creating a cachable facet factory using the information from the parameter
+        ///   and it's facet attribute.
+        /// </summary>
         Factory<IGrainActivationContext, object> Create(ParameterInfo parameter, TAttribute attribute);
     }
 }

@@ -53,7 +53,7 @@ namespace Tester.StorageFacet.Implementations
     {
         public static void UseTableStorageFeature(this IServiceCollection services)
         {
-            services.AddTransient(typeof(TableStorageFeatureFactory<>));
+            services.AddScoped(typeof(TableStorageFeatureFactory<>));
             services.AddTransient(typeof(TableStorageFeature<>));
         }
     }

@@ -118,7 +118,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "OrleansGCPUtils", "src\Orle
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TestInternalGrainInterfaces", "test\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj", "{EBD697E3-91BE-4844-B3F0-6997300A8C12}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orleans.Core.Abstractions", "src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj", "{73514686-D25D-478B-9943-A86F6B0F3A37}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Orleans.Core.Abstractions", "src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj", "{73514686-D25D-478B-9943-A86F6B0F3A37}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{5A71FFF4-651D-4D9F-B57E-333D6CB38D27}"
 	ProjectSection(SolutionItems) = preProject

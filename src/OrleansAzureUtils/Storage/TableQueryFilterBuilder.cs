@@ -39,5 +39,39 @@ namespace Orleans.AzureUtils
             return TableQuery.CombineFilters(MatchPartitionKeyFilter(partitionKey), TableOperators.And,
                                       MatchRowKeyFilter(rowKey));
         }
+        
+        /// <summary>
+        /// Builds query string for all rows greater than or equal to rowkey
+        /// </summary>
+        /// <param name="rowKeyStart"></param>
+        /// <returns></returns>
+        public static string MatchGreaterOrEqualRowKeyFilter(string rowKeyStart)
+        {
+            return TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, rowKeyStart);
+        }
+
+        /// <summary>
+        /// Builds query string for all rows less than or equal to rowkey
+        /// </summary>
+        /// <param name="rowKeyEnd"></param>
+        /// <returns></returns>
+        public static string MatchLessThanOrEqualRowKeyFilter(string rowKeyEnd)
+        {
+            return TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, rowKeyEnd);
+        }
+
+        /// <summary>
+        /// Builds query string that matches a given partitionkey and rowkey range
+        /// </summary>
+        /// <param name="partitionKey"></param>
+        /// <param name="rowKeyStart"></param>
+        /// <param name="rowKeyEnd"></param>
+        /// <returns></returns>
+        public static string MatchPartitionKeyAndRowKeyRangeFilter(string partitionKey, string rowKeyStart, string rowKeyEnd)
+        {
+            return TableQuery.CombineFilters(MatchPartitionKeyFilter(partitionKey), TableOperators.And,
+                                             TableQuery.CombineFilters(MatchGreaterOrEqualRowKeyFilter(rowKeyStart), TableOperators.And,
+                                                                       MatchLessThanOrEqualRowKeyFilter(rowKeyEnd)));
+        }
     }
 }

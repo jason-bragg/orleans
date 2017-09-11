@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using Microsoft.WindowsAzure.Storage.RetryPolicies;
 using Orleans.Runtime;
-
+using Microsoft.WindowsAzure.Storage.Table;
 
 namespace Orleans.AzureUtils
 {
@@ -30,6 +30,22 @@ namespace Orleans.AzureUtils
         public static IRetryPolicy TableOperationRetryPolicy { get; private set; }
 
         public const int MAX_BULK_UPDATE_ROWS = 100;
+
+        public static TableRequestOptions DefaultTableCreationRequestOptions { get; private set; } =
+            new TableRequestOptions
+            {
+                RetryPolicy = TableCreationRetryPolicy,
+                ServerTimeout = TableCreationTimeout,
+                PayloadFormat = TablePayloadFormat.JsonNoMetadata
+            };
+
+        public static TableRequestOptions DefaultTableOperationRequestOptions { get; private set; } =
+            new TableRequestOptions
+            {
+                RetryPolicy = TableOperationRetryPolicy,
+                ServerTimeout = TableOperationTimeout,
+                PayloadFormat = TablePayloadFormat.JsonNoMetadata
+            };
 
         static AzureTableDefaultPolicies()
         {

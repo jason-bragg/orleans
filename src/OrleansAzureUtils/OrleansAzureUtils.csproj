@@ -8,7 +8,7 @@
 
   <PropertyGroup>
     <AssemblyName>OrleansAzureUtils</AssemblyName>
-    <RootNamespace>OrleansAzureUtils</RootNamespace>
+    <RootNamespace>Orleans.AzureUtils</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageTargetFallback Condition=" '$(BuildFlavor)' == 'Legacy' ">$(PackageTargetFallback);portable-net45+win8+wpa81+wp8</PackageTargetFallback>
   </PropertyGroup>

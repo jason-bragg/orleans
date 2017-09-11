@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Net;
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
@@ -19,6 +18,8 @@ namespace Orleans.AzureUtils
     /// <typeparam name="T">Table data entry used by this table / manager.</typeparam>
     public class AzureTableDataManager<T> where T : class, ITableEntity, new()
     {
+        private readonly AzureTableFactory tableFactory;
+
         /// <summary> Name of the table this instance is managing. </summary>
         public string TableName { get; private set; }
 
@@ -38,8 +39,9 @@ namespace Orleans.AzureUtils
         /// <param name="tableName">Name of the table to be connected to.</param>
         /// <param name="storageConnectionString">Connection string for the Azure storage account used to host this table.</param>
         /// <param name="logger">Logger to use.</param>
-        public AzureTableDataManager(string tableName, string storageConnectionString, Logger logger = null)
+        public AzureTableDataManager(string tableName, string storageConnectionString, Logger logger = null, AzureTableFactory tableFactory = null)
         {
+            this.tableFactory = tableFactory ?? new AzureTableFactory(storageConnectionString, AzureTableDefaultPolicies.DefaultTableCreationRequestOptions, logger);
             var loggerName = "AzureTableDataManager-" + typeof(T).Name;
             Logger = logger ?? LogManager.GetLogger(loggerName, LoggerType.Runtime);
             TableName = tableName;
@@ -54,62 +56,16 @@ namespace Orleans.AzureUtils
         /// <returns>Completion promise for this operation.</returns>
         public async Task InitTableAsync()
         {
-            const string operation = "InitTable";
-            var startTime = DateTime.UtcNow;
-
-            try
-            {
-                CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
-                bool didCreate = await tableRef.CreateIfNotExistsAsync();
-
-
-                Logger.Info(ErrorCode.AzureTable_01, "{0} Azure storage table {1}", (didCreate ? "Created" : "Attached to"), TableName);
-
-                CloudTableClient tableOperationsClient = GetCloudTableOperationsClient();
-                tableReference = tableOperationsClient.GetTableReference(TableName);
-            }
-            catch (Exception exc)
-            {
-                Logger.Error(ErrorCode.AzureTable_02, $"Could not initialize connection to storage table {TableName}", exc);
-                throw;
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
+            this.tableReference = await this.tableFactory.CreateTable(this.TableName, AzureTableDefaultPolicies.DefaultTableOperationRequestOptions);
         }
 
         /// <summary>
         /// Deletes the Azure table.
         /// </summary>
         /// <returns>Completion promise for this operation.</returns>
-        public async Task DeleteTableAsync()
+        public Task DeleteTableAsync()
         {
-            const string operation = "DeleteTable";
-            var startTime = DateTime.UtcNow;
-
-            try
-            {
-                CloudTableClient tableCreationClient = GetCloudTableCreationClient();
-                CloudTable tableRef = tableCreationClient.GetTableReference(TableName);
-
-                bool didDelete = await tableRef.DeleteIfExistsAsync();
-
-                if (didDelete)
-                {
-                    Logger.Info(ErrorCode.AzureTable_03, "Deleted Azure storage table {0}", TableName);
-                }
-            }
-            catch (Exception exc)
-            {
-                Logger.Error(ErrorCode.AzureTable_04, "Could not delete storage table {0}", exc);
-                throw;
-            }
-            finally
-            {
-                CheckAlertSlowAccess(startTime, operation);
-            }
+            return this.tableFactory.DeleteTable(this.TableName);
         }
 
         /// <summary>
@@ -642,46 +598,6 @@ namespace Orleans.AzureUtils
             {
                 CheckAlertSlowAccess(startTime, operation);
             }            
-        }
-
-        // Utility methods
-
-        private CloudTableClient GetCloudTableOperationsClient()
-        {
-            try
-            {
-                CloudStorageAccount storageAccount = AzureStorageUtils.GetCloudStorageAccount(ConnectionString);
-                CloudTableClient operationsClient = storageAccount.CreateCloudTableClient();
-                operationsClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableOperationRetryPolicy;
-                operationsClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableOperationTimeout;
-                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
-                operationsClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
-                return operationsClient;
-            }
-            catch (Exception exc)
-            {
-                Logger.Error(ErrorCode.AzureTable_17, "Error creating CloudTableOperationsClient.", exc);
-                throw;
-            }
-        }
-
-        private CloudTableClient GetCloudTableCreationClient()
-        {
-            try
-            {
-                CloudStorageAccount storageAccount = AzureStorageUtils.GetCloudStorageAccount(ConnectionString);
-                CloudTableClient creationClient = storageAccount.CreateCloudTableClient();
-                creationClient.DefaultRequestOptions.RetryPolicy = AzureTableDefaultPolicies.TableCreationRetryPolicy;
-                creationClient.DefaultRequestOptions.ServerTimeout = AzureTableDefaultPolicies.TableCreationTimeout;
-                // Values supported can be AtomPub, Json, JsonFullMetadata or JsonNoMetadata with Json being the default value
-                creationClient.DefaultRequestOptions.PayloadFormat = TablePayloadFormat.JsonNoMetadata;
-                return creationClient;
-            }
-            catch (Exception exc)
-            {
-                Logger.Error(ErrorCode.AzureTable_18, "Error creating CloudTableCreationClient.", exc);
-                throw;
-            }
         }
 
         private void CheckAlertWriteError(string operation, object data1, string data2, Exception exc)

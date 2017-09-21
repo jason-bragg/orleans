@@ -11,38 +11,37 @@ namespace Orleans.Azure
     public class JsonPropertyConverter : IPropertyConverter
     {
         private const Formatting formatting = Formatting.None;
+        private readonly JsonSerializerSettings settings;
 
-        private readonly JsonSerializerSettings settings = new JsonSerializerSettings
+        public JsonPropertyConverter() : this(DefaultJsonSettings.Instance){}
+        
+        public JsonPropertyConverter(JsonSerializerSettings settings)
         {
-            DateTimeZoneHandling = DateTimeZoneHandling.Utc,
-        };
+            this.settings = settings;
+        }
 
         public void ConvertFromStorage(object obj, PropertyInfo userProperty, EntityProperty storageProperty)
         {
             string text = storageProperty.StringValue;
-            object userData = GeneratePropertyFromString(text, userProperty.PropertyType);
+            object userData = text == null ? null : JsonConvert.DeserializeObject(text, userProperty.PropertyType, this.settings);
             userProperty.SetValue(obj, userData, null);
         }
 
         public void ConvertToStorage(object obj, PropertyInfo userProperty, out EntityProperty storageProperty)
         {
             object userData = userProperty.GetValue(obj, null);
-            string encoded = GenerateStringFromProperty(userData);
+            string encoded = userData == null ? null : JsonConvert.SerializeObject(userData, formatting, this.settings);
             storageProperty = EntityProperty.GeneratePropertyForString(encoded);
         }
 
-        private object GeneratePropertyFromString(string text, Type type)
+        public class DefaultJsonSettings : JsonSerializerSettings
         {
-            object userData = text == null ? null : JsonConvert.DeserializeObject(text, type, settings);
+            public static JsonSerializerSettings Instance { get; } = new DefaultJsonSettings();
 
-            return userData;
-        }
-
-        private string GenerateStringFromProperty(object userData)
-        {
-            string encoded = userData == null ? null : JsonConvert.SerializeObject(userData, formatting, settings);
-
-            return encoded;
+            public DefaultJsonSettings()
+            {
+                this.DateTimeZoneHandling = DateTimeZoneHandling.Utc;
+            }
         }
     }
 }

@@ -240,11 +240,9 @@ namespace Tester.AzureUtils.Persistence
             var logger = LogManager.GetLogger("PersistenceProviderTests");
             storage.InitLogger(logger);
 
-            var entity = new DynamicTableEntity();
+            DynamicTableEntity entity = storage.Converter.ConvertToStorage(initialState);
 
-            storage.ConvertToStorageFormat(initialState, entity);
-
-            var convertedState = (TestStoreGrainState)storage.ConvertFromStorageFormat(entity);
+            var convertedState = (TestStoreGrainState)storage.Converter.ConvertFromStorage(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.A, convertedState.A);
             Assert.Equal(initialState.B, convertedState.B);

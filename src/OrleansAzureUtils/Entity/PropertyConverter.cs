@@ -10,7 +10,7 @@ namespace Orleans.Azure
     /// to/from storage properties.  For the native types, the native storage properties are used.  Custom types
     /// all convert to/from string storage properties using inner converter.
     /// </summary>
-    public class PropertyConverter : IPropertyConverter
+    public class PropertyConverter
     {
         private readonly IPropertyConverter converter;
 
@@ -192,16 +192,5 @@ namespace Orleans.Azure
                 throw PropertyConversionException.CreateWriteError(obj.GetType(), userProperty.PropertyType, userProperty.Name, ex);
             }
         }
-    }
-
-    public class PropertyConverter<TConverter> : PropertyConverter
-        where TConverter : IPropertyConverter, new()
-    {
-        public PropertyConverter() : base(new TConverter()) {}
-    }
-
-    public class DefaultPropertyConverter : PropertyConverter<JsonPropertyConverter>
-    {
-        public static IPropertyConverter Instance { get; } = new DefaultPropertyConverter();
     }
 }

@@ -174,13 +174,12 @@ namespace Tester.AzureUtils.Persistence
             IUser grain = this.GrainFactory.GetGrain<IUser>(id);
 
             var initialState = new GrainStateContainingGrainReferences { Grain = grain };
-            var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
             storage.InitLogger(logger);
             await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties, null));
-            storage.ConvertToStorageFormat(initialState, entity);
+            DynamicTableEntity entity = storage.Converter.ConvertToStorage(initialState);
             var convertedState = new GrainStateContainingGrainReferences();
-            convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
+            convertedState = (GrainStateContainingGrainReferences)storage.Converter.ConvertFromStorage(entity);
             Assert.NotNull(convertedState); // Converted state
             Assert.Equal(initialState.Grain,  convertedState.Grain);  // "Grain"
         }
@@ -201,12 +200,11 @@ namespace Tester.AzureUtils.Persistence
                 initialState.GrainList.Add(g);
                 initialState.GrainDict.Add(g.GetPrimaryKey().ToString(), g);
             }
-            var entity = new DynamicTableEntity();
             var storage = new AzureTableStorage();
             storage.InitLogger(logger);
             await storage.Init("AzStore", this.HostedCluster.ServiceProvider.GetRequiredService<ClientProviderRuntime>(), new ProviderConfiguration(providerProperties, null));
-            storage.ConvertToStorageFormat(initialState, entity);
-            var convertedState = (GrainStateContainingGrainReferences)storage.ConvertFromStorageFormat(entity);
+            DynamicTableEntity entity = storage.Converter.ConvertToStorage(initialState);
+            var convertedState = (GrainStateContainingGrainReferences)storage.Converter.ConvertFromStorage(entity);
             Assert.NotNull(convertedState);
             Assert.Equal(initialState.GrainList.Count,  convertedState.GrainList.Count);  // "GrainList size"
             Assert.Equal(initialState.GrainDict.Count,  convertedState.GrainDict.Count);  // "GrainDict size"

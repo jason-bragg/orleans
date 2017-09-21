@@ -14,7 +14,7 @@ namespace Orleans.Azure
         where TPoco : new()
     {
         private const string DefaultExtensionSuffix = "_Expanded_";
-        private readonly IPropertyConverter propertyConverter;
+        private readonly PropertyConverter propertyConverter;
         private readonly PropertyInfo[] properties;
 
         public EntityConverter()
@@ -24,7 +24,7 @@ namespace Orleans.Azure
 
         public EntityConverter(IPropertyConverter propertyConverter)
         {
-            this.propertyConverter = propertyConverter;
+            this.propertyConverter = new PropertyConverter(propertyConverter);
             this.properties = this.BuildFilteredProperties();
         }
 

@@ -5,6 +5,7 @@ namespace Orleans.Azure
 {
     /// <summary>
     ///  Interface for storage entity property converter.  Converts properties to/from storage properties
+    ///  Must convert complext types to either string or binary data.
     /// </summary>
     public interface IPropertyConverter
     {

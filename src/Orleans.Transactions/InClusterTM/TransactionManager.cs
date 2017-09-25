@@ -16,6 +16,7 @@ namespace Orleans.Transactions
 
         private readonly TransactionsConfiguration config;
         private readonly TransactionLog transactionLog;
+        private readonly ActiveTransactionsTracker activeTransactionsTracker;
 
         // Index of transactions by transactionId.
         private readonly ConcurrentDictionary<long, Transaction> transactionsTable;
@@ -48,6 +49,8 @@ namespace Orleans.Transactions
             this.transactionLog = transactionLog;
             this.config = configOption.Value;
             this.Logger = logFactory(nameof(TransactionManager));
+
+            activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, logFactory);
 
             transactionsTable = new ConcurrentDictionary<long, Transaction>(2, 1000000);
 
@@ -98,6 +101,8 @@ namespace Orleans.Transactions
             await transactionLog.EndRecovery();
             var maxAllocatedTransactionId = await transactionLog.GetStartRecord();
 
+            activeTransactionsTracker.Start(maxAllocatedTransactionId);
+
             this.BeginDependencyCompletionLoop();
             this.BeginGroupCommitLoop();
             this.BeginCheckpointLoop();
@@ -115,6 +120,7 @@ namespace Orleans.Transactions
             {
                 await this.transactionLogMaintenanceTask;
             }
+            this.activeTransactionsTracker.Dispose();
         }
 
         public long StartTransaction(TimeSpan timeout)

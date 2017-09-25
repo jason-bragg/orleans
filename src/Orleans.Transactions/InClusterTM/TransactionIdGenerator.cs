@@ -18,7 +18,7 @@ namespace Orleans.Transactions
         public int LeaseRenewMaxRetry { get; set; }
     }
 
-    public class TransactionIdGenerator : ITransactionIdGenerator
+    public class TransactionIdGenerator : ITransactionIdGenerator, IDisposable
     {
         // configuraiton
         private readonly TransactionIdGeneratorConfig config;
@@ -29,7 +29,7 @@ namespace Orleans.Transactions
 
         // leasing
         private readonly ILease lease;
-        private CancellationTokenSource active;
+        private readonly CancellationTokenSource active;
         private bool isLeaseOwner;
         private Task leaseAutoRenew;
 
@@ -42,6 +42,7 @@ namespace Orleans.Transactions
 
         private TransactionIdGenerator(TransactionIdGeneratorConfig config, ILeaseProvider leaseProvider, ITransactionIdGeneratorStorage storage)
         {
+            this.active = new CancellationTokenSource();
             this.config = config;
             LeaseRequest leaseRequest = new LeaseRequest(config.LeaseKey, config.LeaseDuration);
             this.lease = leaseProvider.CreateLease(nameof(TransactionIdGenerator), leaseRequest);

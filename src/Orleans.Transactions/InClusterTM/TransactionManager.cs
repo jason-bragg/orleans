@@ -16,7 +16,6 @@ namespace Orleans.Transactions
 
         private readonly TransactionsConfiguration config;
         private readonly TransactionLog transactionLog;
-        private readonly ActiveTransactionsTracker activeTransactionsTracker;
 
         // Index of transactions by transactionId.
         private readonly ConcurrentDictionary<long, Transaction> transactionsTable;
@@ -49,8 +48,6 @@ namespace Orleans.Transactions
             this.transactionLog = transactionLog;
             this.config = configOption.Value;
             this.Logger = logFactory(nameof(TransactionManager));
-
-            activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, logFactory);
 
             transactionsTable = new ConcurrentDictionary<long, Transaction>(2, 1000000);
 
@@ -91,11 +88,6 @@ namespace Orleans.Transactions
                 }
                 prevLSN = record.LSN;
 
-                foreach (var resource in record.Resources)
-                {
-                    tx.Info.WriteSet.Add(resource, 1);
-                }
-
                 transactionsTable[record.TransactionId] = tx;
                 checkpointQueue.Enqueue(tx);
                 this.SignalCheckpointEnqueued();
@@ -105,8 +97,6 @@ namespace Orleans.Transactions
 
             await transactionLog.EndRecovery();
             var maxAllocatedTransactionId = await transactionLog.GetStartRecord();
-
-            activeTransactionsTracker.Start(maxAllocatedTransactionId);
 
             this.BeginDependencyCompletionLoop();
             this.BeginGroupCommitLoop();
@@ -125,7 +115,6 @@ namespace Orleans.Transactions
             {
                 await this.transactionLogMaintenanceTask;
             }
-            this.activeTransactionsTracker.Dispose();
         }
 
         public long StartTransaction(TimeSpan timeout)
@@ -402,10 +391,6 @@ namespace Orleans.Transactions
                     TransactionId = tx.TransactionId
                 };
 
-                foreach (var resource in tx.Info.WriteSet.Keys)
-                {
-                    commitRecord.Resources.Add(resource);
-                }
                 groupCommitQueue.Enqueue(new Tuple<CommitRecord, Transaction>(commitRecord, tx));
                 this.SignalGroupCommitEnqueued();
 

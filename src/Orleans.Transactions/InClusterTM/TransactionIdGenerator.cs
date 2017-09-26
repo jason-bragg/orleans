@@ -4,18 +4,33 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
 using Orleans.LeaseProviders;
 using Orleans.Transactions.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Transactions
 {
     public class TransactionIdGeneratorConfig
     {
-        public TimeSpan LeaseDuration { get; set; }
+        public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(1);
 
-        public string LeaseKey { get; set; }
+        public string LeaseKey { get; set; } = "TransactionIdGenerator";
 
-        public int AllocationBatchSize { get; set; }
+        public int AllocationBatchSize { get; set; } = 50000;
 
-        public int LeaseRenewMaxRetry { get; set; }
+        public int LeaseRenewMaxRetry { get; set; } = 3;
+
+        public void Copy(TransactionIdGeneratorConfig other)
+        {
+            if(other == null)
+            {
+                Copy(new TransactionIdGeneratorConfig());
+            } else
+            {
+                this.LeaseDuration = other.LeaseDuration;
+                this.LeaseKey = other.LeaseKey;
+                this.AllocationBatchSize = other.AllocationBatchSize;
+                this.LeaseRenewMaxRetry = other.LeaseRenewMaxRetry;
+            }
+        }
     }
 
     public class TransactionIdGenerator : ITransactionIdGenerator
@@ -40,12 +55,14 @@ namespace Orleans.Transactions
         
         private bool IsValid => !active.IsCancellationRequested && isLeaseOwner;
 
-        private TransactionIdGenerator(TransactionIdGeneratorConfig config, ILeaseProvider leaseProvider, ITransactionIdGeneratorStorage storage)
+        public TransactionIdGenerator(IOptions<TransactionIdGeneratorConfig> config, ILeaseProvider leaseProvider, ITransactionIdGeneratorStorage storage)
         {
             this.active = new CancellationTokenSource();
-            this.config = config;
-            LeaseRequest leaseRequest = new LeaseRequest(config.LeaseKey, config.LeaseDuration);
+            this.config = config.Value;
+
+            LeaseRequest leaseRequest = new LeaseRequest(this.config.LeaseKey, this.config.LeaseDuration);
             this.lease = leaseProvider.CreateLease(nameof(TransactionIdGenerator), leaseRequest);
+
             this.storage = storage;
         }
 
@@ -54,11 +71,14 @@ namespace Orleans.Transactions
             Dispose(false);
         }
 
-        public static async Task<ITransactionIdGenerator> Create(IOptions<TransactionIdGeneratorConfig> config, ILeaseProvider leaseProvider, ITransactionIdGeneratorStorage storage)
+        public static Factory<Task<ITransactionIdGenerator>> Create(IServiceProvider serviceProvider)
         {
-            var generator = new TransactionIdGenerator(config.Value, leaseProvider, storage);
-            await generator.Initialize();
-            return generator;
+            return async () =>
+            {
+                var generator = ActivatorUtilities.CreateInstance<TransactionIdGenerator>(serviceProvider, new object[0]);
+                await generator.Initialize();
+                return generator;
+            };
         }
 
         private async Task Initialize()

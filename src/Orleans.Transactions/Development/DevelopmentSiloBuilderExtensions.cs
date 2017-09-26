@@ -18,6 +18,7 @@ namespace Orleans.Transactions.Development
 
         private static void UseInMemoryTransactionLog(IServiceCollection services)
         {
+            services.AddTransient<ITransactionIdGeneratorStorage, InMemoryTransactionIdGeneratorStorage>();
             services.AddTransient<ITransactionLogStorage, InMemoryTransactionLogStorage>();
         }
     }

@@ -101,8 +101,11 @@ namespace Orleans.Transactions
 
                 record = await transactionLog.GetNextCommitRecord();
             }
-            this.lowestActiveTransactionId = this.transactionsTable.Keys.Min();
-            this.highestActiveTransactionId = this.transactionsTable.Keys.Max();
+            if(!this.transactionsTable.IsEmpty)
+            {
+                this.lowestActiveTransactionId = this.transactionsTable.Keys.Min();
+                this.highestActiveTransactionId = this.transactionsTable.Keys.Max();
+            }
 
             await transactionLog.EndRecovery();
             var maxAllocatedTransactionId = await transactionLog.GetStartRecord();

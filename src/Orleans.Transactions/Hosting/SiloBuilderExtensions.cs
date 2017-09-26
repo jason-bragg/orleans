@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Runtime;
 using Orleans.Hosting;
 using Orleans.Transactions.Abstractions;
+using System.Threading.Tasks;
 
 namespace Orleans.Transactions
 {
@@ -14,10 +15,11 @@ namespace Orleans.Transactions
         /// <param name="builder"></param>
         /// <param name="config"></param>
         /// <returns></returns>
-        public static ISiloBuilder UseInClusterTransactionManager(this ISiloBuilder builder, TransactionsConfiguration config)
+        public static ISiloBuilder UseInClusterTransactionManager(this ISiloBuilder builder, TransactionsConfiguration config, TransactionIdGeneratorConfig idGeneratorConfig)
         {
             return builder.ConfigureServices(UseInClusterTransactionManager)
-                          .Configure<TransactionsConfiguration>((cfg) => cfg.Copy(config));
+                          .Configure<TransactionsConfiguration>((cfg) => cfg.Copy(config))
+                          .Configure<TransactionIdGeneratorConfig>((cfg) => cfg.Copy(idGeneratorConfig));
         }
 
         /// <summary>
@@ -31,6 +33,7 @@ namespace Orleans.Transactions
 
         private static void UseInClusterTransactionManager(IServiceCollection services)
         {
+            services.AddTransient(TransactionIdGenerator.Create);
             services.AddTransient<TransactionLog>();
             services.AddTransient<ITransactionManager,TransactionManager>();
             services.AddSingleton<TransactionServiceGrainFactory>();

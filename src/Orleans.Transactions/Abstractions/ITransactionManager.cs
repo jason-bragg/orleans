@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Abstractions
@@ -19,13 +20,13 @@ namespace Orleans.Transactions.Abstractions
         Task StopAsync();
 
         /// <summary>
-        /// Start a new transaction.
+        /// Start new transactions.
         /// </summary>
-        /// <param name="timeout">
+        /// <param name="timeouts">
         /// Transaction is automatically aborted if it does not complete within timeout
         /// </param>
-        /// <returns>Id of the started transaction</returns>
-        long StartTransaction(TimeSpan timeout);
+        /// <returns>Id of the started transactions</returns>
+        Task<long[]> StartTransactions(List<TimeSpan> timeouts);
 
         /// <summary>
         /// Initiates Transaction Commit.

@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Transactions.Abstractions
 {
-    public interface ITransactionIdGenerator
+    public interface ITransactionIdGenerator : IDisposable
     {
         Task<long[]> GenerateTransactionIds(int count);
     }

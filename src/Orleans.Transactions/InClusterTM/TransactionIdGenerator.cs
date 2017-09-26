@@ -18,7 +18,7 @@ namespace Orleans.Transactions
         public int LeaseRenewMaxRetry { get; set; }
     }
 
-    public class TransactionIdGenerator : ITransactionIdGenerator, IDisposable
+    public class TransactionIdGenerator : ITransactionIdGenerator
     {
         // configuraiton
         private readonly TransactionIdGeneratorConfig config;

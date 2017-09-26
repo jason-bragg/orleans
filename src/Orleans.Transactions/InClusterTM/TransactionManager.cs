@@ -6,6 +6,7 @@ using System.Threading;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
+using System.Linq;
 
 namespace Orleans.Transactions
 {
@@ -16,7 +17,8 @@ namespace Orleans.Transactions
 
         private readonly TransactionsConfiguration config;
         private readonly TransactionLog transactionLog;
-        private readonly ActiveTransactionsTracker activeTransactionsTracker;
+        private readonly Factory<Task<ITransactionIdGenerator>> idGeneratorFactory;
+        private ITransactionIdGenerator idGenerator;
 
         // Index of transactions by transactionId.
         private readonly ConcurrentDictionary<long, Transaction> transactionsTable;
@@ -43,14 +45,15 @@ namespace Orleans.Transactions
 
         private bool IsRunning;
         private Task transactionLogMaintenanceTask;
+        private long highestActiveTransactionId;
+        private long lowestActiveTransactionId;
 
-        public TransactionManager(TransactionLog transactionLog, IOptions<TransactionsConfiguration> configOption, Factory<string, Logger> logFactory)
+        public TransactionManager(IOptions<TransactionsConfiguration> configOption, TransactionLog transactionLog, Factory<Task<ITransactionIdGenerator>> idGeneratorFactory, Factory<string, Logger> logFactory)
         {
-            this.transactionLog = transactionLog;
             this.config = configOption.Value;
+            this.idGeneratorFactory = idGeneratorFactory;
+            this.transactionLog = transactionLog;
             this.Logger = logFactory(nameof(TransactionManager));
-
-            activeTransactionsTracker = new ActiveTransactionsTracker(configOption, this.transactionLog, logFactory);
 
             transactionsTable = new ConcurrentDictionary<long, Transaction>(2, 1000000);
 
@@ -73,6 +76,7 @@ namespace Orleans.Transactions
 
         public async Task StartAsync()
         {
+            this.idGenerator = await idGeneratorFactory();
             await transactionLog.Initialize();
             CommitRecord record = await transactionLog.GetFirstCommitRecord();
             long prevLSN = 0;
@@ -97,11 +101,11 @@ namespace Orleans.Transactions
 
                 record = await transactionLog.GetNextCommitRecord();
             }
+            this.lowestActiveTransactionId = this.transactionsTable.Keys.Min();
+            this.highestActiveTransactionId = this.transactionsTable.Keys.Max();
 
             await transactionLog.EndRecovery();
             var maxAllocatedTransactionId = await transactionLog.GetStartRecord();
-
-            activeTransactionsTracker.Start(maxAllocatedTransactionId);
 
             this.BeginDependencyCompletionLoop();
             this.BeginGroupCommitLoop();
@@ -120,22 +124,23 @@ namespace Orleans.Transactions
             {
                 await this.transactionLogMaintenanceTask;
             }
-            this.activeTransactionsTracker.Dispose();
+            this.idGenerator.Dispose();
         }
 
-        public long StartTransaction(TimeSpan timeout)
+        public async Task<long[]> StartTransactions(List<TimeSpan> timeouts)
         {
-            var transactionId = activeTransactionsTracker.GetNewTransactionId();
-
-            Transaction tx = new Transaction(transactionId)
+            long now = DateTime.UtcNow.Ticks;
+            long[] transactionIds = await this.idGenerator.GenerateTransactionIds(timeouts.Count);
+            foreach (Transaction tx in timeouts.Select((timeout,index) => new Transaction(transactionIds[index])
             {
                 State = TransactionState.Started,
-                ExpirationTime = DateTime.UtcNow.Ticks + timeout.Ticks,
-            };
-
-            transactionsTable[transactionId] = tx;
-
-            return tx.TransactionId;
+                ExpirationTime = now + timeout.Ticks,
+            }))
+            { 
+                transactionsTable[tx.TransactionId] = tx;
+                highestActiveTransactionId = tx.TransactionId;
+            }
+            return transactionIds;
         }
 
         public void AbortTransaction(long transactionId, OrleansTransactionAbortedException reason)
@@ -279,7 +284,7 @@ namespace Orleans.Transactions
 
         public long GetReadOnlyTransactionId()
         {
-            long readId = activeTransactionsTracker.GetSmallestActiveTransactionId();
+            long readId = this.lowestActiveTransactionId;
             if (readId > 0)
             {
                 readId--;
@@ -546,7 +551,7 @@ namespace Orleans.Transactions
                         lock (tx)
                         {
                             tx.State = TransactionState.Checkpointed;
-                            tx.HighestActiveTransactionIdAtCheckpoint = activeTransactionsTracker.GetHighestActiveTransactionId();
+                            tx.HighestActiveTransactionIdAtCheckpoint = this.highestActiveTransactionId;
                         }
                     }
 
@@ -624,8 +629,8 @@ namespace Orleans.Transactions
             //
             // Find the oldest active transaction
             //
-            long lowestActiveId = activeTransactionsTracker.GetSmallestActiveTransactionId();
-            long highestActiveId = activeTransactionsTracker.GetHighestActiveTransactionId();
+            long lowestActiveId = this.lowestActiveTransactionId;
+            long highestActiveId = this.highestActiveTransactionId;
             while (lowestActiveId <= highestActiveId)
             {
 
@@ -639,7 +644,7 @@ namespace Orleans.Transactions
                 }
 
                 lowestActiveId++;
-                activeTransactionsTracker.PopSmallestActiveTransactionId();
+                this.lowestActiveTransactionId--;
             }
 
             //
@@ -658,7 +663,7 @@ namespace Orleans.Transactions
                 {
                     lock (txRecord.Value)
                     {
-                        if (txRecord.Value.HighestActiveTransactionIdAtCheckpoint < activeTransactionsTracker.GetSmallestActiveTransactionId() &&
+                        if (txRecord.Value.HighestActiveTransactionIdAtCheckpoint < this.lowestActiveTransactionId &&
                             txRecord.Value.CompletionTimeUtc + this.config.TransactionRecordPreservationDuration < DateTime.UtcNow)
                         {
                             // The oldest active transaction started after this transaction was checkpointed

@@ -108,7 +108,6 @@ namespace Orleans.Transactions
             }
 
             await transactionLog.EndRecovery();
-            var maxAllocatedTransactionId = await transactionLog.GetStartRecord();
 
             this.BeginDependencyCompletionLoop();
             this.BeginGroupCommitLoop();

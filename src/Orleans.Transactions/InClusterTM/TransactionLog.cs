@@ -27,8 +27,6 @@ namespace Orleans.Transactions
 
         private TransactionLogOperatingMode currentLogMode;
 
-        private long lastStartRecordValue;
-
         public TransactionLog(ITransactionLogStorage transactionLogStorage)
         {
             this.transactionLogStorage = transactionLogStorage;
@@ -85,27 +83,6 @@ namespace Orleans.Transactions
             currentLogMode = TransactionLogOperatingMode.AppendMode;
 
             return Task.CompletedTask;
-        }
-
-        public async Task<long> GetStartRecord()
-        {
-            ThrowIfNotInMode(TransactionLogOperatingMode.AppendMode);
-
-            lastStartRecordValue = await transactionLogStorage.GetStartRecord();
-
-            return lastStartRecordValue;
-        }
-
-        public Task UpdateStartRecord(long transactionId)
-        {
-            ThrowIfNotInMode(TransactionLogOperatingMode.AppendMode);
-
-            if (transactionId > lastStartRecordValue)
-            {
-                return transactionLogStorage.UpdateStartRecord(transactionId);
-            }
-
-            throw new InvalidOperationException($"UpdateStartRecord was called in an invalid state. TransactionId: {transactionId}, lastStartRecordValue: {lastStartRecordValue}.");
         }
 
         /// <summary>

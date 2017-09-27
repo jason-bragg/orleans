@@ -113,10 +113,9 @@ namespace Orleans.Transactions
             this.BeginGroupCommitLoop();
             this.BeginCheckpointLoop();
 
+            this.IsRunning = true;
             this.transactionLogMaintenanceTask = MaintainTransactionLog();
             this.transactionLogMaintenanceTask.Ignore(); // protect agains unhandled exception in unexpected cases.
-
-            this.IsRunning = true;
         }
 
         public async Task StopAsync()

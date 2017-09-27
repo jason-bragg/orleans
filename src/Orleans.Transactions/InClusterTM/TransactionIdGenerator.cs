@@ -81,7 +81,7 @@ namespace Orleans.Transactions
             };
         }
 
-        private async Task Initialize()
+        public async Task Initialize()
         {
             this.id = Guid.NewGuid();
 

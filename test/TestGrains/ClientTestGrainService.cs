@@ -36,7 +36,13 @@ namespace UnitTests.Grains
 
     public class ClientTestGrainServiceLookupGrain : Grain, IClientTestGrainServiceLookupGrain
     {
-        List<IClientTestGrainService> services = new List<IClientTestGrainService>();
+        private readonly List<IClientTestGrainService> services = new List<IClientTestGrainService>();
+        private readonly Logger logger;
+
+        public ClientTestGrainServiceLookupGrain(Factory<string,Logger> loggerFactory)
+        {
+            this.logger = loggerFactory("ClientTestGrainServiceLookupGrain");
+        }
 
         public Task<List<IClientTestGrainService>> Lookup()
         {
@@ -45,6 +51,7 @@ namespace UnitTests.Grains
 
         public Task Register(IClientTestGrainService service)
         {
+            this.logger.Info($"Service registered: {service}.");
             this.services.Add(service);
             return Task.CompletedTask;
         }

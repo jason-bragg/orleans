@@ -111,12 +111,6 @@ namespace Orleans.Runtime.Messaging
                 msg.TargetActivation = null;
                 msg.ClearTargetAddress();
 
-                if (msg.TargetGrain.IsSystemTarget)
-                {
-                    msg.TargetSilo = MessageCenter.MyAddress;
-                    msg.TargetActivation = ActivationId.GetSystemActivation(msg.TargetGrain, MessageCenter.MyAddress);
-                }
-
                 MessagingStatisticsGroup.OnMessageReRoute(msg);
                 MessageCenter.RerouteMessage(msg);
             }

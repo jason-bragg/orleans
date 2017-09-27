@@ -36,7 +36,7 @@ namespace DefaultCluster.Tests
             {
                 var options = new TestClusterOptions(SiloCount);
                 // ensure that at least one silo has no gateway
-                // options.ClusterConfiguration.Overrides.Values.First().ProxyGatewayEndpoint = null;
+                options.ClusterConfiguration.Overrides.Values.First().ProxyGatewayEndpoint = null;
                 Type clientTestGrainServiceType = typeof(ClientTestGrainService);
                 options.ClusterConfiguration.Globals.RegisterGrainService(clientTestGrainServiceType.Name, clientTestGrainServiceType.AssemblyQualifiedName);
                 return new TestCluster(options);
@@ -59,8 +59,14 @@ namespace DefaultCluster.Tests
             Tuple<ClientTestCallback, IClientTestCallback> tup = await runtime.BindExtension<ClientTestCallback, IClientTestCallback>(
                 () => new ClientTestCallback());
 
+            foreach(IClientTestGrainService service in services)
+            {
+                this.output.WriteLine($"Found {service}.");
+            }
             // tell all services to call me
             await Task.WhenAll(services.Select(s => s.CallMe(tup.Item2, Guid.NewGuid())));
+
+            this.output.WriteLine($"Wait for callbacks.");
 
             // wait for callbacks
             await TestingUtils.WaitUntilAsync(assertIsTrue => this.CheckCallback(SiloCount, tup.Item1, assertIsTrue), TimeSpan.FromSeconds(2));
@@ -110,7 +116,7 @@ namespace DefaultCluster.Tests
 
         public Task CallMe(IClientTestCallback clientCallback, Guid id)
         {
-            this.Logger.Info($"{nameof(ClientTestGrainService)} with ID {this.id} received callme.");
+            this.Logger.Info($"{nameof(ClientTestGrainService)} with ID {this.id} received callme request {id}.");
             DelayedCallback(clientCallback, id).Ignore();
             return Task.CompletedTask;
         }

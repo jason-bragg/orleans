@@ -175,7 +175,7 @@ namespace Orleans.Messaging
             bool startRequired = false;
 
             // If there's a specific gateway specified, use it
-            if (msg.TargetSilo != null)
+            if (!msg.TargetGrain.IsSystemTarget && msg.TargetSilo != null)
             {
                 Uri addr = msg.TargetSilo.ToGatewayUri();
                 lock (lockable)
@@ -192,33 +192,49 @@ namespace Orleans.Messaging
             // For untargeted messages to system targets, and for unordered messages, pick a next connection in round robin fashion.
             else if (msg.TargetGrain.IsSystemTarget || msg.IsUnordered)
             {
-                // Get the cached list of live gateways.
-                // Pick a next gateway name in a round robin fashion.
-                // See if we have a live connection to it.
-                // If Yes, use it.
-                // If not, create a new GatewayConnection and start it.
-                // If start fails, we will mark this connection as dead and remove it from the GetCachedLiveGatewayNames.
-                lock (lockable)
+                // for system targets, try to send to the silo if a gateway exists for it
+                if(msg.TargetGrain.IsSystemTarget)
                 {
-                    int msgNumber = numMessages;
-                    numMessages = unchecked(numMessages + 1);
-                    IList<Uri> gatewayNames = GatewayManager.GetLiveGateways();
-                    int numGateways = gatewayNames.Count;
-                    if (numGateways == 0)
+                    Uri addr = msg.TargetSilo.ToGatewayUri();
+                    lock (lockable)
                     {
-                        RejectMessage(msg, "No gateways available");
-                        logger.Warn(ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, GatewayManager);
-                        return;
+                        // gateway exists, and is connected, use it
+                        if (gatewayConnections.TryGetValue(addr, out gatewayConnection) && !gatewayConnection.IsLive)
+                        {
+                            gatewayConnection = null;
+                        }
                     }
-                    Uri addr = gatewayNames[msgNumber % numGateways];
-                    if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
+                }
+                if(gatewayConnection == null)
+                {
+                    // Get the cached list of live gateways.
+                    // Pick a next gateway name in a round robin fashion.
+                    // See if we have a live connection to it.
+                    // If Yes, use it.
+                    // If not, create a new GatewayConnection and start it.
+                    // If start fails, we will mark this connection as dead and remove it from the GetCachedLiveGatewayNames.
+                    lock (lockable)
                     {
-                        gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
-                        gatewayConnections[addr] = gatewayConnection;
-                        if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
-                        startRequired = true;
+                        int msgNumber = numMessages;
+                        numMessages = unchecked(numMessages + 1);
+                        IList<Uri> gatewayNames = GatewayManager.GetLiveGateways();
+                        int numGateways = gatewayNames.Count;
+                        if (numGateways == 0)
+                        {
+                            RejectMessage(msg, "No gateways available");
+                            logger.Warn(ErrorCode.ProxyClient_CannotSend, "Unable to send message {0}; gateway manager state is {1}", msg, GatewayManager);
+                            return;
+                        }
+                        Uri addr = gatewayNames[msgNumber % numGateways];
+                        if (!gatewayConnections.TryGetValue(addr, out gatewayConnection) || !gatewayConnection.IsLive)
+                        {
+                            gatewayConnection = new GatewayConnection(addr, this, this.messageFactory);
+                            gatewayConnections[addr] = gatewayConnection;
+                            if (logger.IsVerbose) logger.Verbose(ErrorCode.ProxyClient_CreatedGatewayUnordered, "Creating gateway to {0} for unordered message to grain {1}", addr, msg.TargetGrain);
+                            startRequired = true;
+                        }
+                        // else - Fast path - we've got a live gatewayConnection to use
                     }
-                    // else - Fast path - we've got a live gatewayConnection to use
                 }
             }
             // Otherwise, use the buckets to ensure ordering.

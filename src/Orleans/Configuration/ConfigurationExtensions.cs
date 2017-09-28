@@ -21,8 +21,9 @@ namespace Orleans.Runtime.Configuration
         public static void AddSimpleMessageStreamProvider(this ClusterConfiguration config, string providerName, 
             bool fireAndForgetDelivery = SimpleMessageStreamProvider.DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY, 
             bool optimizeForImmutableData = SimpleMessageStreamProvider.DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA,
-            StreamPubSubType pubSubType = SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE)
+            string pubSubType = null)
         {
+            pubSubType = pubSubType ?? SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE;
             var properties = GetSimpleMessageStreamProviderConfiguration(providerName, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
             config.Globals.RegisterStreamProvider<SimpleMessageStreamProvider>(providerName, properties);
         }
@@ -38,13 +39,14 @@ namespace Orleans.Runtime.Configuration
         public static void AddSimpleMessageStreamProvider(this ClientConfiguration config, string providerName,
             bool fireAndForgetDelivery = SimpleMessageStreamProvider.DEFAULT_VALUE_FIRE_AND_FORGET_DELIVERY,
             bool optimizeForImmutableData = SimpleMessageStreamProvider.DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA,
-            StreamPubSubType pubSubType = SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE)
+            string pubSubType = null)
         {
+            pubSubType = pubSubType ?? SimpleMessageStreamProvider.DEFAULT_STREAM_PUBSUB_TYPE;
             var properties = GetSimpleMessageStreamProviderConfiguration(providerName, fireAndForgetDelivery, optimizeForImmutableData, pubSubType);
             config.RegisterStreamProvider<SimpleMessageStreamProvider>(providerName, properties);
         }
 
-        private static Dictionary<string, string> GetSimpleMessageStreamProviderConfiguration(string providerName, bool fireAndForgetDelivery, bool optimizeForImmutableData, StreamPubSubType pubSubType)
+        private static Dictionary<string, string> GetSimpleMessageStreamProviderConfiguration(string providerName, bool fireAndForgetDelivery, bool optimizeForImmutableData, string pubSubType)
         {
             if (string.IsNullOrWhiteSpace(providerName)) throw new ArgumentNullException(nameof(providerName));
 
@@ -52,7 +54,7 @@ namespace Orleans.Runtime.Configuration
             {
                 { SimpleMessageStreamProvider.FIRE_AND_FORGET_DELIVERY, fireAndForgetDelivery.ToString() },
                 { SimpleMessageStreamProvider.OPTIMIZE_FOR_IMMUTABLE_DATA, optimizeForImmutableData.ToString() },
-                { SimpleMessageStreamProvider.STREAM_PUBSUB_TYPE, pubSubType.ToString() },
+                { SimpleMessageStreamProvider.STREAM_PUBSUB_TYPE, pubSubType },
             };
 
             return properties;

@@ -720,6 +720,8 @@ namespace UnitTests.StreamingTests
                 promises.Clear();
             }
 
+            Assert.True(false);
+            /*
             var pubSub = StreamTestUtils.GetStreamPubSub(this.InternalClient);
 
             // Check Consumer counts
@@ -729,6 +731,7 @@ namespace UnitTests.StreamingTests
             // Check Producer counts
             int producerCount = await pubSub.ProducerCount(streamId, streamProviderName, StreamNamespace);
             Assert.Equal(numProducers,  producerCount);  //  "ProducerCount for Stream {0}", streamId
+            */
 
             // Check message counts received by consumers
             int totalMessages = (numMessages + 1) * numProducers;

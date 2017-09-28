@@ -10,9 +10,6 @@ namespace Orleans.Providers
 {
     internal class ClientProviderRuntime : IStreamProviderRuntime
     {
-        private IStreamPubSub grainBasedPubSub;
-        private IStreamPubSub implictPubSub;
-        private IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private StreamDirectory streamDirectory;
         private readonly Dictionary<Type, Tuple<IGrainExtension, IAddressable>> caoTable;
         private readonly AsyncLock lockable;
@@ -52,10 +49,6 @@ namespace Orleans.Providers
             {
                 throw new ArgumentNullException(nameof(implicitStreamSubscriberTable));
             }
-            grainBasedPubSub = new GrainBasedPubSubRuntime(GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.grainFactory, implicitStreamSubscriberTable);
-            implictPubSub = tmp;
-            combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(grainBasedPubSub, tmp);
             streamDirectory = new StreamDirectory();
         }
 
@@ -163,21 +156,6 @@ namespace Orleans.Providers
             // we have to return the extension as well as the IAddressable because the caller needs to root the extension
             // to prevent it from being collected (the IAddressable uses a weak reference).
             return Tuple.Create(extension, typedAddressable);
-        }
-
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
-        {
-            switch (pubSubType)
-            {
-                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
-                    return combinedGrainBasedAndImplicitPubSub;
-                case StreamPubSubType.ExplicitGrainBasedOnly:
-                    return grainBasedPubSub;
-                case StreamPubSubType.ImplicitOnly:
-                    return implictPubSub;
-                default:
-                    return null;
-            }
         }
 
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)

@@ -20,9 +20,6 @@ namespace Orleans.Runtime.Providers
         private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
         private readonly ISiloRuntimeClient runtimeClient;
-        private readonly IStreamPubSub grainBasedPubSub;
-        private readonly IStreamPubSub implictPubSub;
-        private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
         private InvokeInterceptor invokeInterceptor;
 
@@ -52,11 +49,6 @@ namespace Orleans.Runtime.Providers
             this.runtimeClient = runtimeClient;
             this.ServiceId = config.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
-
-            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
-            this.implictPubSub = tmp;
-            this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
         public void SetInvokeInterceptor(InvokeInterceptor interceptor)
@@ -93,21 +85,6 @@ namespace Orleans.Runtime.Providers
             scheduler.UnregisterWorkContext(systemTarget.SchedulingContext);
         }
 
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
-        {
-            switch (pubSubType)
-            {
-                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
-                    return combinedGrainBasedAndImplicitPubSub;
-                case StreamPubSubType.ExplicitGrainBasedOnly:
-                    return grainBasedPubSub;
-                case StreamPubSubType.ImplicitOnly:
-                    return implictPubSub;
-                default:
-                    return null;
-            }
-        }
-
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
             return new EquallyDividedRangeRingProvider(this.consistentRingProvider, this.loggerFactory, mySubRangeIndex, numSubRanges);
@@ -115,6 +92,7 @@ namespace Orleans.Runtime.Providers
 
         public async Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
+            IStreamProducerRegistrar producerRegistrar,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             PersistentStreamProviderConfig config,
@@ -122,7 +100,7 @@ namespace Orleans.Runtime.Providers
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(config, streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(config.PubSubType), adapterFactory, queueBalancer, config, providerConfig, this.loggerFactory);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, producerRegistrar, adapterFactory, queueBalancer, config, providerConfig, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();

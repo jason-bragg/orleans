@@ -36,7 +36,7 @@ namespace Orleans.Providers.Streams.Common
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
     /// <typeparam name="TAdapterFactory"></typeparam>
-    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever
+    public class PersistentStreamProvider<TAdapterFactory> : IInternalStreamProvider, IControllable, IManageableSreamProvider
         where TAdapterFactory : IQueueAdapterFactory, new()
     {
         private Logger                  logger;
@@ -52,6 +52,8 @@ namespace Orleans.Providers.Streams.Common
         private SerializationManager serializationManager;
         private IRuntimeClient runtimeClient;
         private IStreamSubscriptionManager streamSubscriptionManager;
+        private IStreamSubscriptionRegistrar subscriptionRegistrar;
+        private IStreamProducerRegistrar producerRegistrar;
         private IProviderConfiguration providerConfig;
         public string Name { get; private set; }
         private ILoggerFactory loggerFactory;
@@ -75,12 +77,11 @@ namespace Orleans.Providers.Streams.Common
             this.providerConfig = config;
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 			this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
-            if (this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
-                || this.myConfig.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
-            {
-                this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
-                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-            }
+
+            this.streamSubscriptionManager = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamSubscriptionManager>(this.myConfig.PubSubType);
+            this.subscriptionRegistrar = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamSubscriptionRegistrar>(this.myConfig.PubSubType);
+            this.producerRegistrar = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProducerRegistrar>(this.myConfig.PubSubType);
+
             string startup;
             if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))
             {
@@ -108,7 +109,7 @@ namespace Orleans.Providers.Streams.Common
                 var siloRuntime = providerRuntime as ISiloSideStreamProviderRuntime;
                 if (siloRuntime != null)
                 {
-                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, adapterFactory, queueAdapter, myConfig, this.providerConfig);
+                    pullingAgentManager = await siloRuntime.InitializePullingAgents(Name, this.producerRegistrar, adapterFactory, queueAdapter, myConfig, this.providerConfig);
 
                     // TODO: No support yet for DeliveryDisabled, only Stopped and Started
                     if (startupState == PersistentStreamProviderState.AgentsStarted)
@@ -157,7 +158,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, providerRuntime.PubSub(myConfig.PubSubType), this.loggerFactory, IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime, this.subscriptionRegistrar, this.loggerFactory, IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)

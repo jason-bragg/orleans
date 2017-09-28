@@ -7,12 +7,12 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class StreamPubSubImpl : IStreamPubSub
+    internal class StreamPubSubImpl : IStreamSubscriptionRegistrar, IStreamProducerRegistrar
     {
-        private readonly IStreamPubSub explicitPubSub;
+        private readonly GrainBasedPubSubRuntime explicitPubSub;
         private readonly ImplicitStreamPubSub implicitPubSub;
 
-        public StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
+        public StreamPubSubImpl(GrainBasedPubSubRuntime explicitPubSub, ImplicitStreamPubSub implicitPubSub)
         {
             if (explicitPubSub == null)
             {

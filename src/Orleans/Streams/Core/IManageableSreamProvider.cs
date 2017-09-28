@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Orleans.Streams.Core
 {
-    public interface IStreamSubscriptionManagerRetriever
+    public interface IManageableSreamProvider
     {
         IStreamSubscriptionManager GetStreamSubscriptionManager();
     }

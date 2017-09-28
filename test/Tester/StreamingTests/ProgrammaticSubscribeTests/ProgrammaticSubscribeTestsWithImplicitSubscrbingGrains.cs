@@ -30,9 +30,9 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
-                    StreamPubSubType.ImplicitOnly);
+                    StreamPubSubType.ImplicitOnly.ToString());
                 options.ClientConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
-                    StreamPubSubType.ImplicitOnly);
+                    StreamPubSubType.ImplicitOnly.ToString());
                 return new TestCluster(options);
             }
         }

@@ -16,7 +16,7 @@ namespace Orleans.Streams
         private const int StreamInactivityCheckFrequency = 10;
 
         private readonly string streamProviderName;
-        private readonly IStreamPubSub pubSub;
+        private readonly IStreamProducerRegistrar producerRegistrar;
         private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
         private readonly PersistentStreamProviderConfig config;
@@ -42,7 +42,7 @@ namespace Orleans.Streams
             string strProviderName,
             IStreamProviderRuntime runtime,
             ILoggerFactory loggerFactory,
-            IStreamPubSub streamPubSub,
+            IStreamProducerRegistrar producerRegistrar,
             QueueId queueId,
             PersistentStreamProviderConfig config)
             : base(id, runtime.ExecutingSiloAddress, true, loggerFactory)
@@ -52,7 +52,7 @@ namespace Orleans.Streams
 
             QueueId = queueId;
             streamProviderName = strProviderName;
-            pubSub = streamPubSub;
+            this.producerRegistrar = producerRegistrar;
             pubSubCache = new Dictionary<StreamId, StreamConsumerCollection>();
             safeRandom = new SafeRandom();
             this.config = config;
@@ -197,7 +197,7 @@ namespace Orleans.Streams
                 tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
                 logger.Info(ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
-                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
+                unregisterTasks.Add(producerRegistrar.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
             }
 
             try
@@ -643,7 +643,7 @@ namespace Orleans.Streams
             {
                 logger.Warn(ErrorCode.Stream_ConsumerIsDead,
                     "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
-                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, consumerData.StreamId.ProviderName).Ignore();
+                producerRegistrar.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId).Ignore();
                 return true;
             }
 
@@ -674,7 +674,7 @@ namespace Orleans.Streams
                         () => DeliverErrorToConsumer(
                             consumerData, new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId), batch));
                     // mark subscription as faulted.
-                    await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
+                    await producerRegistrar.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
                 }
                 finally
                 {
@@ -690,10 +690,10 @@ namespace Orleans.Streams
         {
             try
             {
-                if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
+                if (producerRegistrar == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
 
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-                ISet<PubSubSubscriptionState> streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
+                ISet<PubSubSubscriptionState> streamData = await producerRegistrar.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
                 if (logger.IsVerbose) logger.Verbose(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
                 var addSubscriptionTasks = new List<Task>(streamData.Count);

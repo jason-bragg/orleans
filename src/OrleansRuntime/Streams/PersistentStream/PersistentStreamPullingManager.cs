@@ -17,7 +17,7 @@ namespace Orleans.Streams
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
-        private readonly IStreamPubSub pubSub;
+        private readonly IStreamProducerRegistrar producerRegistrar;
 
         private readonly PersistentStreamProviderConfig config;
         private readonly IProviderConfiguration providerConfig;
@@ -38,7 +38,7 @@ namespace Orleans.Streams
             GrainId id, 
             string strProviderName, 
             IStreamProviderRuntime runtime,
-            IStreamPubSub streamPubSub,
+            IStreamProducerRegistrar producerRegistrar,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             PersistentStreamProviderConfig config,
@@ -54,9 +54,9 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
             }
-            if (streamPubSub == null)
+            if (producerRegistrar == null)
             {
-                throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
+                throw new ArgumentNullException(nameof(producerRegistrar), "Stream producer registrar reference should not be null");
             }
             if (streamQueueBalancer == null)
             {
@@ -66,7 +66,7 @@ namespace Orleans.Streams
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
             providerRuntime = runtime;
-            pubSub = streamPubSub;
+            this.producerRegistrar = producerRegistrar;
             this.config = config;
             this.providerConfig = providerConfig;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
@@ -220,7 +220,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, config);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, this.producerRegistrar, queueId, config);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);

@@ -28,9 +28,9 @@ namespace Tester.StreamingTests
                 options.ClusterConfiguration.AddMemoryStorageProvider("Default");
                 options.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName, false, true,
-                    StreamPubSubType.ExplicitGrainBasedAndImplicit);
+                    StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString());
                 options.ClusterConfiguration.AddSimpleMessageStreamProvider(StreamProviderName2, false, true,
-                   StreamPubSubType.ExplicitGrainBasedOnly);
+                   StreamPubSubType.ExplicitGrainBasedOnly.ToString());
                 return new TestCluster(options);
             }
         }

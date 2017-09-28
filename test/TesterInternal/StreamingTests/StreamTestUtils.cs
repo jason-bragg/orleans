@@ -28,13 +28,9 @@ namespace UnitTests.StreamingTests
             logger.Info("\n\n--END------------------------ {0} --------------------------------- \n\n", testName);
         }
 
-        internal static IStreamPubSub GetStreamPubSub(IInternalClusterClient client)
+        internal static Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamId, string streamProviderName, string streamNamespace)
         {
-            return client.StreamProviderRuntime.PubSub(StreamPubSubType.ExplicitGrainBasedAndImplicit);
-        }
-
-        internal static async Task CheckPubSubCounts(IInternalClusterClient client, ITestOutputHelper output, string when, int expectedPublisherCount, int expectedConsumerCount, Guid streamId, string streamProviderName, string streamNamespace)
-        {
+            /*
             var pubSub = GetStreamPubSub(client);
 
             int consumerCount = await pubSub.ConsumerCount(streamId, streamProviderName, streamNamespace);
@@ -43,9 +39,11 @@ namespace UnitTests.StreamingTests
                 when, streamId, consumerCount);
 
             int publisherCount = await pubSub.ProducerCount(streamId, streamProviderName, streamNamespace);
-
+            
             Assert_AreEqual(output, expectedPublisherCount, publisherCount, "{0} - PublisherCount for stream {1} = {2}",
                 when, streamId, publisherCount);
+                */
+            throw new NotImplementedException();
         }
 
         internal static void Assert_AreEqual(ITestOutputHelper output, int expected, int actual, string msg, params object[] args)
@@ -58,6 +56,11 @@ namespace UnitTests.StreamingTests
             {
                 Assert.Equal(expected, actual);
             }
+        }
+
+        internal static Task<int> ProducerCount(IServiceProvider serviceProvider, Guid streamId, string providerName, string defaultStreamNamespace)
+        {
+            throw new NotImplementedException();
         }
     }
 }

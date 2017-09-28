@@ -102,15 +102,28 @@ namespace Orleans
                 sp => ActivatorUtilities.CreateInstance<GatewayProviderFactory>(sp).CreateGatewayListProvider());
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<MessageFactory>();
+
+            // streaming
             services.TryAddSingleton<StreamProviderManager>();
-            services.TryAddSingleton<ClientStatisticsManager>();
             services.TryAddFromExisting<IStreamProviderManager, StreamProviderManager>();
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
+            services.TryAddSingleton<ImplicitStreamSubscriberTable>();
+            services.AddTransient<GrainBasedPubSubRuntime>();
+            services.AddTransient<ImplicitStreamPubSub>();
+            services.AddTransientNamedService<IStreamSubscriptionRegistrar, ImplicitStreamPubSub>(StreamPubSubType.ImplicitOnly.ToString());
+            services.AddTransientNamedService<IStreamProducerRegistrar, ImplicitStreamPubSub>(StreamPubSubType.ImplicitOnly.ToString());
+            services.AddTransientNamedService<IStreamSubscriptionRegistrar, GrainBasedPubSubRuntime>(StreamPubSubType.ExplicitGrainBasedOnly.ToString());
+            services.AddTransientNamedService<IStreamProducerRegistrar, GrainBasedPubSubRuntime>(StreamPubSubType.ExplicitGrainBasedOnly.ToString());
+            services.AddTransientNamedService<IStreamSubscriptionRegistrar, StreamPubSubImpl>(StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString());
+            services.AddTransientNamedService<IStreamProducerRegistrar, StreamPubSubImpl>(StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString());
+            services.TryAddSingleton<IKeyedServiceCollection<string,IStreamSubscriptionManager>, StreamSubscriptionManagerCollection>();
+
+            services.TryAddSingleton<ClientStatisticsManager>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.TryAddSingleton<CodeGeneratorManager>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
+            services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
         }
     }
 }

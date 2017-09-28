@@ -7,7 +7,7 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class ImplicitStreamPubSub : IStreamPubSub
+    internal class ImplicitStreamPubSub : IStreamSubscriptionRegistrar, IStreamProducerRegistrar
     {
         private readonly IInternalGrainFactory grainFactory;
         private readonly ImplicitStreamSubscriberTable implicitTable;

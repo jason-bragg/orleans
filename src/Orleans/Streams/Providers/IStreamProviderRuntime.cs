@@ -31,12 +31,6 @@ namespace Orleans.Streams
 
         void UnregisterSystemTarget(ISystemTarget target);
 
-        /// <summary>
-        /// A Pub Sub runtime interface.
-        /// </summary>
-        /// <returns></returns>
-        IStreamPubSub PubSub(StreamPubSubType pubSubType);
-
         /// <summary>A consistent ring interface.</summary>
         /// <param name="mySubRangeIndex">Index of the silo in the ring.</param>
         /// <param name="numSubRanges">Total number of sub ranges within this silo range.</param>
@@ -52,6 +46,7 @@ namespace Orleans.Streams
         /// <summary>Start the pulling agents for a given persistent stream provider.</summary>
         Task<IPersistentStreamPullingManager> InitializePullingAgents(
             string streamProviderName,
+            IStreamProducerRegistrar producerRegistrar,
             IQueueAdapterFactory adapterFactory,
             IQueueAdapter queueAdapter,
             PersistentStreamProviderConfig config,
@@ -85,7 +80,7 @@ namespace Orleans.Streams
         public static Type DEFAULT_STREAM_QUEUE_BALANCER_TYPE = null;
 
         public const string STREAM_PUBSUB_TYPE = "PubSubType";
-        public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
+        public static readonly string DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString();
 
         public const string SILO_MATURITY_PERIOD = "SiloMaturityPeriod";
         public static readonly TimeSpan DEFAULT_SILO_MATURITY_PERIOD = TimeSpan.FromMinutes(2);
@@ -100,7 +95,7 @@ namespace Orleans.Streams
         /// you should use your custom balancer's type
         /// </summary>
         public Type BalancerType { get; set; } = DEFAULT_STREAM_QUEUE_BALANCER_TYPE;
-        public StreamPubSubType PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;
+        public string PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;
         public TimeSpan SiloMaturityPeriod { get; set; } = DEFAULT_SILO_MATURITY_PERIOD;
 
         public PersistentStreamProviderConfig()
@@ -129,9 +124,7 @@ namespace Orleans.Streams
                 StreamInactivityPeriod = ConfigUtilities.ParseTimeSpan(timeout,
                     "Invalid time value for the " + STREAM_INACTIVITY_PERIOD + " property in the provider config values.");
 
-            string pubSubTypeString;
-            if (config.Properties.TryGetValue(STREAM_PUBSUB_TYPE, out pubSubTypeString))
-                PubSubType = (StreamPubSubType)Enum.Parse(typeof(StreamPubSubType), pubSubTypeString);
+            this.PubSubType = config.GetProperty(STREAM_PUBSUB_TYPE, DEFAULT_STREAM_PUBSUB_TYPE);
 
             string immaturityPeriod;
             if (config.Properties.TryGetValue(SILO_MATURITY_PERIOD, out immaturityPeriod))
@@ -167,24 +160,23 @@ namespace Orleans.Streams
         }
     }
 
-    internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
+    internal interface IStreamProducerRegistrar
     {
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
         Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
+        Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId);
+    }
+
+    internal interface IStreamSubscriptionRegistrar
+    {
         Task RegisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter);
 
         Task UnregisterConsumer(GuidId subscriptionId, StreamId streamId, string streamProvider);
 
-        Task<int> ProducerCount(Guid streamId, string streamProvider, string streamNamespace);
-
-        Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
-
         Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
 
         GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer);
-
-        Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId);
     }
 }

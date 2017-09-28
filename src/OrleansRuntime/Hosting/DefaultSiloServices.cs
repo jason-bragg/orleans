@@ -65,7 +65,6 @@ namespace Orleans.Hosting
             services.TryAddTransient<DynamicClusterConfigDeploymentBalancer>();
             services.TryAddTransient<ClusterConfigDeploymentLeaseBasedBalancer>();
             services.TryAddTransient<ConsistentRingQueueBalancer>();
-            services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
 
             services.TryAddSingleton<ProviderManagerSystemTarget>();
 
@@ -93,8 +92,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SerializationManager>();
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
             services.TryAddSingleton<IReminderRegistry, ReminderRegistry>();
-            services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
-            services.AddFromExisting<IProviderManager, IStreamProviderManager>();
+
             services.TryAddSingleton<GrainRuntime>();
             services.TryAddSingleton<IGrainRuntime, GrainRuntime>();
             services.TryAddSingleton<OrleansTaskScheduler>();
@@ -137,9 +135,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<LocalReminderServiceFactory>();
             services.TryAddSingleton<ClientObserverRegistrar>();
             services.TryAddSingleton<SiloProviderRuntime>();
-            services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, SiloProviderRuntime>();
-            services.TryAddSingleton<ImplicitStreamSubscriberTable>();
             services.TryAddSingleton<MessageFactory>();
             services.TryAddSingleton<CodeGeneratorManager>();
 
@@ -182,7 +178,6 @@ namespace Orleans.Hosting
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();
             services.TryAddScoped<IGrainActivationContext>(sp => sp.GetRequiredService<ActivationData.GrainActivationContextFactory>().Context);
 
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>
                 {
@@ -198,6 +193,22 @@ namespace Orleans.Hosting
                 });
             
             services.TryAddSingleton(typeof(IKeyedServiceCollection<,>), typeof(KeyedServiceCollection<,>));
+
+            // streaming
+            services.TryAddSingleton<IStreamProviderManager, StreamProviderManager>();
+            services.AddFromExisting<IProviderManager, IStreamProviderManager>();
+            services.TryAddFromExisting<IStreamProviderRuntime, SiloProviderRuntime>();
+            services.TryAddSingleton<ImplicitStreamSubscriberTable>();
+            services.TryAddTransient(typeof(IStreamSubscriptionObserver<>), typeof(StreamSubscriptionObserverProxy<>));
+            services.AddTransient<GrainBasedPubSubRuntime>();
+            services.AddTransient<ImplicitStreamPubSub>();
+            services.AddTransientNamedService<IStreamSubscriptionRegistrar, ImplicitStreamPubSub>(StreamPubSubType.ImplicitOnly.ToString());
+            services.AddTransientNamedService<IStreamProducerRegistrar, ImplicitStreamPubSub>(StreamPubSubType.ImplicitOnly.ToString());
+            services.AddTransientNamedService<IStreamSubscriptionRegistrar, GrainBasedPubSubRuntime>(StreamPubSubType.ExplicitGrainBasedOnly.ToString());
+            services.AddTransientNamedService<IStreamProducerRegistrar, GrainBasedPubSubRuntime>(StreamPubSubType.ExplicitGrainBasedOnly.ToString());
+            services.AddTransientNamedService<IStreamSubscriptionRegistrar, StreamPubSubImpl>(StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString());
+            services.AddTransientNamedService<IStreamProducerRegistrar, StreamPubSubImpl>(StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString());
+            services.TryAddSingleton<IKeyedServiceCollection<string, IStreamSubscriptionManager>, StreamSubscriptionManagerCollection>();
 
             // Transactions
             services.TryAddSingleton<ITransactionAgent, TransactionAgent>();

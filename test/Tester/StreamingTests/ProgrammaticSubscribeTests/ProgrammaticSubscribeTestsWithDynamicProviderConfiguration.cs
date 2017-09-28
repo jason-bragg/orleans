@@ -43,8 +43,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public async Task Programmatic_Subscribe_UsingClientSideSubscriptionManager_UsingDynamicProviderConfig()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
-            var subManager = this.Client.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
-                .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            var subManager = this.Client.ServiceProvider.GetServiceByName<IStreamSubscriptionManager>(StreamPubSubType.ExplicitGrainBasedOnly.ToString());
             //set up stream subscriptions for grains
             var subscriptions = await SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
             var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
@@ -80,8 +79,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public async Task Programmatic_Subscribe_DynamicAddNewStreamProvider_WhenConsuming()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
-            var subManager = this.Client.ServiceProvider.GetService<IStreamSubscriptionManagerAdmin>()
-                .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            var subManager = this.Client.ServiceProvider.GetServiceByName<IStreamSubscriptionManager>(StreamPubSubType.ExplicitGrainBasedOnly.ToString());
             //set up stream subscriptions for grains
             var subscriptions = await SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(subManager, this.GrainFactory, streamId, 10);
             var consumers = subscriptions.Select(sub => this.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
@@ -164,7 +162,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             foreach (string providerName in streamProviderNames)
             {
                 this.HostedCluster.ClusterConfiguration.AddSimpleMessageStreamProvider(providerName, false, true,
-                    StreamPubSubType.ExplicitGrainBasedAndImplicit);
+                    StreamPubSubType.ExplicitGrainBasedAndImplicit.ToString());
             }
             var mgmtGrain = this.GrainFactory.GetGrain<IManagementGrain>(0);
             var siloAddresses = this.HostedCluster.GetActiveSilos().Select(siloHandle => siloHandle.SiloAddress).ToArray();

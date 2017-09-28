@@ -18,7 +18,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly SerializationManager serializationManager;
 
         [NonSerialized]
-        private readonly IStreamPubSub                  pubSub;
+        private readonly IStreamProducerRegistrar       producerRegistrar;
 
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
@@ -39,13 +39,13 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
             IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData,
-            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager,
+            IStreamProducerRegistrar producerRegistrar, bool isRewindable, SerializationManager serializationManager,
             ILoggerFactory loggerFactory)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
-            this.pubSub = pubSub;
+            this.producerRegistrar = producerRegistrar;
             this.serializationManager = serializationManager;
             connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
@@ -61,7 +61,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
         {
             var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, this.producerRegistrar, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
 
             myExtension = tup.Item1;
             myGrainReference = tup.Item2;
@@ -69,7 +69,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             myExtension.AddStream(stream.StreamId);
 
             // Notify streamRendezvous about new stream streamProducer. Retreave the list of RemoteSubscribers.
-            return await pubSub.RegisterProducer(stream.StreamId, streamProviderName, myGrainReference);
+            return await producerRegistrar.RegisterProducer(stream.StreamId, streamProviderName, myGrainReference);
         }
 
         private async Task ConnectToRendezvous()
@@ -153,7 +153,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 try
                 {
-                    await pubSub.UnregisterProducer(stream.StreamId, streamProviderName, myGrainReference);
+                    await producerRegistrar.UnregisterProducer(stream.StreamId, streamProviderName, myGrainReference);
                     connectedToRendezvous = false;
                 }
                 catch (Exception exc)

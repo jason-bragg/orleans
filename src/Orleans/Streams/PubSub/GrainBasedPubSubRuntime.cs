@@ -6,7 +6,7 @@ using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
-    internal class GrainBasedPubSubRuntime : IStreamPubSub
+    internal class GrainBasedPubSubRuntime : IStreamSubscriptionRegistrar, IStreamProducerRegistrar
     {
         private readonly IGrainFactory grainFactory;
 

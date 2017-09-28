@@ -17,7 +17,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly IStreamProviderRuntime     providerRuntime;
         [NonSerialized]
-        private readonly IStreamPubSub              pubSub;
+        private readonly IStreamSubscriptionRegistrar subscriptionRegistrar;
         private StreamConsumerExtension             myExtension;
         private IStreamConsumerExtension            myGrainReference;
         [NonSerialized]
@@ -25,17 +25,17 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly ILogger logger;
 
-        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamPubSub pubSub, ILoggerFactory loggerFactory, bool isRewindable)
+        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime providerUtilities, IStreamSubscriptionRegistrar subscriptionRegistrar, ILoggerFactory loggerFactory, bool isRewindable)
         {
             if (stream == null) throw new ArgumentNullException("stream");
             if (providerUtilities == null) throw new ArgumentNullException("providerUtilities");
-            if (pubSub == null) throw new ArgumentNullException("pubSub");
+            if (subscriptionRegistrar == null) throw new ArgumentNullException(nameof(subscriptionRegistrar));
 
             logger = loggerFactory.CreateLogger(string.Format("<{0}>-{1}", typeof(StreamConsumer<T>).FullName, stream));
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
-            this.pubSub = pubSub;
+            this.subscriptionRegistrar = subscriptionRegistrar;
             IsRewindable = isRewindable;
             myExtension = null;
             myGrainReference = null;
@@ -66,9 +66,9 @@ namespace Orleans.Streams
                 filterWrapper = new FilterPredicateWrapperData(filterData, filterFunc);
             
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
-                pubSub, myGrainReference, token);
+                subscriptionRegistrar, myGrainReference, token);
 
-            GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.StreamId, myGrainReference);
+            GuidId subscriptionId = subscriptionRegistrar.CreateSubscriptionId(stream.StreamId, myGrainReference);
 
             // Optimistic Concurrency: 
             // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
@@ -85,7 +85,7 @@ namespace Orleans.Streams
             var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
             try
             {
-                await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
+                await subscriptionRegistrar.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
                 return subriptionHandle;
             } catch(Exception)
             {
@@ -109,7 +109,7 @@ namespace Orleans.Streams
             await BindExtensionLazy();
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
-                pubSub, myGrainReference, token);
+                subscriptionRegistrar, myGrainReference, token);
 
             StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, token, null);
 
@@ -131,9 +131,9 @@ namespace Orleans.Streams
             // UnregisterConsumer from pubsub even if does not have this handle localy, to allow UnsubscribeAsync retries.
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
-                pubSub, myGrainReference);
+                subscriptionRegistrar, myGrainReference);
 
-            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
+            await subscriptionRegistrar.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
 
             handleImpl.Invalidate();
         }
@@ -142,7 +142,7 @@ namespace Orleans.Streams
         {
             await BindExtensionLazy();
 
-            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
+            List<StreamSubscription> subscriptions= await subscriptionRegistrar.GetAllSubscriptions(stream.StreamId, myGrainReference);
             return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
                                   .ToList<StreamSubscriptionHandle<T>>();
         }
@@ -158,7 +158,7 @@ namespace Orleans.Streams
             foreach (var handle in allHandles)
             {
                 myExtension.RemoveObserver(handle.SubscriptionId);
-                tasks.Add(pubSub.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName));
+                tasks.Add(subscriptionRegistrar.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName));
             }
             try
             {

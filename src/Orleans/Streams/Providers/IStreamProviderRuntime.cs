@@ -162,11 +162,11 @@ namespace Orleans.Streams
 
     internal interface IStreamProducerRegistrar
     {
-        Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
+        Task<ISet<PubSubSubscriptionState>> RegisterProducer(IStreamIdentity streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
-        Task UnregisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
+        Task UnregisterProducer(IStreamIdentity streamId, string streamProvider, IStreamProducerExtension streamProducer);
 
-        Task<bool> FaultSubscription(StreamId streamId, GuidId subscriptionId);
+        Task<bool> FaultSubscription(IStreamIdentity streamId, GuidId subscriptionId);
     }
 
     internal interface IStreamSubscriptionRegistrar

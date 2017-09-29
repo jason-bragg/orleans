@@ -78,9 +78,15 @@ namespace Orleans.Providers.Streams.Common
             this.serializationManager = this.providerRuntime.ServiceProvider.GetRequiredService<SerializationManager>();
 			this.runtimeClient = this.providerRuntime.ServiceProvider.GetRequiredService<IRuntimeClient>();
 
-            this.streamSubscriptionManager = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamSubscriptionManager>(this.myConfig.PubSubType);
-            this.subscriptionRegistrar = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamSubscriptionRegistrar>(this.myConfig.PubSubType);
-            this.producerRegistrar = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProducerRegistrar>(this.myConfig.PubSubType);
+            if(this.queueAdapter.Direction != StreamProviderDirection.ReadOnly)
+            {
+                this.streamSubscriptionManager = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamSubscriptionManager>(this.myConfig.PubSubType);
+                this.subscriptionRegistrar = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamSubscriptionRegistrar>(this.myConfig.PubSubType);
+            }
+            if (this.queueAdapter.Direction != StreamProviderDirection.WriteOnly)
+            {
+                this.producerRegistrar = this.providerRuntime.ServiceProvider.GetServiceByName<IStreamProducerRegistrar>(this.myConfig.PubSubType);
+            }
 
             string startup;
             if (config.Properties.TryGetValue(StartupStatePropertyName, out startup))

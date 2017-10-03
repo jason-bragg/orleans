@@ -25,7 +25,7 @@ namespace Orleans.Transactions.Azure.Tests
                     .ConfigureSiloName(siloName)
                     .UseConfiguration(clusterConfiguration)
                     .ConfigureLogging(builder => TestingUtils.ConfigureDefaultLoggingBuilder(builder, clusterConfiguration.GetOrCreateNodeConfigurationForSilo(siloName).TraceFileName))
-                    .UseInClusterTransactionManager(new TransactionsConfiguration())
+                    .UseInClusterTransactionManager(new TransactionsConfiguration(), new TransactionIdGeneratorConfig())
                     .UseAzureTransactionLog(new AzureTransactionLogConfiguration() {
                         // TODO: Find better way for test isolation.  Possibly different partition keys.
                         TableName = $"TransactionLog{((uint)clusterConfiguration.Globals.DeploymentId.GetHashCode())%100000}",

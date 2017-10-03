@@ -279,7 +279,7 @@ namespace Orleans.Transactions
             try
             {
                 StartTransactionsResponse startResponse = await this.tmService.StartTransactions(startingTransactions);
-                List<long> startedIds = startResponse.TransactionId;
+                long[] startedIds = startResponse.TransactionId;
 
                 // reply to clients with results
                 for (int i = 0; i < startCompletions.Count; i++)

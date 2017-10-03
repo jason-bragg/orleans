@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions.Development
 {
@@ -17,6 +18,7 @@ namespace Orleans.Transactions.Development
         private static void UseInMemoryTransactionLog(IServiceCollection services)
         {
             services.AddTransient(InMemoryTransactionLogStorage.Create);
+            services.AddTransient<ITransactionIdGeneratorStorage, InMemoryTransactionIdGeneratorStorage>();
         }
     }
 }

@@ -26,21 +26,6 @@ namespace Orleans.Transactions.Abstractions
         Task<CommitRecord> GetNextCommitRecord();
 
         /// <summary>
-        /// Returns the first available transaction id for new transactions.
-        /// </summary>
-        /// <remarks>
-        /// This method helps to ensure that a given transaction id is never issued more than once.
-        /// </remarks>
-        Task<long> GetStartRecord();
-
-        /// <summary>
-        /// Update the start record with the <paramref name="transactionId"/> value.
-        /// </summary>
-        /// <param name="transactionId">Id of the transaction to update the start record with.</param>
-        /// <returns></returns>
-        Task UpdateStartRecord(long transactionId);
-
-        /// <summary>
         /// Append the given records to the log in order
         /// </summary>
         /// <param name="commitRecords">Commit Records</param>

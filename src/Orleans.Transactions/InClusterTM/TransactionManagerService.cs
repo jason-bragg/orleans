@@ -14,19 +14,14 @@ namespace Orleans.Transactions
             this.tm = tm;
         }
 
-        public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
+        public async Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
         {
-            var result = new StartTransactionsResponse { TransactionId = new List<long>() };
-
-            foreach (var timeout in timeouts)
+            return new StartTransactionsResponse
             {
-                result.TransactionId.Add(tm.StartTransaction(timeout));
-            }
-
-            result.ReadOnlyTransactionId = tm.GetReadOnlyTransactionId();
-            result.AbortLowerBound = result.ReadOnlyTransactionId;
-
-            return Task.FromResult(result);
+                TransactionId = await tm.StartTransactions(timeouts),
+                ReadOnlyTransactionId = tm.GetReadOnlyTransactionId(),
+                AbortLowerBound = tm.GetReadOnlyTransactionId(),
+            };
         }
 
         public Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions, HashSet<long> queries)

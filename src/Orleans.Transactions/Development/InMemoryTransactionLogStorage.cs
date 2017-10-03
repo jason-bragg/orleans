@@ -13,8 +13,6 @@ namespace Orleans.Transactions.Development
     {
         private static readonly Task<CommitRecord> NullCommitRecordTask = Task.FromResult<CommitRecord>(null);
 
-        private long startRecordValue;
-
         private readonly List<CommitRecord> log;
 
         private int lastLogRecordIndex;
@@ -25,7 +23,6 @@ namespace Orleans.Transactions.Development
         {
             log = new List<CommitRecord>();
 
-            startRecordValue = 0;
             lastLogRecordIndex = 0;
         }
 
@@ -59,20 +56,6 @@ namespace Orleans.Transactions.Development
             nextLogSequenceNumber++;
 
             return Task.FromResult(log[lastLogRecordIndex++]);
-        }
-
-        public Task<long> GetStartRecord()
-        {
-            startRecordValue = 50000;
-
-            return Task.FromResult(startRecordValue);
-        }
-
-        public Task UpdateStartRecord(long transactionId)
-        {
-            startRecordValue = transactionId;
-
-            return Task.CompletedTask;
         }
 
         public Task Append(IEnumerable<CommitRecord> commitRecords)

@@ -32,6 +32,6 @@ namespace Orleans.Transactions
     {
         public long ReadOnlyTransactionId { get; set; }
         public long AbortLowerBound { get; set; }
-        public List<long> TransactionId { get; set; }
+        public long[] TransactionId { get; set; }
     }
 }

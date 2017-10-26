@@ -1,14 +1,9 @@
-﻿using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 
 namespace Orleans.Streams.Core
 {
-    public interface IStreamSubscriptionObserver<T> 
+    public interface IStreamSubscriptionObserver
     {
-        Task OnSubscribed(StreamSubscriptionHandle<T> handle);
+        Task OnSubscribed(IStreamSubscriptionHandle handle);
     }
 }

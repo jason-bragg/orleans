@@ -699,19 +699,14 @@ namespace Orleans.Runtime
 
             GrainTypeData grainTypeData = GrainTypeManager[grainClassName];
 
-            //Get the grain's type
-            Type grainType = grainTypeData.Type;
-
             lock (data)
             {
                 data.SetupContext(grainTypeData, this.serviceProvider);
 
                 Grain grain = grainCreator.CreateGrainInstance(data);
 
-                Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap;
                 //if grain implements IStreamSubscriptionObserver<T>, then can get a set of subscriptionObserver from it
-                if(TryGetStreamSubscriptionObservers(grainType, grain, out observerProxyMap))
-                    InstallStreamConsumerExtension(data, observerProxyMap);
+                SetupStreamSubscriptionObservers(data, grain);
 
                 grain.Data = data;
                 data.SetGrainInstance(grain);
@@ -722,33 +717,15 @@ namespace Orleans.Runtime
             if (logger.IsVerbose) logger.Verbose("CreateGrainInstance {0}{1}", data.Grain, data.ActivationId);
         }
 
-        private void InstallStreamConsumerExtension(ActivationData result, Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap)
+        private void SetupStreamSubscriptionObservers(ActivationData data, IAddressable grain)
         {
+            IStreamSubscriptionObserver subscriptionObserver = grain as IStreamSubscriptionObserver;
+            if (subscriptionObserver == null) return;
             var invoker = InsideRuntimeClient.TryGetExtensionInvoker(this.GrainTypeManager, typeof(IStreamConsumerExtension));
             if (invoker == null)
                 throw new InvalidOperationException("Extension method invoker was not generated for an extension interface");
-            var subscriptionChangeHandler = new StreamSubscriptionChangeHandler(this.providerManager, observerProxyMap);
-            var handler = new StreamConsumerExtension(this.providerRuntime, subscriptionChangeHandler);
-            result.TryAddExtension(invoker, handler);
-        }
-
-        private bool TryGetStreamSubscriptionObservers(Type grainType, IAddressable grain, out Dictionary<Type, IStreamSubscriptionObserverProxy> observerProxyMap)
-        {
-            var interfaces = grainType.GetInterfaces();
-            var subObserverProxyMap = new Dictionary<Type, IStreamSubscriptionObserverProxy>();
-            foreach (var interf in interfaces)
-            {
-                //use GetTypeInfo for netstandard compatible
-                if (interf.GetTypeInfo().IsGenericType && (interf.GetGenericTypeDefinition().GetTypeInfo().IsEquivalentTo(typeof(IStreamSubscriptionObserver<>))))
-                {
-                    var typeParam = interf.GetGenericArguments()[0];
-                    var observerProxy = (IStreamSubscriptionObserverProxy)this.serviceProvider.GetService(interf);
-                    observerProxy.SubscriptionObserver = grain;
-                    subObserverProxyMap.Add(typeParam, observerProxy);
-                }
-            }
-            observerProxyMap = subObserverProxyMap;
-            return subObserverProxyMap.Count > 0;
+            var consumerExtension = new StreamConsumerExtension(this.providerRuntime, subscriptionObserver);
+            data.TryAddExtension(invoker, consumerExtension);
         }
 
         /// <summary>

@@ -25,7 +25,7 @@ namespace Orleans.Streams
         /// The consumer may unsubscribe by using this handle.
         /// The subscription remains active for as long as it is not explicitely unsubscribed.
         /// </returns>
-        Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer);
+        Task<IStreamSubscriptionHandle> SubscribeAsync(IAsyncObserver<T> observer);
 
         /// <summary>
         /// Subscribe a consumer to this observable.
@@ -41,7 +41,7 @@ namespace Orleans.Streams
         /// </returns>
         /// <exception cref="ArgumentException">Thrown if the supplied stream filter function is not suitable. 
         /// Usually this is because it is not a static method. </exception>
-        Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
+        Task<IStreamSubscriptionHandle> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
             StreamFilterPredicate filterFunc = null,
             object filterData = null);
     }

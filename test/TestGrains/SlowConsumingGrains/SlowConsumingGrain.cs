@@ -17,7 +17,7 @@ namespace UnitTests.Grains
     {
         private Logger logger;
         public SlowObserver<int> ConsumerObserver { get; private set; }
-        public StreamSubscriptionHandle<int> ConsumerHandle { get; set; }
+        public IStreamSubscriptionHandle ConsumerHandle { get; set; }
         public override Task OnActivateAsync()
         {
             logger = base.GetLogger(this.GetType().Name + base.IdentityString);

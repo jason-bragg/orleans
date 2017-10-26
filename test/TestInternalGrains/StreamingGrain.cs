@@ -37,7 +37,7 @@ namespace UnitTests.Grains
         [NonSerialized]
         private Logger _logger;
         [NonSerialized]
-        private StreamSubscriptionHandle<StreamItem> _subscription;
+        private IStreamSubscriptionHandle _subscription;
         private int _itemsConsumed;
         private Guid _streamId;
         private string _streamNamespace;
@@ -97,13 +97,13 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
+        public async Task BecomeConsumer(Guid streamId, string providerName, IStreamProvider streamProvider, string streamNamespace)
         {
             _logger.Info("BecomeConsumer");
             if (ProviderName != null)
                 throw new InvalidOperationException("redundant call to BecomeConsumer");
             _streamId = streamId;
-            ProviderName = streamProvider.Name;
+            ProviderName = providerName;
             _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
             IAsyncStream<StreamItem> stream = streamProvider.GetStream<StreamItem>(streamId, streamNamespace);
 
@@ -182,7 +182,7 @@ namespace UnitTests.Grains
             return new ProducerObserver(logger, grainFactory);
         }
 
-        public void BecomeProducer(Guid streamId, IStreamProvider streamProvider, string streamNamespace)
+        public void BecomeProducer(Guid streamId, string providerName, IStreamProvider streamProvider, string streamNamespace)
         {
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
@@ -205,7 +205,7 @@ namespace UnitTests.Grains
             }
             _streamId = streamId;
             _streamNamespace = string.IsNullOrWhiteSpace(streamNamespace) ? null : streamNamespace.Trim();
-            _providerName = streamProvider.Name;
+            _providerName = providerName;
         }
 
         public void RenewProducer(Logger logger, IStreamProvider streamProvider)
@@ -491,7 +491,7 @@ namespace UnitTests.Grains
             _cleanedUpFlag.ThrowNotInitializedIfSet();
 
             ProducerObserver producer = ProducerObserver.NewObserver(_logger, GrainFactory);
-            producer.BecomeProducer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            producer.BecomeProducer(streamId, providerToUse, GetStreamProvider(providerToUse), streamNamespace);
             _producers.Add(producer);
             return Task.CompletedTask;
         }
@@ -668,7 +668,7 @@ namespace UnitTests.Grains
         {
             _providerToUse = providerToUse;
             ConsumerObserver consumerObserver = ConsumerObserver.NewObserver(_logger);
-            await consumerObserver.BecomeConsumer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            await consumerObserver.BecomeConsumer(streamId, providerToUse, GetStreamProvider(providerToUse), streamNamespace);
             _observers.Add(consumerObserver);
         }
 
@@ -796,7 +796,7 @@ namespace UnitTests.Grains
         public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
         {
             _producer = ProducerObserver.NewObserver(MyLogger(), GrainFactory);
-            _producer.BecomeProducer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            _producer.BecomeProducer(streamId, providerToUse, GetStreamProvider(providerToUse), streamNamespace);
             return Task.CompletedTask;
         }
 
@@ -832,7 +832,7 @@ namespace UnitTests.Grains
         {
             _providerToUseForConsumer = providerToUse;
             _consumer = ConsumerObserver.NewObserver(MyLogger());
-            await _consumer.BecomeConsumer(streamId, GetStreamProvider(providerToUse), streamNamespace);
+            await _consumer.BecomeConsumer(streamId, providerToUse, GetStreamProvider(providerToUse), streamNamespace);
         }
 
         public async Task<int> GetItemsConsumed()
@@ -899,7 +899,7 @@ namespace UnitTests.Grains
             // discuss: Note that we need to know the provider that will be used in advance. I think it would be beneficial if we specified the provider as an argument to ImplicitConsumerActivationAttribute.
 
             var providerManager = (StreamProviderManager) Runtime.ServiceProvider.GetService(typeof(StreamProviderManager));
-            var activeStreamProviders = providerManager.GetStreamProviders().Select(x => x.Name).ToList();
+            var activeStreamProviders = providerManager.GetStreamProviders().Cast<IProvider>().Select(x => x.Name).ToList();
             await Task.WhenAll(activeStreamProviders.Select(stream => BecomeConsumer(this.GetPrimaryKey(), stream, "TestNamespace1")));
         }
 
@@ -922,7 +922,7 @@ namespace UnitTests.Grains
             }
 
             ConsumerObserver consumerObserver = ConsumerObserver.NewObserver(_logger);
-            await consumerObserver.BecomeConsumer(streamGuid, GetStreamProvider(providerToUse), streamNamespace);
+            await consumerObserver.BecomeConsumer(streamGuid, providerToUse, GetStreamProvider(providerToUse), streamNamespace);
             _observers[providerToUse] = consumerObserver;
         }
 

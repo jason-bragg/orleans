@@ -57,12 +57,12 @@ namespace Orleans.Streams
             this.runtimeClient = runtimeClient;
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
+        public Task<IStreamSubscriptionHandle> SubscribeAsync(IAsyncObserver<T> observer)
         {
             return GetConsumerInterface().SubscribeAsync(observer, null);
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
+        public Task<IStreamSubscriptionHandle> SubscribeAsync(IAsyncObserver<T> observer, StreamSequenceToken token,
             StreamFilterPredicate filterFunc = null,
             object filterData = null)
         {
@@ -105,20 +105,20 @@ namespace Orleans.Streams
             return GetProducerInterface().OnErrorAsync(ex);
         }
 
-        internal Task<StreamSubscriptionHandle<T>> ResumeAsync(
-            StreamSubscriptionHandle<T> handle,
+        internal Task<IStreamSubscriptionHandle> ResumeAsync(
+            IStreamSubscriptionHandle handle,
             IAsyncObserver<T> observer,
             StreamSequenceToken token)
         {
             return GetConsumerInterface().ResumeAsync(handle, observer, token);
         }
 
-        public Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptionHandles()
+        public Task<IList<IStreamSubscriptionHandle>> GetAllSubscriptionHandles()
         {
             return GetConsumerInterface().GetAllSubscriptions();
         }
 
-        internal Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
+        internal Task UnsubscribeAsync(IStreamSubscriptionHandle handle)
         {
             return GetConsumerInterface().UnsubscribeAsync(handle);
         }

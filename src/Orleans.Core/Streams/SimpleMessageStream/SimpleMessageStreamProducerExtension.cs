@@ -237,17 +237,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         
             internal Task CompleteStream(StreamId streamId, bool fireAndForgetDelivery)
             {
-                var tasks = fireAndForgetDelivery ? null : new List<Task>();
-                foreach (GuidId subscriptionId in consumers.Keys)
-                {
-                    var data = consumers[subscriptionId];
-                    IStreamConsumerExtension remoteConsumer = data.Item1;
-                    Task task = remoteConsumer.CompleteStream(subscriptionId);
-                    if (fireAndForgetDelivery) task.Ignore();
-                    else tasks.Add(task);
-                }
-                // If there's no subscriber, presumably we just drop the item on the floor
-                return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
+                throw new NotImplementedException();
             }
 
             internal Task ErrorInStream(StreamId streamId, Exception exc, bool fireAndForgetDelivery)

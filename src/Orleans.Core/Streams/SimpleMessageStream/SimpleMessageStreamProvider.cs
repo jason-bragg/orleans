@@ -29,6 +29,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
         public bool IsRewindable { get { return false; } }
 
+        IStreamPubSub IInternalStreamProvider.StreamPubSub => this.providerRuntime.PubSub(pubSubType);
+
         public Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
             if (!stateManager.PresetState(ProviderState.Initialized)) return Task.CompletedTask;

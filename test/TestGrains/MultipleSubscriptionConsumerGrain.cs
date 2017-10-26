@@ -11,7 +11,7 @@ namespace UnitTests.Grains
 {
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
-        private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
+        private readonly Dictionary<IStreamSubscriptionHandle, Tuple<Counter,Counter>> consumedMessageCounts;
         private Logger logger;
         private int consumerCount = 0;
 
@@ -32,7 +32,7 @@ namespace UnitTests.Grains
 
         public MultipleSubscriptionConsumerGrain()
         {
-            consumedMessageCounts = new Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter, Counter>>();
+            consumedMessageCounts = new Dictionary<IStreamSubscriptionHandle, Tuple<Counter, Counter>>();
         }
 
         public override Task OnActivateAsync()
@@ -42,7 +42,7 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
-        public async Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
+        public async Task<GuidId> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("BecomeConsumer");
 
@@ -57,7 +57,7 @@ namespace UnitTests.Grains
             int countCapture = consumerCount;
             consumerCount++;
             // subscribe
-            StreamSubscriptionHandle<int> handle = await stream.SubscribeAsync(
+            IStreamSubscriptionHandle handle = await stream.SubscribeAsync(
                 (e, t) => OnNext(e, t, countCapture, count),
                 e => OnError(e, countCapture, error));
 
@@ -65,40 +65,44 @@ namespace UnitTests.Grains
             consumedMessageCounts.Add(handle, Tuple.Create(count,error));
 
             // return handle
-            return handle;
+            return handle.SubscriptionId;
         }
 
-        public async Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle)
+        public async Task Resume(GuidId subscription, Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("Resume");
-            if(handle == null)
-                throw new ArgumentNullException("handle");
 
             // new counter for this subscription
-            Tuple<Counter,Counter> counters;
-            if (!consumedMessageCounts.TryGetValue(handle, out counters))
+            IStreamSubscriptionHandle handle = consumedMessageCounts.Keys.FirstOrDefault(h => h.SubscriptionId == subscription);
+            Tuple<Counter, Counter> counters = null;
+            if (handle != null)
             {
-                counters = Tuple.Create(new Counter(), new Counter());
+                consumedMessageCounts.TryGetValue(handle, out counters);
+                consumedMessageCounts.Remove(handle);
+            } else
+            {
+                IStreamProvider streamProvider = GetStreamProvider(providerToUse);
+                var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
+                handle = (await stream.GetAllSubscriptionHandles()).FirstOrDefault(h => h.SubscriptionId == subscription);
             }
+            counters = counters ?? Tuple.Create(new Counter(), new Counter());
 
-            int countCapture = consumerCount;
-            consumerCount++;
+            int countCapture = consumerCount++;
             // subscribe
-            StreamSubscriptionHandle<int> newhandle = await handle.ResumeAsync(
+            IStreamSubscriptionHandle newhandle = await handle.ResumeAsync<int>(
                 (e, t) => OnNext(e, t, countCapture, counters.Item1),
                 e => OnError(e, countCapture, counters.Item2));
 
             // track counter
             consumedMessageCounts[newhandle] = counters;
-
-            // return handle
-            return newhandle;
-
         }
 
-        public async Task StopConsuming(StreamSubscriptionHandle<int> handle)
+        public async Task StopConsuming(GuidId subscription)
         {
-            logger.Info("StopConsuming");
+            IStreamSubscriptionHandle handle = consumedMessageCounts.Keys.FirstOrDefault(h => h.SubscriptionId == subscription);
+            if (handle == null)
+                return;
+
             // unsubscribe
             await handle.UnsubscribeAsync();
 
@@ -106,7 +110,7 @@ namespace UnitTests.Grains
             consumedMessageCounts.Remove(handle);
         }
 
-        public Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
+        public async Task<IList<GuidId>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
         {
             logger.Info("GetAllSubscriptionHandles");
 
@@ -115,15 +119,16 @@ namespace UnitTests.Grains
             var stream = streamProvider.GetStream<int>(streamId, streamNamespace);
 
             // get all active subscription handles for this stream.
-            return stream.GetAllSubscriptionHandles();
+            IList<IStreamSubscriptionHandle> handles = await stream.GetAllSubscriptionHandles();
+            return handles.Select(h => h.SubscriptionId).ToList();
         }
 
-        public Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed()
+        public Task<Dictionary<GuidId, Tuple<int,int>>> GetNumberConsumed()
         {
             logger.Info(String.Format("ConsumedMessageCounts = \n{0}", 
-                Utils.EnumerableToString(consumedMessageCounts, kvp => String.Format("Consumer: {0} -> count: {1}", kvp.Key.HandleId.ToString(), kvp.Value.ToString()))));
+                Utils.EnumerableToString(consumedMessageCounts, kvp => String.Format("Consumer: {0} -> count: {1}", kvp.Key.SubscriptionId.ToString(), kvp.Value.ToString()))));
 
-            return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key, kvp => Tuple.Create(kvp.Value.Item1.Value, kvp.Value.Item2.Value)));
+            return Task.FromResult(consumedMessageCounts.ToDictionary(kvp => kvp.Key.SubscriptionId, kvp => Tuple.Create(kvp.Value.Item1.Value, kvp.Value.Item2.Value)));
         }
 
         public Task ClearNumberConsumed()

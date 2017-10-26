@@ -2,21 +2,21 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Streams;
+using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
     public interface IMultipleSubscriptionConsumerGrain : IGrainWithGuidKey
     {
-        Task<StreamSubscriptionHandle<int>> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
+        Task<GuidId> BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task<StreamSubscriptionHandle<int>> Resume(StreamSubscriptionHandle<int> handle);
+        Task Resume(GuidId subscription, Guid streamId, string streamNamespace, string providerToUse);
 
-        Task StopConsuming(StreamSubscriptionHandle<int> handle);
+        Task StopConsuming(GuidId subscription);
 
-        Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse);
+        Task<IList<GuidId>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse);
 
-        Task<Dictionary<StreamSubscriptionHandle<int>, Tuple<int,int>>> GetNumberConsumed();
+        Task<Dictionary<GuidId, Tuple<int,int>>> GetNumberConsumed();
 
         Task ClearNumberConsumed();
 

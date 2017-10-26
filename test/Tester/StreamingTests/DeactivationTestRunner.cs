@@ -51,7 +51,7 @@ namespace UnitTests.StreamingTests
             var consumer = this.client.GetGrain<IMultipleSubscriptionConsumerGrain>(Guid.NewGuid());
 
             // subscribe (PubSubRendezvousGrain will have one consumer)
-            StreamSubscriptionHandle<int> subscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+            GuidId subscriptionHandle = await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
             // produce one message (PubSubRendezvousGrain will have one consumer and one producer)
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
@@ -85,7 +85,7 @@ namespace UnitTests.StreamingTests
             // get stream and subscribe
             IStreamProvider streamProvider = this.client.GetStreamProvider(streamProviderName);
             var stream = streamProvider.GetStream<int>(streamGuid, streamNamespace);
-            StreamSubscriptionHandle<int> subscriptionHandle = await stream.SubscribeAsync((e, t) => count.Increment());
+            IStreamSubscriptionHandle subscriptionHandle = await stream.SubscribeAsync((e, t) => count.Increment());
 
             // produce one message (PubSubRendezvousGrain will have one consumer and one producer)
             await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);

@@ -108,6 +108,7 @@ namespace Orleans
             services.TryAddSingleton<StreamProviderManager>();
             services.TryAddSingleton<ClientStatisticsManager>();
             services.TryAddFromExisting<IStreamProviderManager, StreamProviderManager>();
+            services.TryAddFromExisting<IKeyedServiceCollection<string, IStreamProvider>, StreamProviderManager>(); // as named services
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
             services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();

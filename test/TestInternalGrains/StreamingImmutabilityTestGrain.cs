@@ -9,7 +9,7 @@ namespace UnitTests.Grains
     public class StreamingImmutabilityTestGrain : Grain, IStreamingImmutabilityTestGrain
     {
         private StreamImmutabilityTestObject _myObject;
-        private StreamSubscriptionHandle<StreamImmutabilityTestObject> _streamSubscriptionHandle;
+        private IStreamSubscriptionHandle _streamSubscriptionHandle;
 
         public async Task SubscribeToStream(Guid guid, string providerName)
         {

@@ -25,14 +25,6 @@ namespace UnitTests.Grains
         public bool IsProducer { get; set; }
         public int NumMessagesSent { get; set; }
         public int NumErrors { get; set; }
-
-        // For consumer only.
-        public HashSet<StreamSubscriptionHandle<int>> ConsumerSubscriptionHandles { get; set; }
-
-        public StreamLifecycleTestGrainState()
-        {
-            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
-        }
     }
 
     public class GenericArg
@@ -123,7 +115,6 @@ namespace UnitTests.Grains
                 if (logger.IsVerbose) logger.Verbose("Stream already exists for StreamId={0} StreamProvider={1} - Resetting", State.Stream, providerToUse);
 
                 // Note: in this test, we are deliberately not doing Unsubscribe consumers, just discard old stream and let auto-cleanup functions do their thing.
-                State.ConsumerSubscriptionHandles.Clear();
                 State.IsProducer = false;
                 State.NumMessagesSent = 0;
                 State.NumErrors = 0;
@@ -157,7 +148,7 @@ namespace UnitTests.Grains
             this.streamProviderRuntime = streamProviderRuntime;
         }
 
-        protected IDictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
+        protected IDictionary<IStreamSubscriptionHandle, MyStreamObserver<int>> Observers { get; set; }
 
         public override async Task OnActivateAsync()
         {
@@ -168,19 +159,21 @@ namespace UnitTests.Grains
 
             if (Observers == null)
             {
-                Observers = new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
+                Observers = new Dictionary<IStreamSubscriptionHandle, MyStreamObserver<int>>();
             }
 
             if (State.Stream != null && State.StreamProviderName != null)
             {
-                if (State.ConsumerSubscriptionHandles.Count > 0)
+                IStreamProvider streamProvider = GetStreamProvider(this.State.StreamProviderName);
+                IAsyncStream<int> stream = streamProvider.GetStream<int>(this.State.Stream.Guid, this.State.Stream.Namespace);
+                IList<IStreamSubscriptionHandle> handles = await stream.GetAllSubscriptionHandles();
+                if (handles.Count > 0)
                 {
-                    var handles = State.ConsumerSubscriptionHandles.ToArray();
                     logger.Info("ReconnectConsumerHandles SubscriptionHandles={0} Grain={1}", Utils.EnumerableToString(handles), this.AsReference<IStreamLifecycleConsumerGrain>());
                     foreach (var handle in handles)
                     {
                         var observer = new MyStreamObserver<int>(logger);
-                        StreamSubscriptionHandle<int> subsHandle = await handle.ResumeAsync(observer);
+                        IStreamSubscriptionHandle subsHandle = await handle.ResumeAsync(observer);
                         Observers.Add(subsHandle, observer);
                     }
                 }
@@ -221,7 +214,6 @@ namespace UnitTests.Grains
             InitStream(streamId, streamNamespace, providerToUse);
             var observer = new MyStreamObserver<int>(logger);
             var subsHandle = await State.Stream.SubscribeAsync(observer);
-            State.ConsumerSubscriptionHandles.Add(subsHandle);
             Observers.Add(subsHandle, observer);
             await WriteStateAsync();
         }
@@ -247,28 +239,28 @@ namespace UnitTests.Grains
             GuidId subscriptionId = GuidId.GetNewGuidId();
             await pubsub.RegisterConsumer(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId, myExtensionReference, null);
 
-            myExtension.SetObserver(subscriptionId, ((StreamImpl<int>)State.Stream), observer, null, null);
+            IStreamSubscriptionHandle hande = myExtension.CreateHandle(subscriptionId, ((StreamImpl<int>)State.Stream).StreamId);
+            myExtension.SetObserver(hande, observer, null);
         }
 
-        public async Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> subsHandle)
+        public async Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, GuidId subscription)
         {
             if (logger.IsVerbose) logger.Verbose("RemoveConsumer StreamId={0} StreamProvider={1}", streamId, providerName);
-            if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
+            if (this.Observers.Count == 0) throw new InvalidOperationException("Not a Consumer");
+            IStreamSubscriptionHandle subsHandle = this.Observers.Keys.FirstOrDefault(h => h.SubscriptionId == subscription);
+            if (subsHandle == null) return;
             await subsHandle.UnsubscribeAsync();
             Observers.Remove(subsHandle);
-            State.ConsumerSubscriptionHandles.Remove(subsHandle);
             await WriteStateAsync();
         }
 
         public async Task ClearGrain()
         {
             logger.Info("ClearGrain");
-            var subsHandles = State.ConsumerSubscriptionHandles.ToArray();
-            foreach (var handle in subsHandles)
+            foreach (var handle in Observers.Keys)
             {
                 await handle.UnsubscribeAsync();
             }
-            State.ConsumerSubscriptionHandles.Clear();
             State.Stream = null;
             State.IsProducer = false;
             Observers.Clear();
@@ -319,7 +311,6 @@ namespace UnitTests.Grains
 
             var subsHandle = await State.Stream.SubscribeAsync(observer, null, filterFunc, filterData);
 
-            State.ConsumerSubscriptionHandles.Add(subsHandle);
             Observers.Add(subsHandle, observer);
             await WriteStateAsync();
         }
@@ -526,14 +517,5 @@ namespace UnitTests.Grains
         public ClosedTypeStreamObserver(Logger logger) : base(logger)
         {
         }
-    }
-
-    public interface IClosedTypeAsyncObservable : IAsyncObservable<AsyncObservableArg> { }
-
-    public interface IClosedTypeAsyncStream : IAsyncStream<AsyncStreamArg> { }
-
-    internal class ClosedTypeStreamSubscriptionHandle : StreamSubscriptionHandleImpl<StreamSubscriptionHandleArg>
-    {
-        public ClosedTypeStreamSubscriptionHandle() : base(null, null) { /* not a subject to the creation */ }
     }
 }

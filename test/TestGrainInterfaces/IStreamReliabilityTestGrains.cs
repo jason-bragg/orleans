@@ -20,11 +20,11 @@ namespace UnitTests.GrainInterfaces
 
         Task Ping();
 #if USE_GENERICS
-        Task<StreamSubscriptionHandle<T>> AddConsumer(Guid streamId, string providerName);
-        Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<T> consumerHandle);
+        Task<IStreamSubscriptionHandle> AddConsumer(Guid streamId, string providerName);
+        Task RemoveConsumer(Guid streamId, string providerName, IStreamSubscriptionHandle consumerHandle);
 #else
-        Task<StreamSubscriptionHandle<int>> AddConsumer(Guid streamId, string providerName);
-        Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<int> consumerHandle);
+        Task<GuidId> AddConsumer(Guid streamId, string providerName);
+        Task RemoveConsumer(Guid streamId, string providerName, GuidId subscription);
 #endif
         
         Task BecomeProducer(Guid streamId, string providerName);

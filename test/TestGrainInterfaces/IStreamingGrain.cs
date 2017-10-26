@@ -66,7 +66,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface IProducerObserver
     {
-        void BecomeProducer(Guid streamId, IStreamProvider streamProvider, string streamNamespace);
+        void BecomeProducer(Guid streamId, string providerName,  IStreamProvider streamProvider, string streamNamespace);
         void RenewProducer(Logger logger, IStreamProvider streamProvider);
         Task StopBeingProducer();
         Task ProduceSequentialSeries(int count);
@@ -82,7 +82,7 @@ namespace UnitTests.GrainInterfaces
 
     public interface IConsumerObserver
     {
-        Task BecomeConsumer(Guid streamId, IStreamProvider streamProvider, string streamNamespace);
+        Task BecomeConsumer(Guid streamId, string providerName, IStreamProvider streamProvider, string streamNamespace);
         Task RenewConsumer(Logger logger, IStreamProvider streamProvider);
         Task StopBeingConsumer(IStreamProvider streamProvider);
         Task<int> ItemsConsumed { get; }

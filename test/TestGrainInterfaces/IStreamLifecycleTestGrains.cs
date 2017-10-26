@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using Orleans.Streams;
+using Orleans.Runtime;
 
 namespace UnitTests.GrainInterfaces
 {
@@ -13,7 +14,7 @@ namespace UnitTests.GrainInterfaces
         Task Ping();
         Task BecomeConsumer(Guid streamId, string streamNamespace, string providerName);
         Task TestBecomeConsumerSlim(Guid streamId, string streamNamespace, string providerName);
-        Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, StreamSubscriptionHandle<int> consumerHandle);
+        Task RemoveConsumer(Guid streamId, string streamNamespace, string providerName, GuidId subscription);
         Task ClearGrain();
     }
 

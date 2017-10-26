@@ -42,12 +42,12 @@ namespace Orleans.Streams
             bindExtLock = new AsyncLock();
         }
 
-        public Task<StreamSubscriptionHandle<T>> SubscribeAsync(IAsyncObserver<T> observer)
+        public Task<IStreamSubscriptionHandle> SubscribeAsync(IAsyncObserver<T> observer)
         {
             return SubscribeAsync(observer, null);
         }
 
-        public async Task<StreamSubscriptionHandle<T>> SubscribeAsync(
+        public async Task<IStreamSubscriptionHandle> SubscribeAsync(
             IAsyncObserver<T> observer,
             StreamSequenceToken token,
             StreamFilterPredicate filterFunc = null,
@@ -82,7 +82,8 @@ namespace Orleans.Streams
             // and undo it in the case of failure. 
             // There is no problem with that we call myExtension.SetObserver too early before the handle is registered in pub sub,
             // since this subscriptionId is unique (random Guid) and no one knows it anyway, unless successfully subscribed in the pubsub.
-            var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, token, filterWrapper);
+            var subriptionHandle = myExtension.CreateHandle(subscriptionId, this.stream.StreamId);
+            myExtension.SetObserver(subriptionHandle, observer, token);
             try
             {
                 await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference, filterWrapper);
@@ -95,13 +96,11 @@ namespace Orleans.Streams
             }            
         }
 
-        public async Task<StreamSubscriptionHandle<T>> ResumeAsync(
-            StreamSubscriptionHandle<T> handle,
+        public async Task<IStreamSubscriptionHandle> ResumeAsync(
+            IStreamSubscriptionHandle handle,
             IAsyncObserver<T> observer,
             StreamSequenceToken token = null)
         {
-            StreamSubscriptionHandleImpl<T> oldHandleImpl = CheckHandleValidity(handle);
-
             if (token != null && !IsRewindable)
                 throw new ArgumentNullException("token", "Passing a non-null token to a non-rewindable IAsyncObservable.");
 
@@ -111,40 +110,26 @@ namespace Orleans.Streams
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
                 pubSub, myGrainReference, token);
 
-            StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, token, null);
-
-            // On failure caller should be able to retry using the original handle, so invalidate old handle only if everything succeeded.  
-            oldHandleImpl.Invalidate();
-
-            return newHandle;
+            await handle.ResumeAsync<T>(observer, token);
+            return handle;
         }
 
-        public async Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle)
+        public async Task UnsubscribeAsync(IStreamSubscriptionHandle handle)
         {
             await BindExtensionLazy();
 
-            StreamSubscriptionHandleImpl<T> handleImpl = CheckHandleValidity(handle);
-
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe StreamSubscriptionHandle={0}", handle);
 
-            myExtension.RemoveObserver(handleImpl.SubscriptionId);
-            // UnregisterConsumer from pubsub even if does not have this handle localy, to allow UnsubscribeAsync retries.
-
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
-                pubSub, myGrainReference);
-
-            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
-
-            handleImpl.Invalidate();
+            await handle.UnsubscribeAsync();
         }
 
-        public async Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions()
+        public async Task<IList<IStreamSubscriptionHandle>> GetAllSubscriptions()
         {
             await BindExtensionLazy();
 
             List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
-            return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
-                                  .ToList<StreamSubscriptionHandle<T>>();
+            return subscriptions.Select(sub => this.myExtension.CreateHandle(GuidId.GetGuidId(sub.SubscriptionId), stream.StreamId))
+                                  .ToList<IStreamSubscriptionHandle>();
         }
 
         public async Task Cleanup()
@@ -153,7 +138,7 @@ namespace Orleans.Streams
             if (myExtension == null)
                 return;
 
-            var allHandles = myExtension.GetAllStreamHandles<T>();
+            var allHandles = myExtension.GetAllStreamHandles(this.stream.StreamId);
             var tasks = new List<Task>();
             foreach (var handle in allHandles)
             {
@@ -173,9 +158,9 @@ namespace Orleans.Streams
         }
 
         // Used in test.
-        internal bool InternalRemoveObserver(StreamSubscriptionHandle<T> handle)
+        internal bool InternalRemoveObserver(IStreamSubscriptionHandle handle)
         {
-            return myExtension != null && myExtension.RemoveObserver(((StreamSubscriptionHandleImpl<T>)handle).SubscriptionId);
+            return myExtension != null && myExtension.RemoveObserver(handle.SubscriptionId);
         }
 
         internal Task<int> DiagGetConsumerObserversCount()
@@ -200,20 +185,6 @@ namespace Orleans.Streams
                     }
                 }
             }
-        }
-
-        private StreamSubscriptionHandleImpl<T> CheckHandleValidity(StreamSubscriptionHandle<T> handle)
-        {
-            if (handle == null)
-                throw new ArgumentNullException("handle");
-            if (!handle.StreamIdentity.Equals(stream))
-                throw new ArgumentException("Handle is not for this stream.", "handle");
-            var handleImpl = handle as StreamSubscriptionHandleImpl<T>;
-            if (handleImpl == null)
-                throw new ArgumentException("Handle type not supported.", "handle");
-            if (!handleImpl.IsValid)
-                throw new ArgumentException("Handle is no longer valid.  It has been used to unsubscribe or resume.", "handle");
-            return handleImpl;
         }
     }
 }

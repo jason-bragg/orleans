@@ -40,17 +40,17 @@ namespace Tester.StreamingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task Programmatic_Subscribe_Provider_WithExplicitPubsub_CanGetSubscriptionManager()
         {
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task StreamingTests_Consumer_Producer_Subscribe()
         {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+            var streamId = new FullStreamIdentity(Guid.NewGuid(), Passive_ConsumerGrain_Const.FruitSteamNamespace, StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             //set up subscription for 10 consumer grains
             var subscriptions = await subGrain.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
@@ -79,10 +79,10 @@ namespace Tester.StreamingTests
             await Task.WhenAll(tasks);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task StreamingTests_Consumer_Producer_UnSubscribe()
         {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+            var streamId = new FullStreamIdentity(Guid.NewGuid(), Passive_ConsumerGrain_Const.IntSteamNamespace, StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             //set up subscription for consumer grains
             var subscriptions = await subGrain.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 2);
@@ -124,10 +124,10 @@ namespace Tester.StreamingTests
             await consumerUnSub.StopConsuming();
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task StreamingTests_Consumer_Producer_GetSubscriptions()
         {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+            var streamId = new FullStreamIdentity(Guid.NewGuid(), Passive_ConsumerGrain_Const.IntSteamNamespace, StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             //set up subscriptions
             var expectedSubscriptions = await subGrain.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 2);
@@ -147,7 +147,7 @@ namespace Tester.StreamingTests
             // clean up tests
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task StreamingTests_Consumer_Producer_ConsumerUnsubscribeOnAdd()
         {
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
@@ -173,10 +173,10 @@ namespace Tester.StreamingTests
         }
 
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStreamProcessDifferentType()
         {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+            var streamId = new FullStreamIdentity(Guid.NewGuid(), Passive_ConsumerGrain_Const.IntSteamNamespace, StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             //set up subscription for 10 consumer grains
             var subscriptions = await subGrain.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
@@ -217,10 +217,10 @@ namespace Tester.StreamingTests
             await Task.WhenAll(tasks2);
         }
 
-        [Fact, TestCategory("BVT"), TestCategory("Functional")]
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
         public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
         {
-            var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+            var streamId = new FullStreamIdentity(Guid.NewGuid(), Passive_ConsumerGrain_Const.IntSteamNamespace, StreamProviderName);
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
             //set up subscription for 10 consumer grains
             var subscriptions = await subGrain.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
@@ -234,7 +234,7 @@ namespace Tester.StreamingTests
             int numProduced = 0;
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout);
             // set up the new stream to subscribe, which produce strings
-            var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
+            var streamId2 = new FullStreamIdentity(Guid.NewGuid(), Passive_ConsumerGrain_Const.FruitSteamNamespace, StreamProviderName2);
             var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 

@@ -48,13 +48,13 @@ namespace UnitTests.StreamingTests
         public Task BecomeConsumer(Guid streamId, string providerToUse)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), null);
+            return _consumer.BecomeConsumer(streamId, providerToUse, this.client.GetStreamProvider(providerToUse), null);
         }
         
         public Task BecomeConsumer(Guid streamId, string providerToUse, string streamNamespace)
         {
             _providerToUse = providerToUse;
-            return _consumer.BecomeConsumer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            return _consumer.BecomeConsumer(streamId, providerToUse, this.client.GetStreamProvider(providerToUse), streamNamespace);
         }
 
         public Task StopBeingConsumer()
@@ -97,7 +97,7 @@ namespace UnitTests.StreamingTests
 
         public Task BecomeProducer(Guid streamId, string providerToUse, string streamNamespace)
         {
-            this.producer.BecomeProducer(streamId, this.client.GetStreamProvider(providerToUse), streamNamespace);
+            this.producer.BecomeProducer(streamId, providerToUse, this.client.GetStreamProvider(providerToUse), streamNamespace);
             return Task.CompletedTask;
         }
 

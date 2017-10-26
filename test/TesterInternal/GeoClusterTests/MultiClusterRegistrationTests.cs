@@ -214,7 +214,7 @@ namespace UnitTests.GeoClusterTests
                 IAsyncStream<int> stream = streamProvider.GetStream<int>(guid, "notificationtest");
                 handle = stream.SubscribeAsync(listener).GetResult();
             }
-            StreamSubscriptionHandle<int> handle;
+            IStreamSubscriptionHandle handle;
 
             public void InjectClusterConfiguration(params string[] clusters)
             {

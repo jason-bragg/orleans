@@ -120,7 +120,7 @@ namespace UnitTests.Grains
         internal int numConsumedItems;
         internal Logger logger;
         private IAsyncObserver<int> consumerObserver;
-        private StreamSubscriptionHandle<int> consumerHandle;
+        private IStreamSubscriptionHandle consumerHandle;
 
         public override Task OnActivateAsync()
         {
@@ -167,7 +167,7 @@ namespace UnitTests.Grains
         private IAsyncObservable<int> consumer;
         internal int numConsumedItems;
         internal Logger logger;
-        private StreamSubscriptionHandle<int> consumerHandle;
+        private IStreamSubscriptionHandle consumerHandle;
 
         public override Task OnActivateAsync()
         {

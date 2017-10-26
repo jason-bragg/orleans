@@ -12,7 +12,7 @@ namespace UnitTests.Grains
         private int _numConsumedItems;
         private Logger _logger;
         private IAsyncObservable<int> _consumer;
-        private StreamSubscriptionHandle<int> _subscriptionHandle;
+        private IStreamSubscriptionHandle _subscriptionHandle;
         internal const string StreamNamespace = "HaloStreamingNamespace";
 
 

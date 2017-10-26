@@ -87,7 +87,7 @@ namespace Orleans.Runtime.TestHooks
             allProviders.AddRange(storageProviderManager.GetProviderNames());
 
             var streamProviderManager = this.host.Services.GetRequiredService<IStreamProviderManager>();
-            allProviders.AddRange(streamProviderManager.GetStreamProviders().Select(p => p.Name));
+            allProviders.AddRange(streamProviderManager.GetStreamProviders().Cast<IProvider>().Select(p => p.Name));
 
             var statisticsProviderManager = this.host.Services.GetRequiredService<StatisticsProviderManager>();
             allProviders.AddRange(statisticsProviderManager.GetProviders().Select(p => p.Name));

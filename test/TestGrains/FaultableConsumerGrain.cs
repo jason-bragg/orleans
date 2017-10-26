@@ -15,7 +15,7 @@ namespace UnitTests.Grains
         private int errorsCount;
         private int eventsFailedCount;
         private Logger logger;
-        private StreamSubscriptionHandle<int> consumerHandle;
+        private IStreamSubscriptionHandle consumerHandle;
         private Stopwatch failPeriodTimer;
         private TimeSpan failPeriod;
 

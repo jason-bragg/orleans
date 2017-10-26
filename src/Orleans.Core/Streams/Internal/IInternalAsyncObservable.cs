@@ -5,14 +5,14 @@ namespace Orleans.Streams
 {
     internal interface IInternalAsyncObservable<T> : IAsyncObservable<T>
     {
-        Task<StreamSubscriptionHandle<T>> ResumeAsync(
-            StreamSubscriptionHandle<T> handle,
+        Task<IStreamSubscriptionHandle> ResumeAsync(
+            IStreamSubscriptionHandle handle,
             IAsyncObserver<T> observer,
             StreamSequenceToken token = null);
 
-        Task UnsubscribeAsync(StreamSubscriptionHandle<T> handle);
+        Task UnsubscribeAsync(IStreamSubscriptionHandle handle);
 
-        Task<IList<StreamSubscriptionHandle<T>>> GetAllSubscriptions();
+        Task<IList<IStreamSubscriptionHandle>> GetAllSubscriptions();
 
         Task Cleanup();
     }

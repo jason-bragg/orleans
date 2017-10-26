@@ -26,23 +26,6 @@ namespace UnitTests.Grains
 #endif
 
         public bool IsProducer { get; set; }
-
-        // For consumer only.
-#if USE_GENERICS
-        public HashSet<StreamSubscriptionHandle<T>> ConsumerSubscriptionHandles { get; set; }
-
-        public StreamReliabilityTestGrainState()
-        {
-            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<T>>();
-        }
-#else
-        public HashSet<StreamSubscriptionHandle<int>> ConsumerSubscriptionHandles { get; set; }
-
-        public StreamReliabilityTestGrainState()
-        {
-            ConsumerSubscriptionHandles = new HashSet<StreamSubscriptionHandle<int>>();
-        }
-#endif
     }
 
     [Orleans.Providers.StorageProvider(ProviderName = "AzureStore")]
@@ -58,35 +41,34 @@ namespace UnitTests.Grains
 #if USE_GENERICS
         private IAsyncStream<T> Stream { get; set; }
         private IAsyncObserver<T> Producer { get; set; }
-        private Dictionary<StreamSubscriptionHandle<T>, MyStreamObserver<T>> Observers { get; set; }
+        private Dictionary<IStreamSubscriptionHandle, MyStreamObserver<T>> Observers { get; set; }
 #else
         private IAsyncStream<int> Stream { get { return State.Stream; } }
         private IAsyncObserver<int> Producer { get; set; }
-        private Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>> Observers { get; set; }
+        private Dictionary<IStreamSubscriptionHandle, MyStreamObserver<int>> Observers { get; set; }
 #endif
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
         public override async Task OnActivateAsync()
         {
             logger = GetLogger("StreamReliabilityTestGrain-" + this.IdentityString);
-            logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
-                State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
 
             if (Observers == null)
 #if USE_GENERICS
-                Observers = new Dictionary<StreamSubscriptionHandle<T>, MyStreamObserver<T>>();
+                Observers = new Dictionary<IStreamSubscriptionHandle, MyStreamObserver<T>>();
 #else
-                Observers = new Dictionary<StreamSubscriptionHandle<int>, MyStreamObserver<int>>();
+                Observers = new Dictionary<IStreamSubscriptionHandle, MyStreamObserver<int>>();
 #endif
 
             if (State.Stream != null && State.StreamProviderName != null)
             {
-                //TryInitStream(State.Stream, State.StreamProviderName);
-
-                if (State.ConsumerSubscriptionHandles.Count > 0)
+                IStreamProvider streamProvider = GetStreamProvider(this.State.StreamProviderName);
+                IAsyncStream<int> stream = streamProvider.GetStream<int>(this.State.Stream.Guid, this.State.Stream.Namespace);
+                IList<IStreamSubscriptionHandle> handles = await stream.GetAllSubscriptionHandles();
+                logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
+                    State.IsProducer, handles != null && handles.Count > 0));
+                if (handles.Count > 0)
                 {
-                    var handles = State.ConsumerSubscriptionHandles.ToArray();
-                    State.ConsumerSubscriptionHandles.Clear();
                     await ReconnectConsumerHandles(handles);
                 }
                 if (State.IsProducer)
@@ -111,7 +93,7 @@ namespace UnitTests.Grains
 
         public Task<int> GetConsumerCount()
         {
-            int numConsumers = State.ConsumerSubscriptionHandles.Count;
+            int numConsumers = this.Observers.Count;
             logger.Info("ConsumerCount={0}", numConsumers);
             return Task.FromResult(numConsumers);
         }
@@ -135,9 +117,9 @@ namespace UnitTests.Grains
         }
 
 #if USE_GENERICS
-        public async Task<StreamSubscriptionHandle<T>> AddConsumer(Guid streamId, string providerName)
+        public async Task<IStreamSubscriptionHandle> AddConsumer(Guid streamId, string providerName)
 #else
-        public async Task<StreamSubscriptionHandle<int>> AddConsumer(Guid streamId, string providerName)
+        public async Task<GuidId> AddConsumer(Guid streamId, string providerName)
 #endif
         {
             logger.Info("AddConsumer StreamId={0} StreamProvider={1} Grain={2}", streamId, providerName, this.AsReference<IStreamReliabilityTestGrain>());
@@ -149,36 +131,34 @@ namespace UnitTests.Grains
 #endif
             var subsHandle = await Stream.SubscribeAsync(observer);
             Observers.Add(subsHandle, observer);
-            State.ConsumerSubscriptionHandles.Add(subsHandle);
             await WriteStateAsync();
-            return subsHandle;
+            return subsHandle.SubscriptionId;
         }
 
 #if USE_GENERICS
-        public async Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<T> subsHandle)
+        public async Task RemoveConsumer(Guid streamId, string providerName, IStreamSubscriptionHandle subsHandle)
 #else
-        public async Task RemoveConsumer(Guid streamId, string providerName, StreamSubscriptionHandle<int> subsHandle)
+        public async Task RemoveConsumer(Guid streamId, string providerName, GuidId subscription)
 #endif
         {
             logger.Info("RemoveConsumer StreamId={0} StreamProvider={1}", streamId, providerName);
-            if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
+            if (this.Observers.Count == 0) throw new InvalidOperationException("Not a Consumer");
+            IStreamSubscriptionHandle subsHandle = this.Observers.Keys.FirstOrDefault(h => h.SubscriptionId == subscription);
+            if (subsHandle == null) return;
             await subsHandle.UnsubscribeAsync();
             Observers.Remove(subsHandle);
-            State.ConsumerSubscriptionHandles.Remove(subsHandle);
             await WriteStateAsync();
         }
 
         public async Task RemoveAllConsumers()
         {
-            logger.Info("RemoveAllConsumers: State.ConsumerSubscriptionHandles.Count={0}", State.ConsumerSubscriptionHandles.Count);
-            if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
-            var handles = State.ConsumerSubscriptionHandles.ToArray();
-            foreach (var handle in handles)
+            logger.Info("RemoveAllConsumers: State.ConsumerSubscriptionHandles.Count={0}", this.Observers.Count);
+            if (this.Observers.Count == 0) throw new InvalidOperationException("Not a Consumer");
+            foreach (var handle in this.Observers.Keys)
             {
                 await handle.UnsubscribeAsync();
             }
             //Observers.Remove(subsHandle);
-            State.ConsumerSubscriptionHandles.Clear();
             await WriteStateAsync();
         }
 
@@ -203,7 +183,6 @@ namespace UnitTests.Grains
         public async Task ClearGrain()
         {
             logger.Info("ClearGrain.");
-            State.ConsumerSubscriptionHandles.Clear();
             State.IsProducer = false;
             Observers.Clear();
             State.Stream = null;
@@ -212,7 +191,7 @@ namespace UnitTests.Grains
 
         public Task<bool> IsConsumer()
         {
-            bool isConsumer = State.ConsumerSubscriptionHandles.Count > 0;
+            bool isConsumer = this.Observers.Count > 0;
             logger.Info("IsConsumer={0}", isConsumer);
             return Task.FromResult(isConsumer);
         }
@@ -224,7 +203,7 @@ namespace UnitTests.Grains
         }
         public Task<int> GetConsumerHandlesCount()
         {
-            return Task.FromResult(State.ConsumerSubscriptionHandles.Count);
+            return Task.FromResult(this.Observers.Count);
         }
 
         public async Task<int> GetConsumerObserversCount()
@@ -275,9 +254,9 @@ namespace UnitTests.Grains
         }
 
 #if USE_GENERICS
-        private async Task ReconnectConsumerHandles(StreamSubscriptionHandle<T>[] subscriptionHandles)
+        private async Task ReconnectConsumerHandles(IList<IStreamSubscriptionHandle> subscriptionHandles)
 #else
-        private async Task ReconnectConsumerHandles(StreamSubscriptionHandle<int>[] subscriptionHandles)
+        private async Task ReconnectConsumerHandles(IList<IStreamSubscriptionHandle> subscriptionHandles)
 #endif
         {
             logger.Info("ReconnectConsumerHandles SubscriptionHandles={0} Grain={1}", Utils.EnumerableToString(subscriptionHandles), this.AsReference<IStreamReliabilityTestGrain>());
@@ -294,7 +273,6 @@ namespace UnitTests.Grains
 #endif
                 var subsHandle = await subHandle.ResumeAsync(observer);
                 Observers.Add(subsHandle, observer);
-                State.ConsumerSubscriptionHandles.Add(subsHandle);
             }
             await WriteStateAsync();
         }
@@ -344,12 +322,16 @@ namespace UnitTests.Grains
 
         private const string StreamNamespace = StreamTestsConstants.StreamReliabilityNamespace;
 
-        public override Task OnActivateAsync()
+        public override async Task OnActivateAsync()
         {
             logger = GetLogger("StreamUnsubscribeTestGrain-" + this.IdentityString);
-            logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.",
-                State.IsProducer, State.ConsumerSubscriptionHandles != null && State.ConsumerSubscriptionHandles.Count > 0));
-            return Task.CompletedTask;
+            if (State.Stream != null && State.StreamProviderName != null)
+            {
+                IStreamProvider streamProvider = GetStreamProvider(this.State.StreamProviderName);
+                IAsyncStream<int> stream = streamProvider.GetStream<int>(this.State.Stream.Guid, this.State.Stream.Namespace);
+                IList<IStreamSubscriptionHandle> handles = await stream.GetAllSubscriptionHandles();
+                logger.Info(String.Format("OnActivateAsync IsProducer = {0}, IsConsumer = {1}.", State.IsProducer, handles != null && handles.Count > 0));
+            }
         }
 
         public async Task Subscribe(Guid streamId, string providerName)
@@ -367,21 +349,23 @@ namespace UnitTests.Grains
             var observer = new MyStreamObserver<int>(logger);
             var consumer = State.Stream;
             var subsHandle = await consumer.SubscribeAsync(observer);
-            State.ConsumerSubscriptionHandles.Add(subsHandle);
             await WriteStateAsync();
         }
 
         public async Task UnSubscribeFromAllStreams()
         {
-            logger.Info("UnSubscribeFromAllStreams: State.ConsumerSubscriptionHandles.Count={0}", State.ConsumerSubscriptionHandles.Count);
-            if (State.ConsumerSubscriptionHandles.Count == 0) throw new InvalidOperationException("Not a Consumer");
-            var handles = State.ConsumerSubscriptionHandles.ToArray();
-            foreach (var handle in handles)
+            if (State.Stream != null && State.StreamProviderName != null)
             {
-                await handle.UnsubscribeAsync();
+                IStreamProvider streamProvider = GetStreamProvider(this.State.StreamProviderName);
+                IAsyncStream<int> stream = streamProvider.GetStream<int>(this.State.Stream.Guid, this.State.Stream.Namespace);
+                IList<IStreamSubscriptionHandle> handles = await stream.GetAllSubscriptionHandles();
+                if (handles.Count == 0) throw new InvalidOperationException("Not a Consumer");
+                logger.Info("UnSubscribeFromAllStreams: Subscription Count={0}", handles.Count);
+                foreach (var handle in handles)
+                {
+                    await handle.UnsubscribeAsync();
+                }
             }
-            State.ConsumerSubscriptionHandles.Clear();
-            await WriteStateAsync();
         }
     }
 }

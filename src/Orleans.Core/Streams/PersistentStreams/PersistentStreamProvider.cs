@@ -57,6 +57,8 @@ namespace Orleans.Providers.Streams.Common
         private ILoggerFactory loggerFactory;
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
+        IStreamPubSub IInternalStreamProvider.StreamPubSub => this.providerRuntime.PubSub(myConfig.PubSubType);
+
         public async Task Init(string name, IProviderRuntime providerUtilitiesManager, IProviderConfiguration config)
         {
             if(!stateManager.PresetState(ProviderState.Initialized)) return;

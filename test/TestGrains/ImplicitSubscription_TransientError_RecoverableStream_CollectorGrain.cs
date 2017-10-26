@@ -91,9 +91,9 @@ namespace TestGrains
 
             var streamProvider = GetStreamProvider(GeneratedStreamTestConstants.StreamProviderName);
             stream = streamProvider.GetStream<GeneratedEvent>(State.StreamGuid, State.StreamNamespace);
-            foreach (StreamSubscriptionHandle<GeneratedEvent> handle in await stream.GetAllSubscriptionHandles())
+            foreach (IStreamSubscriptionHandle handle in await stream.GetAllSubscriptionHandles())
             {
-                await handle.ResumeAsync(OnNextAsync, OnErrorAsync, State.RecoveryToken);
+                await handle.ResumeAsync<GeneratedEvent>(OnNextAsync, OnErrorAsync, State.RecoveryToken);
             }
         }
 

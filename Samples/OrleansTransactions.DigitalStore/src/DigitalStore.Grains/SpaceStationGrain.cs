@@ -1,9 +1,12 @@
+using System;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
 using DigitalStore.Interfaces;
-using System;
 
 namespace DigitalStore.Grains
 {
@@ -12,33 +15,47 @@ namespace DigitalStore.Grains
     /// </summary>
     internal class SpaceStationGrain : Grain, ISpaceStation
     {
-        Station station;
-        StationState state;
-        SpaceStationSimulation simulation;
+        private string station;
+        private StationState state;
+        private ISpaceStationSimulation simulation;
+        private IDisposable yearlyTimer;
+
         public override Task OnActivateAsync()
         {
-            this.station = (Station)this.GetPrimaryKeyLong();
-            this.simulation = this.ServiceProvider.GetServiceByKey<Station,SpaceStationSimulation>(station);
+            this.station = this.GetPrimaryKeyString();
+            this.simulation = this.ServiceProvider.GetServiceByName<ISpaceStationSimulation>(station);
             this.state = this.simulation.CreateInitialState();
+            IOptions<SolSimulationSettings> settings = this.ServiceProvider.GetRequiredService<IOptions<SolSimulationSettings>>();
+            this.yearlyTimer = this.RegisterTimer(YearlyTick, null, settings.Value.OneYearSimulationTime, settings.Value.OneYearSimulationTime);
             return Task.CompletedTask;
         }
 
-        Task<long> ISpaceStation.Buy(Product product, int quantity)
+        Task<ulong> ISpaceStation.Buy(Product product, uint quantity)
         {
             if (state.Inventory[product] <= quantity)
                 throw new InvalidOperationException($"Station {this.station} does not have {quantity} {product} in stock.");
-            int price = this.simulation.GetPrice(this.state, product);
-
+            Stock item = new Stock(0, this.simulation.GetPrice(this.state, product));
+            return Task.FromResult((ulong)(item.BuyPrice * quantity * 0.95));
         }
 
         Task<Dictionary<Product, Stock>> ISpaceStation.PeekAtInventory()
         {
-            throw new System.NotImplementedException();
+            return Task.FromResult(this.state.Inventory.Keys.
+                ToDictionary(p => p, p => new Stock(this.state.Inventory[p], this.simulation.GetPrice(this.state, p))));
         }
 
-        Task<long> ISpaceStation.Sell(Product product, int quantity)
+        Task<ulong> ISpaceStation.Sell(Product product, uint quantity)
         {
-            throw new System.NotImplementedException();
+            if (state.Inventory[product] <= quantity)
+                throw new InvalidOperationException($"Station {this.station} does not have {quantity} {product} in stock.");
+            Stock item = new Stock(0, this.simulation.GetPrice(this.state, product));
+            return Task.FromResult((ulong)(item.SellPrice * quantity * 0.95));
+        }
+
+        private Task YearlyTick(object obj)
+        {
+            this.simulation.SimulateYear(this.state);
+            return Task.CompletedTask;
         }
     }
 }

@@ -10,14 +10,30 @@ namespace DigitalStore.Grains
     /// </summary>
     internal class SpaceTraderGrain : Grain, ISpaceTrader
     {
-        Task<long> ISpaceTrader.GetBallance()
+        private ulong balance = 1000;
+
+        Task<ulong> ISpaceTrader.GetBalance()
         {
-            throw new NotImplementedException();
+            return Task.FromResult(this.balance);
         }
 
-        Task<TradeResult> ISpaceTrader.ShipProduct(Product product, int quantity, Station from, Station to)
+        async Task<TradeResult> ISpaceTrader.ShipProduct(Product product, uint quantity, string from, string to)
         {
-            throw new NotImplementedException();
+            ISpaceStation fromStation = GrainFactory.GetGrain<ISpaceStation>(from);
+            ISpaceStation toStation = GrainFactory.GetGrain<ISpaceStation>(to);
+            ulong buyPrice = await fromStation.Buy(product, quantity);
+            if (buyPrice > this.balance)
+                throw new InvalidOperationException("Not enough money");
+            this.balance -= buyPrice;
+            ulong sellPrice = await toStation.Sell(product, quantity);
+            this.balance += sellPrice;
+            return new TradeResult()
+            {
+                Pirated = false,
+                CaptainsMessage = buyPrice < sellPrice ? "profit" : "loss",
+                BuyPrice = buyPrice,
+                SellPrice = sellPrice
+            };
         }
     }
 }

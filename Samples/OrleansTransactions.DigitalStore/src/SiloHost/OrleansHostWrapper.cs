@@ -1,15 +1,19 @@
-﻿using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Runtime.Host;
-using System;
+﻿using System;
 using System.Net;
 using System.Reflection;
+using Orleans.Runtime.Configuration;
+using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+using DigitalStore.Grains;
+using Orleans.Runtime;
+using Microsoft.Extensions.Logging;
 
 namespace OrleansSiloHost
 {
     internal class OrleansHostWrapper
     {
-        private readonly SiloHost _siloHost;
+        private readonly ISiloHost _siloHost;
+        private ILogger logger;
 
         public OrleansHostWrapper(ClusterConfiguration config, string[] args)
         {
@@ -24,10 +28,21 @@ namespace OrleansSiloHost
                 config.Globals.DeploymentId = siloArgs.DeploymentId;
             }
 
-            _siloHost = new SiloHost(siloArgs.SiloName, config);
-            _siloHost.LoadOrleansConfig();
-        }
+            config.AddMemoryStorageProvider();
 
+            this._siloHost = new SiloHostBuilder()
+                .UseConfiguration(config)
+                .ConfigureSiloName(siloArgs.SiloName)
+                .ConfigureServices(ConfigureServices)
+                .ConfigureLogging((logging) =>
+                {
+                    logging.SetMinimumLevel(LogLevel.Debug);
+                    logging.AddConsole();
+                })
+                .AddApplicationPartsFromAppDomain()
+                .Build();
+        }
+        
         public int Run()
         {
             if (_siloHost == null)
@@ -38,17 +53,13 @@ namespace OrleansSiloHost
 
             try
             {
-                _siloHost.InitializeOrleansSilo();
-
-                if (!_siloHost.StartOrleansSilo())
-                    throw new OrleansException($"Failed to start Orleans silo '{_siloHost.Name}' as a {_siloHost.Type} node.");
-
-                Console.WriteLine($"Successfully started Orleans silo '{_siloHost.Name}' as a {_siloHost.Type} node.");
+                _siloHost.StartAsync().Wait();
+                ILogger logger = _siloHost.Services.GetRequiredService<ILoggerFactory>().CreateLogger("main");
+                logger.LogInformation("Silo started");
                 return 0;
             }
             catch (Exception exc)
             {
-                _siloHost.ReportStartupError(exc);
                 Console.Error.WriteLine(exc);
                 return 1;
             }
@@ -59,13 +70,11 @@ namespace OrleansSiloHost
             if (_siloHost == null) return 0;
             try
             {
-                _siloHost.StopOrleansSilo();
-                _siloHost.Dispose();
-                Console.WriteLine($"Orleans silo '{_siloHost.Name}' shutdown.");
+                _siloHost.StopAsync().Wait();
+                this._siloHost.Stopped.Wait();
             }
             catch (Exception exc)
             {
-                _siloHost.ReportStartupError(exc);
                 Console.Error.WriteLine(exc);
                 return 1;
             }
@@ -147,6 +156,17 @@ namespace OrleansSiloHost
 
             public string SiloName { get; set; }
             public string DeploymentId { get; set; }
+        }
+
+        private void ConfigureServices(HostBuilderContext context, IServiceCollection serviceCollection)
+        {
+            serviceCollection.AddSingleton<IKeyedServiceCollection<string, ISpaceStationSimulation>, NamedStationSimulations>();
+            serviceCollection.AddTransientNamedService<StationSettings, MercuryPowerAndLightSettings>("MercuryPowerAndLight");
+            serviceCollection.AddTransientNamedService<StationSettings, EarthFoodAndDrugsSettings>("EarthFoodAndDrugs");
+            serviceCollection.AddTransientNamedService<StationSettings, LunaTechIndustriesSettings>("LunaTechIndustries");
+            serviceCollection.AddTransientNamedService<StationSettings, MarsMetalWorksSettings>("MarsMetalWorks");
+            serviceCollection.AddTransientNamedService<StationSettings, EuropanIceSettings>("EuropanIce");
+            serviceCollection.AddTransientNamedService<StationSettings, UranusGassesSettings>("UranusGasses");
         }
     }
 }

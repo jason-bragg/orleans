@@ -10,7 +10,8 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Orleans.Server"  Version="2.0.0-beta*"  />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="2.0.0" />
+    <PackageReference Include="Microsoft.Orleans.Server" Version="2.0.0-beta*" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\DigitalStore.Grains\DigitalStore.Grains.csproj" />

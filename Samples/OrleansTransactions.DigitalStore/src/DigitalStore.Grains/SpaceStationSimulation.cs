@@ -1,17 +1,19 @@
-﻿using System.Collections.Generic;
-using DigitalStore.Interfaces;
-using System;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using DigitalStore.Interfaces;
 
 namespace DigitalStore.Grains
 {
-    public class SpaceStationSimulation
+    public class SpaceStationSimulation : ISpaceStationSimulation
     {
-        private readonly StationProductionOptions production;
+        private readonly StationSettings production;
+        StationState targetState;
 
-        public SpaceStationSimulation(StationProductionOptions production)
+        public SpaceStationSimulation(StationSettings production)
         {
             this.production = production;
+            this.targetState = CreateInitialState();
         }
 
         public bool SimulateYear(StationState state)
@@ -31,23 +33,30 @@ namespace DigitalStore.Grains
             {
                 state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value);
             }
+            state.PopulationInMillions = (uint)(state.PopulationInMillions * 1.1);
+            this.targetState = GetTargetStateByPopulaiton(state.PopulationInMillions);
             return true;
         }
 
-        bool CheckInventory(uint population, float consumptionRatio, uint quantity)
+        public bool CheckInventory(uint population, float consumptionRatio, uint quantity)
         {
             return population * consumptionRatio >= quantity;
         }
 
         public StationState CreateInitialState()
         {
+            return GetTargetStateByPopulaiton(production.StartPopulationInMillions);
+        }
+
+        public StationState GetTargetStateByPopulaiton(uint population)
+        {
             var state = new StationState
             {
-                PopulationInMillions = production.StartPopulationInMillions
+                PopulationInMillions = population
             };
 
             // calculate stockpiled inventory
-            foreach (KeyValuePair<Product,float> kvp in production.ConsumptionRatios)
+            foreach (KeyValuePair<Product, float> kvp in production.ConsumptionRatios)
             {
                 state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value * production.InitialStockInYears);
             }
@@ -57,21 +66,21 @@ namespace DigitalStore.Grains
             }
             return state;
         }
-    }
 
-    public class StationState
-    {
-        public StationState()
+        public ulong GetPrice(StationState state, Product product)
         {
-            foreach (Product product in Enum.GetValues(typeof(Product))) Inventory[product] = 0;
+            uint targetQuantity = this.targetState.Inventory[product];
+            uint currentQuantity = state.Inventory[product];
+            if (currentQuantity == 0) return 300;
+            return Math.Max((targetQuantity * 100) / currentQuantity , 300);
         }
-
-        public uint PopulationInMillions { get; set; }
-        public Dictionary<Product, uint> Inventory { get; set; } = new Dictionary<Product, uint>();
     }
-
-    public class StationProductionOptions
+    
+    public class StationSettings
     {
+        public string Name { get; set; }
+        public string StarSystem { get; set; }
+        public string Message { get; set; }
         // Intial population
         public uint StartPopulationInMillions { get; set; }
         // Years worth of intial products
@@ -82,7 +91,7 @@ namespace DigitalStore.Grains
         public Dictionary<Product, float> ConsumptionRatios { get; set; }
     }
 
-    public class SolSimulationOptions
+    public class SolSimulationSettings
     {
         /// <summary>
         /// How much play time it takes for one in game year to pass.
@@ -94,7 +103,7 @@ namespace DigitalStore.Grains
         /// How often pirate attacks occur, on average.
         /// Defaults to 1 minute
         /// </summary>
-        public TimeSpan AveratePirateAttackFrequency { get; set; } = TimeSpan.FromMinutes(1);
+        public TimeSpan AveragePirateAttackFrequency { get; set; } = TimeSpan.FromMinutes(1);
     }
 
 }

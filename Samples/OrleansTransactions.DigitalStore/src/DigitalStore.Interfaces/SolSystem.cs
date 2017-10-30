@@ -1,24 +1,14 @@
 ﻿
-using System.Collections.Generic;
-
 namespace DigitalStore.Interfaces
 {
     public enum Product
     {
         Foods,
         Water,
-        Pharmaceuticals,
+        Energy,
         Hardware,
         Metals,
         Gasses,
-    }
-
-    public enum Station
-    {
-        MercuryPowerAndLight,
-        EarthFoodAndDrugs,
-        LunaTeckIndustries,
-        MarsMetalWorks,
-        EuropanIce
+        Pharmaceuticals,
     }
 }

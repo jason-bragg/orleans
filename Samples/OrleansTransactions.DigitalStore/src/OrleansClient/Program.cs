@@ -5,6 +5,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using DigitalStore.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace OrleansClient
 {
@@ -18,10 +19,7 @@ namespace OrleansClient
             var initializeClient = StartClient();
             initializeClient.Wait();
             var client = initializeClient.Result;
-
             DoClientWork(client).Wait();
-            Console.WriteLine("Press Enter to terminate...");
-            Console.ReadLine();
             return 0;
         }
 
@@ -52,6 +50,12 @@ namespace OrleansClient
                 {
                     client = new ClientBuilder()
                         .UseConfiguration(config)
+                        .AddApplicationPartsFromAppDomain()
+                        .ConfigureLogging((logging) =>
+                        {
+                            logging.SetMinimumLevel(LogLevel.Debug);
+                            logging.AddConsole();
+                        })
                         .Build();
 
                     await client.Connect();
@@ -76,10 +80,11 @@ namespace OrleansClient
         private static async Task DoClientWork(IClusterClient client)
         {
             // example of calling grains from the initialized client
-            var friend = client.GetGrain<ISpaceTrader>(0);
-            var response = await friend.ShipProduct(SolType.Foods, 10, Guid.NewGuid(), Guid.NewGuid());
-            Console.WriteLine("\n\n{0}\n\n", response);
+            var bobBot = client.GetGrain<ITraderBot>("bob");
+            await bobBot.StartTrading("Sol");
+            Console.WriteLine("Press Enter to terminate...");
+            Console.ReadLine();
+            await bobBot.StopTrading();
         }
-
     }
 }

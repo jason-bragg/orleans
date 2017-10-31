@@ -25,11 +25,9 @@ namespace OrleansClient
 
         private static Task<IClusterClient> StartClient()
         {
-            var config = ClientConfiguration.LocalhostSilo();
-
             try
             {
-                return InitializeWithRetries(config);
+                return InitializeWithRetries();
             }
             catch (Exception ex)
             {
@@ -40,7 +38,7 @@ namespace OrleansClient
             }
         }
 
-        private static async Task<IClusterClient> InitializeWithRetries(ClientConfiguration config, int initializeAttemptsBeforeFailing = 5)
+        private static async Task<IClusterClient> InitializeWithRetries(int initializeAttemptsBeforeFailing = 5)
         {
             int attempt = 0;
             IClusterClient client;
@@ -48,14 +46,11 @@ namespace OrleansClient
             {
                 try
                 {
+                    ClientConfiguration config = ClientConfiguration.LocalhostSilo();
                     client = new ClientBuilder()
                         .UseConfiguration(config)
-                        .AddApplicationPartsFromAppDomain()
-                        .ConfigureLogging((logging) =>
-                        {
-                            logging.SetMinimumLevel(LogLevel.Debug);
-                            logging.AddConsole();
-                        })
+                        .AddApplicationPartsFromReferences(typeof(ITraderBot).Assembly)
+                        .ConfigureLogging(logging => logging.AddConsole())
                         .Build();
 
                     await client.Connect();

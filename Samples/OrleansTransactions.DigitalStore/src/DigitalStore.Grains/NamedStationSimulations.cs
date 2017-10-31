@@ -10,7 +10,7 @@ namespace DigitalStore.Grains
         {
             StationSettings stationSettings = services.GetServiceByName<StationSettings>(key);
             return (stationSettings != null)
-                ? ActivatorUtilities.CreateInstance<ISpaceStationSimulation>(services, stationSettings)
+                ? ActivatorUtilities.CreateInstance<SpaceStationSimulation>(services, stationSettings)
                 : default(ISpaceStationSimulation);
         }
     }

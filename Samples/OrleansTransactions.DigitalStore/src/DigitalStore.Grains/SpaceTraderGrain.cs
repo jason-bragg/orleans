@@ -1,14 +1,13 @@
 ﻿using System;
 using System.Threading.Tasks;
 using DigitalStore.Interfaces;
-using Orleans;
 
 namespace DigitalStore.Grains
 {
     /// <summary>
     /// Player space trader grain
     /// </summary>
-    internal class SpaceTraderGrain : Grain, ISpaceTrader
+    public class SpaceTraderGrain : Orleans.Grain, ISpaceTrader
     {
         private ulong balance = 1000;
 

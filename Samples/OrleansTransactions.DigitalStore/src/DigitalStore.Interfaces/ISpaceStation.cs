@@ -36,7 +36,7 @@ namespace DigitalStore.Interfaces
         public Stock(uint quantity, ulong price)
         {
             this.Quantity = quantity;
-            this.BuyPrice = (ulong)(price * (1.0 + Markup));
+            this.BuyPrice = Math.Min(1,(ulong)(price * (1.0 + Markup)));
             this.SellPrice = (ulong)(price * (1.0 - Markup));
         }
 

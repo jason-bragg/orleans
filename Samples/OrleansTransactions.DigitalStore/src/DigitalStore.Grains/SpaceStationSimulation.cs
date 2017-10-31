@@ -2,18 +2,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using DigitalStore.Interfaces;
+using Microsoft.Extensions.Logging;
 
 namespace DigitalStore.Grains
 {
     public class SpaceStationSimulation : ISpaceStationSimulation
     {
         private readonly StationSettings production;
+        private readonly ILogger logger;
         StationState targetState;
 
-        public SpaceStationSimulation(StationSettings production)
+        public SpaceStationSimulation(StationSettings production, ILoggerFactory loggerFactory)
         {
             this.production = production;
-            this.targetState = CreateInitialState();
+            this.logger = loggerFactory.CreateLogger($"{GetType().FullName}.{production.Name}");
+            this.targetState = GetTargetStateByPopulaiton(production.StartPopulationInMillions);
         }
 
         public bool SimulateYear(StationState state)
@@ -34,6 +37,10 @@ namespace DigitalStore.Grains
                 state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value);
             }
             state.PopulationInMillions = (uint)(state.PopulationInMillions * 1.1);
+            foreach (KeyValuePair<Product, uint> kvp in state.Inventory)
+            {
+                this.logger.LogInformation($"{kvp.Value} of {kvp.Key}.");
+            }
             this.targetState = GetTargetStateByPopulaiton(state.PopulationInMillions);
             return true;
         }
@@ -45,10 +52,31 @@ namespace DigitalStore.Grains
 
         public StationState CreateInitialState()
         {
-            return GetTargetStateByPopulaiton(production.StartPopulationInMillions);
+            var state = new StationState
+            {
+                PopulationInMillions = this.production.StartPopulationInMillions
+            };
+
+            // calculate stockpiled inventory
+            foreach (KeyValuePair<Product, float> kvp in production.ConsumptionRatios)
+            {
+                state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value * production.InitialStockInYears);
+            }
+            // add stockpiled production
+            foreach (KeyValuePair<Product, float> kvp in production.ProductionRatios)
+            {
+                state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value * production.InitialStockInYears);
+            }
+
+            foreach (KeyValuePair<Product, uint> kvp in state.Inventory)
+            {
+                this.logger.LogInformation($"{kvp.Value} of {kvp.Key}.");
+            }
+
+            return state;
         }
 
-        public StationState GetTargetStateByPopulaiton(uint population)
+        private StationState GetTargetStateByPopulaiton(uint population)
         {
             var state = new StationState
             {
@@ -60,10 +88,12 @@ namespace DigitalStore.Grains
             {
                 state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value * production.InitialStockInYears);
             }
-            foreach (KeyValuePair<Product, float> kvp in production.ProductionRatios)
+
+            foreach (KeyValuePair<Product, uint> kvp in state.Inventory)
             {
-                state.Inventory[kvp.Key] += (uint)(state.PopulationInMillions * kvp.Value * production.InitialStockInYears);
+                this.logger.LogInformation($"Target for {kvp.Key} is {kvp.Value}.");
             }
+
             return state;
         }
 
@@ -71,8 +101,9 @@ namespace DigitalStore.Grains
         {
             uint targetQuantity = this.targetState.Inventory[product];
             uint currentQuantity = state.Inventory[product];
-            if (currentQuantity == 0) return 300;
-            return Math.Max((targetQuantity * 100) / currentQuantity , 300);
+            if (currentQuantity == 0) currentQuantity = 1;
+            double adjustment = targetQuantity / currentQuantity;
+            return (ulong)(1000 * adjustment);
         }
     }
     
@@ -91,7 +122,7 @@ namespace DigitalStore.Grains
         public Dictionary<Product, float> ConsumptionRatios { get; set; }
     }
 
-    public class SolSimulationSettings
+    public class SystemSimulationSettings
     {
         /// <summary>
         /// How much play time it takes for one in game year to pass.

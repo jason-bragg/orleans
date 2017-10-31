@@ -13,7 +13,7 @@ namespace DigitalStore.Grains
     /// <summary>
     /// A non-player space station grain
     /// </summary>
-    internal class SpaceStationGrain : Grain, ISpaceStation
+    public class SpaceStationGrain : Grain, ISpaceStation
     {
         private string station;
         private StationState state;
@@ -25,7 +25,7 @@ namespace DigitalStore.Grains
             this.station = this.GetPrimaryKeyString();
             this.simulation = this.ServiceProvider.GetServiceByName<ISpaceStationSimulation>(station);
             this.state = this.simulation.CreateInitialState();
-            IOptions<SolSimulationSettings> settings = this.ServiceProvider.GetRequiredService<IOptions<SolSimulationSettings>>();
+            IOptions<SystemSimulationSettings> settings = this.ServiceProvider.GetRequiredService<IOptions<SystemSimulationSettings>>();
             this.yearlyTimer = this.RegisterTimer(YearlyTick, null, settings.Value.OneYearSimulationTime, settings.Value.OneYearSimulationTime);
             return Task.CompletedTask;
         }
@@ -35,7 +35,7 @@ namespace DigitalStore.Grains
             if (state.Inventory[product] <= quantity)
                 throw new InvalidOperationException($"Station {this.station} does not have {quantity} {product} in stock.");
             Stock item = new Stock(0, this.simulation.GetPrice(this.state, product));
-            return Task.FromResult((ulong)(item.BuyPrice * quantity * 0.95));
+            return Task.FromResult((ulong)(item.BuyPrice * quantity));
         }
 
         Task<Dictionary<Product, Stock>> ISpaceStation.PeekAtInventory()
@@ -49,7 +49,7 @@ namespace DigitalStore.Grains
             if (state.Inventory[product] <= quantity)
                 throw new InvalidOperationException($"Station {this.station} does not have {quantity} {product} in stock.");
             Stock item = new Stock(0, this.simulation.GetPrice(this.state, product));
-            return Task.FromResult((ulong)(item.SellPrice * quantity * 0.95));
+            return Task.FromResult((ulong)(item.SellPrice * quantity));
         }
 
         private Task YearlyTick(object obj)

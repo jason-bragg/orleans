@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Pipes</PackageId>
+    <Title>Microsoft Orleans pipes support</Title>
+    <Description>Core pipe library of Microsoft Orleans.</Description>
+    <PackageTags>$(PackageTags) Pipes</PackageTags>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.Pipes</AssemblyName>
+    <RootNamespace>Orleans.Pipes</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
+    <ProjectReference Include="..\Orleans.Core\Orleans.Core.csproj" />
+  </ItemGroup>
+</Project>

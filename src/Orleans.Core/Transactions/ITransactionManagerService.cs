@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Orleans.Concurrency;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -6,8 +7,8 @@ namespace Orleans.Transactions
 {
     public interface ITransactionManagerService
     {
-        Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts);
-        Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions, HashSet<long> queries);
+        Task<StartTransactionsResponse> StartTransactions(Immutable<List<TimeSpan>> timeouts);
+        Task<CommitTransactionsResponse> CommitTransactions(Immutable<List<TransactionInfo>> transactions, Immutable<HashSet<long>> queries);
         Task AbortTransaction(long transactionId, OrleansTransactionAbortedException reason);
     }
 

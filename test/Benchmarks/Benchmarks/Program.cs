@@ -5,6 +5,8 @@ using System.Linq;
 using BenchmarkDotNet.Running;
 using Benchmarks.MapReduce;
 using Benchmarks.Serialization;
+using Benchmarks.Transactions;
+using Benchmarks.Ping;
 
 namespace Benchmarks
 {
@@ -28,7 +30,33 @@ namespace Benchmarks
             ["Serialization"] = () =>
             {
                 BenchmarkRunner.Run<SerializationBenchmarks>();
-            }
+            },
+            ["Ping"] = () =>
+            {
+                RunBenchmark(
+                "Running bing benchmark",
+                () =>
+                {
+                    var benchmark = new PingBenchmark();
+                    benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Transactions"] = () =>
+            {
+                RunBenchmark(
+                "Running Transactions benchmark",
+                () =>
+                {
+                    var benchmark = new TransactionBenchmark();
+                    benchmark.Setup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().Wait(),
+                benchmark => benchmark.Teardown());
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter

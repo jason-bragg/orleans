@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
@@ -14,11 +15,11 @@ namespace Orleans.Transactions
             this.tm = tm;
         }
 
-        public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
+        public Task<StartTransactionsResponse> StartTransactions(Immutable<List<TimeSpan>> timeouts)
         {
             var result = new StartTransactionsResponse { TransactionId = new List<long>() };
 
-            foreach (var timeout in timeouts)
+            foreach (var timeout in timeouts.Value)
             {
                 result.TransactionId.Add(tm.StartTransaction(timeout));
             }
@@ -29,13 +30,13 @@ namespace Orleans.Transactions
             return Task.FromResult(result);
         }
 
-        public Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions, HashSet<long> queries)
+        public Task<CommitTransactionsResponse> CommitTransactions(Immutable<List<TransactionInfo>> transactions, Immutable<HashSet<long>> queries)
         {
             List<Task> tasks = new List<Task>();
 
             var result = new CommitTransactionsResponse { CommitResult = new Dictionary<long, CommitResult>() };
 
-            foreach (var ti in transactions)
+            foreach (var ti in transactions.Value)
             {
                 try
                 {
@@ -52,7 +53,7 @@ namespace Orleans.Transactions
                 }
             }
 
-            foreach (var q in queries)
+            foreach (var q in queries.Value)
             {
                 OrleansTransactionAbortedException abortingException;
                 var status = tm.GetTransactionStatus(q, out abortingException);

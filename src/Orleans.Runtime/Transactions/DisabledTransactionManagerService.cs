@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Transactions;
+using Orleans.Concurrency;
 
 namespace Orleans.Transactions
 {
@@ -12,12 +13,12 @@ namespace Orleans.Transactions
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task<CommitTransactionsResponse> CommitTransactions(List<TransactionInfo> transactions, HashSet<long> queries)
+        public Task<CommitTransactionsResponse> CommitTransactions(Immutable<List<TransactionInfo>> transactions, Immutable<HashSet<long>> queries)
         {
             throw new OrleansTransactionsDisabledException();
         }
 
-        public Task<StartTransactionsResponse> StartTransactions(List<TimeSpan> timeouts)
+        public Task<StartTransactionsResponse> StartTransactions(Immutable<List<TimeSpan>> timeouts)
         {
             throw new OrleansTransactionsDisabledException();
         }

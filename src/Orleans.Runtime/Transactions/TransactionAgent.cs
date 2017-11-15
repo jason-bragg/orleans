@@ -24,7 +24,7 @@ namespace Orleans.Transactions
 
         private readonly Logger logger;
         private readonly ILoggerFactory loggerFactory;
-        private IGrainTimer requestProcessor;
+        private IDisposable requestProcessor;
         private Task startTransactionsTask = Task.CompletedTask;
         private Task commitTransactionsTask = Task.CompletedTask;
 
@@ -183,18 +183,11 @@ namespace Orleans.Transactions
                 }
 
 
-                if (startingTransactions.Count > 0 && startTransactionsTask.IsCompleted)
-                {
-                    logger.Verbose(ErrorCode.Transactions_SendingTMRequest, "Calling TM to start {0} transactions", startingTransactions.Count);
-
-                    startTransactionsTask = this.StartTransactions(startingTransactions, startCompletions);
-                }
-
                 if ((committingTransactions.Count > 0 || outstandingCommits.Count > 0) && commitTransactionsTask.IsCompleted)
                 {
                     logger.Verbose(ErrorCode.Transactions_SendingTMRequest, "Calling TM to commit {0} transactions", committingTransactions.Count);
 
-                    commitTransactionsTask = this.tmService.CommitTransactions(committingTransactions, outstandingCommits).ContinueWith(
+                    commitTransactionsTask = this.tmService.CommitTransactions(committingTransactions.AsImmutable(), outstandingCommits.AsImmutable()).ContinueWith(
                         async commitRequest =>
                         {
                             try
@@ -203,29 +196,29 @@ namespace Orleans.Transactions
                                 var commitResults = commitResponse.CommitResult;
 
                                 // reply to clients with the outcomes we received from the TM.
-                                foreach (var completedId in commitResults.Keys)
+                                foreach (var kvp in commitResults)
                                 {
-                                    outstandingCommits.Remove(completedId);
+                                    outstandingCommits.Remove(kvp.Key);
 
                                     TaskCompletionSource<bool> completion;
-                                    if (commitCompletions.TryRemove(completedId, out completion))
+                                    if (commitCompletions.TryRemove(kvp.Key, out completion))
                                     {
-                                        if (commitResults[completedId].Success)
+                                        if (kvp.Value.Success)
                                         {
                                             TransactionsStatisticsGroup.OnTransactionCommitted();
                                             completion.SetResult(true);
                                         }
                                         else
                                         {
-                                            if (commitResults[completedId].AbortingException != null)
+                                            if (kvp.Value.AbortingException != null)
                                             {
                                                 TransactionsStatisticsGroup.OnTransactionAborted();
-                                                completion.SetException(commitResults[completedId].AbortingException);
+                                                completion.SetException(kvp.Value.AbortingException);
                                             }
                                             else
                                             {
                                                 TransactionsStatisticsGroup.OnTransactionInDoubt();
-                                                completion.SetException(new OrleansTransactionInDoubtException(completedId));
+                                                completion.SetException(new OrleansTransactionInDoubtException(kvp.Key));
                                             }
                                         }
                                     }
@@ -270,6 +263,13 @@ namespace Orleans.Transactions
                         }
                     }
                 }
+
+                if (startingTransactions.Count > 0 && startTransactionsTask.IsCompleted)
+                {
+                    logger.Verbose(ErrorCode.Transactions_SendingTMRequest, "Calling TM to start {0} transactions", startingTransactions.Count);
+
+                    startTransactionsTask = this.StartTransactions(startingTransactions, startCompletions);
+                }
             }
 
         }
@@ -278,7 +278,7 @@ namespace Orleans.Transactions
         {
             try
             {
-                StartTransactionsResponse startResponse = await this.tmService.StartTransactions(startingTransactions);
+                StartTransactionsResponse startResponse = await this.tmService.StartTransactions(startingTransactions.AsImmutable());
                 List<long> startedIds = startResponse.TransactionId;
 
                 // reply to clients with results
@@ -335,8 +335,7 @@ namespace Orleans.Transactions
 
         public Task Start()
         {
-            requestProcessor = GrainTimer.FromTaskCallback(this.RuntimeClient.Scheduler, this.loggerFactory.CreateLogger<GrainTimer>(), ProcessRequests, null, TimeSpan.FromMilliseconds(0), TimeSpan.FromMilliseconds(10), "TransactionAgent");
-            requestProcessor.Start();
+            requestProcessor = this.RegisterTimer(ProcessRequests, null, TimeSpan.FromMilliseconds(0), TimeSpan.FromMilliseconds(10), "TransactionAgent");
             return Task.CompletedTask;
         }
 

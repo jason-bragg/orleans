@@ -46,47 +46,36 @@ namespace Tester.AzureUtils.Persistence
 
                 private void AddStorage(HostBuilderContext context, IServiceCollection serviceCollection, Guid serviceId)
                 {
-                    // named lifecycle participant infrastructure, should already be in place, added here in test because it's not.. :/
-                    serviceCollection.AddSingleton<KeyedSiloLifecycleParticipantCollection<string, IGrainStorage>>();
-                    serviceCollection.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, KeyedSiloLifecycleParticipantCollection<string, IGrainStorage>>();
-
-                    // standard application layer options configuration
-                    serviceCollection.AddOptions<AzureTableStorageOptions>("AzureStore")
-                        .Configure(option =>
+                    serviceCollection.AddAzureTableStorage("AzureStore", option =>
                         {
-                            option.Name = "AzureStore";
+                            option.Name = "AzureStore"; // should not be needed if we change how the factory works
                             option.ServiceId = serviceId.ToString();
                             option.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
                             option.DeleteStateOnClear = true;
                         });
-                    serviceCollection.AddOptions<AzureTableStorageOptions>("AzureStore1")
+
+                    // can also take options builder that allows chaining Configure and Bind calls
+                    serviceCollection.AddAzureTableStorage("AzureStore1", optionsBuilder => 
+                        optionsBuilder
+                        .Bind(context.Configuration.GetSection("AzureStore1"))
                         .Configure(option =>
                         {
                             option.Name = "AzureStore1";
                             option.ServiceId = serviceId.ToString();
                             option.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        });
-                    serviceCollection.AddOptions<AzureTableStorageOptions>("AzureStore2")
-                        .Configure(option =>
+                        }));
+                    serviceCollection.AddAzureTableStorage("AzureStore2", option =>
                         {
                             option.Name = "AzureStore2";
                             option.ServiceId = serviceId.ToString();
                             option.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
                         });
-                    serviceCollection.AddOptions<AzureTableStorageOptions>("AzureStore3")
-                        .Configure(option =>
+                    serviceCollection.AddAzureTableStorage("AzureStore3", option =>
                         {
                             option.Name = "AzureStore3";
                             option.ServiceId = serviceId.ToString();
                             option.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
                         });
-
-
-                    // Wire up named services to silo lifecycle - this all applications should need to add, assuming configuration arealready in place.
-                    serviceCollection.AddNamedSiloLifecycleParticipant("AzureStore", AzureTableGrainStorageFactory.Create);
-                    serviceCollection.AddNamedSiloLifecycleParticipant("AzureStore1", AzureTableGrainStorageFactory.Create);
-                    serviceCollection.AddNamedSiloLifecycleParticipant("AzureStore2", AzureTableGrainStorageFactory.Create);
-                    serviceCollection.AddNamedSiloLifecycleParticipant("AzureStore3", AzureTableGrainStorageFactory.Create);
                 }
             }
         }

@@ -42,6 +42,19 @@ namespace Orleans.Storage
         private const string BINARY_DATA_PROPERTY_NAME = "Data";
         private const string STRING_DATA_PROPERTY_NAME = "StringData";
 
+        // TODO: use a constructor like this instead. 
+        // Benefits: 
+        //    - no special factory for each concrete provider, mostly can rely on the generic ActivatorUtilities.CreateInstance<T>(sp, name)
+        //    - provider is aware of its name without resorting to having named options that also need the name specified in the options themselves
+        //    - it's how named options work anyway
+        //public AzureTableGrainStorage(string name, IOptionsSnapshot<AzureTableStorageOptions> options, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        //{
+        //    this.options = options.Get(name);
+        //    this.serializationManager = serializationManager;
+        //    this.loggerFactory = loggerFactory;
+        //    this.logger = this.loggerFactory.CreateLogger($"{this.GetType().FullName}.{this.options.Name}");
+        //}
+
         /// <summary> Default constructor </summary>
         public AzureTableGrainStorage(AzureTableStorageOptions options, SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
@@ -568,6 +581,8 @@ namespace Orleans.Storage
     /// </example>
     public class AzureTableStorage : IStorageProvider, IRestExceptionDecoder
     {
+        // julido: not sure I understand the purpose of having this wrapper. Why not just have a configurator (similar to LegacyAzureMembershipConfigurator)
+        // that just uses the services.UseAzureStorage extension method, but passes an options builder that reads from the legacy config?
         private SiloLifecycle fakeSiloLifecycle;
         private AzureTableGrainStorage storage;
 

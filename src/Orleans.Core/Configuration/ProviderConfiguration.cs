@@ -198,7 +198,6 @@ namespace Orleans.Runtime.Configuration
     [Serializable]
     public class ProviderCategoryConfiguration
     {
-        public const string BOOTSTRAP_PROVIDER_CATEGORY_NAME = "Bootstrap";
         public const string STORAGE_PROVIDER_CATEGORY_NAME = "Storage";
         public const string STREAM_PROVIDER_CATEGORY_NAME = "Stream";
         public const string LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME = "LogConsistency";

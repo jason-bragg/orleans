@@ -93,8 +93,6 @@ namespace Orleans.Hosting
             services.TryAddFromExisting<IKeyedServiceCollection<string, ILogConsistencyProvider>, LogConsistencyProviderManager>(); // as named services
             services.TryAddSingleton<ILogConsistencyProvider>(sp => sp.GetRequiredService<LogConsistencyProviderManager>().GetDefaultProvider()); // default
 
-            services.TryAddSingleton<BootstrapProviderManager>();
-            services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
             services.TryAddSingleton<LoadedProviderTypeLoaders>();
             services.AddLogging();
             //temporary change until runtime moved away from Logger
@@ -131,7 +129,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<InsideRuntimeClient>();
             services.TryAddFromExisting<IRuntimeClient, InsideRuntimeClient>();
             services.TryAddFromExisting<ISiloRuntimeClient, InsideRuntimeClient>();
-            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, InsideRuntimeClient>();
             services.TryAddSingleton<MultiClusterGossipChannelFactory>();
             services.TryAddSingleton<MultiClusterOracle>();
             services.TryAddSingleton<MultiClusterRegistrationStrategyManager>();

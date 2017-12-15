@@ -63,18 +63,6 @@ namespace Orleans.Runtime.TestHooks
             }
         }
 
-        public Task<bool> HasBoostraperProvider(string providerName)
-        {
-            foreach (var provider in this.host.Services.GetRequiredService<BootstrapProviderManager>().GetProviders())
-            {
-                if (String.Equals(providerName, provider.Name))
-                {
-                    return Task.FromResult(true);
-                }
-            }
-            return Task.FromResult(false);
-        }
-
         public Task<ICollection<string>> GetStorageProviderNames() => Task.FromResult<ICollection<string>>(this.host.Services.GetRequiredService<StorageProviderManager>().GetProviderNames().ToList());
 
         public Task<ICollection<string>> GetStreamProviderNames() => Task.FromResult<ICollection<string>>(this.host.Services.GetRequiredService<IStreamProviderManager>().GetStreamProviders().Select(p => ((IProvider)p).Name).ToList());
@@ -91,9 +79,6 @@ namespace Orleans.Runtime.TestHooks
 
             var statisticsProviderManager = this.host.Services.GetRequiredService<StatisticsProviderManager>();
             allProviders.AddRange(statisticsProviderManager.GetProviders().Select(p => p.Name));
-
-            var booststrampProviderManager = this.host.Services.GetRequiredService<BootstrapProviderManager>();
-            allProviders.AddRange(booststrampProviderManager.GetProviders().Select(p => p.Name));
 
             return Task.FromResult<ICollection<string>>(allProviders);
         }

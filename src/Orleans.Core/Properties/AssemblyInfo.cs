@@ -37,4 +37,8 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("UnitTestGrains")]
 [assembly: InternalsVisibleTo("UnitTests")]
 
+// Legacy provider support
+[assembly: InternalsVisibleTo("Orleans.Core.Legacy")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Legacy")]
+
 [assembly: KnownAssembly(typeof(IGrain))]

@@ -76,7 +76,6 @@ namespace Orleans.Runtime
         private StorageProviderManager storageProviderManager;
         private LogConsistencyProviderManager logConsistencyProviderManager;
         private StatisticsProviderManager statisticsProviderManager;
-        private BootstrapProviderManager bootstrapProviderManager;
         private IReminderService reminderService;
         private ProviderManagerSystemTarget providerManagerSystemTarget;
         private readonly IMembershipOracle membershipOracle;
@@ -107,7 +106,6 @@ namespace Orleans.Runtime
         internal IStorageProviderManager StorageProviderManager { get { return storageProviderManager; } }
         internal IProviderManager StatisticsProviderManager { get { return statisticsProviderManager; } }
         internal IStreamProviderManager StreamProviderManager { get; private set; }
-        internal IList<IBootstrapProvider> BootstrapProviders { get; private set; }
         internal ISiloPerformanceMetrics Metrics { get { return siloStatistics.MetricsTable; } }
         internal ICatalog Catalog => catalog;
 
@@ -530,15 +528,6 @@ namespace Orleans.Runtime
                     this.logger.Debug("Reminder service started successfully.");
                 }
 
-                this.bootstrapProviderManager = this.Services.GetRequiredService<BootstrapProviderManager>();
-                await this.scheduler.QueueTask(
-                    () => this.bootstrapProviderManager.LoadAppBootstrapProviders(siloProviderRuntime, this.GlobalConfig.ProviderConfigurations),
-                    this.providerManagerSystemTarget.SchedulingContext)
-                        .WithTimeout(this.initTimeout);
-                this.BootstrapProviders = this.bootstrapProviderManager.GetProviders(); // Data hook for testing & diagnotics
-
-                logger.Debug("App bootstrap calls done successfully."); 
-
                 // Start stream providers after silo is active (so the pulling agents don't start sending messages before silo is active).
                 // also after bootstrap provider started so bootstrap provider can initialize everything stream before events from this silo arrive.
                 await this.scheduler.QueueTask(siloStreamProviderManager.StartStreamProviders, this.providerManagerSystemTarget.SchedulingContext)
@@ -770,12 +759,6 @@ namespace Orleans.Runtime
                         .WaitWithThrow(initTimeout);
             });
             // 10:
-            SafeExecute(() =>
-            {
-                scheduler.QueueTask(() => bootstrapProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)
-                        .WaitWithThrow(initTimeout);
-            });
-            // 11:
             SafeExecute(() =>
             {
                 scheduler.QueueTask(() => storageProviderManager.CloseProviders(), providerManagerSystemTarget.SchedulingContext)

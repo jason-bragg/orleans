@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Runtime
+namespace Orleans.Providers.Legacy
 {
     internal class BootstrapProviderManager : IProviderManager
     {
@@ -13,7 +13,7 @@ namespace Orleans.Runtime
 
         public BootstrapProviderManager(LoadedProviderTypeLoaders loadedProviderTypeLoaders, ILoggerFactory loggerFactory)
         {
-            configCategoryName = ProviderCategoryConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
+            configCategoryName = BootstrapProviderConfiguration.BOOTSTRAP_PROVIDER_CATEGORY_NAME;
             pluginManager = new PluginManager<IBootstrapProvider>(loggerFactory, loadedProviderTypeLoaders);
         }
 

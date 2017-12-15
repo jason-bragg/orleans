@@ -79,13 +79,6 @@ namespace Orleans.TestingHost
             this.host = host;
         }
 
-        internal IBootstrapProvider GetBootstrapProvider(string name)
-        {
-            var bootstrapProviderManager = this.host.Services.GetRequiredService<BootstrapProviderManager>();
-            IBootstrapProvider provider = (IBootstrapProvider)bootstrapProviderManager.GetProvider(name);
-            return CheckReturnBoundaryReference("bootstrap provider", provider);
-        }
-
         /// <summary>Find the named storage provider loaded in this silo. </summary>
         internal IStorageProvider GetStorageProvider(string name) => CheckReturnBoundaryReference("storage provider", (IStorageProvider)this.host.Services.GetRequiredService<StorageProviderManager>().GetProvider(name));
 

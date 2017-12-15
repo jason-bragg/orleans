@@ -11,7 +11,6 @@ namespace Orleans.Providers
     /// <summary>
     /// Base interface for all type-specific provider interfaces in Orleans
     /// </summary>
-    /// <seealso cref="Orleans.Providers.IBootstrapProvider"/>
     /// <seealso cref="Orleans.Storage.IStorageProvider"/>
     /// <seealso cref="Orleans.LogConsistency.ILogConsistencyProvider"/>
 

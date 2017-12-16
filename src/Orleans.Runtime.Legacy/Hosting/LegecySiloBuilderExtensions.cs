@@ -6,7 +6,7 @@ using Orleans.Providers.Legacy;
 
 namespace Orleans.Hosting
 {
-    public static class LegecyProviderSiloBuilderExtensions
+    public static class LegecySiloBuilderExtensions
     {
         /// <summary>
         /// Configures the silo to use legacy Bootstrap providers
@@ -21,10 +21,13 @@ namespace Orleans.Hosting
         /// </summary>
         public static IServiceCollection UseBootstrapProviders(this IServiceCollection services)
         {
-            services.AddSingleton<BootstrapProviderLifecycle>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, BootstrapProviderLifecycle>();
-            services.AddSingleton<BootstrapProviderManager>();
-            services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
+            if (!services.IsInCollection<BootstrapProviderLifecycle>())
+            {
+                services.AddSingleton<BootstrapProviderLifecycle>();
+                services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, BootstrapProviderLifecycle>();
+                services.AddSingleton<BootstrapProviderManager>();
+                services.AddFromExisting<IProviderManager, BootstrapProviderManager>();
+            }
             return services;
         }
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Transactions.Abstractions;
 using Orleans.Core;
 using Orleans.Runtime;
@@ -15,12 +16,14 @@ namespace Orleans.Transactions
     {
         private readonly IStorageProvider storageProvider;
         private readonly IGrainActivationContext context;
+        private readonly ILoggerFactory loggerFactory;
         private readonly ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>> stateStorages;
 
-        public TransactionalStateStorageProviderWrapper(IStorageProvider storageProvider, IGrainActivationContext context)
+        public TransactionalStateStorageProviderWrapper(IStorageProvider storageProvider, IGrainActivationContext context, ILoggerFactory loggerFactory)
         {
             this.storageProvider = storageProvider;
             this.context = context;
+            this.loggerFactory = loggerFactory;
             this.stateStorages = new ConcurrentDictionary<string, IStorage<TransactionalStateRecord<TState>>>();
         }
 
@@ -64,7 +67,7 @@ namespace Orleans.Transactions
 
         private IStorage<TransactionalStateRecord<TState>> GetStateStorage(string stateName)
         {
-            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, storageProvider));
+            return this.stateStorages.GetOrAdd(stateName, name => new StateStorageBridge<TransactionalStateRecord<TState>>(name, this.context.GrainInstance.GrainReference, storageProvider, this.loggerFactory));
         }
     }
 

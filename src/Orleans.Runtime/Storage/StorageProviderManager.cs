@@ -9,7 +9,7 @@ using Orleans.Storage;
 
 namespace Orleans.Runtime.Storage
 {
-    internal class StorageProviderManager : IStorageProviderManager, IStorageProviderRuntime, IKeyedServiceCollection<string,IStorageProvider>
+    internal class StorageProviderManager : IStorageProviderManager, IProviderRuntime, IKeyedServiceCollection<string,IGrainStorage>
     {
         private readonly IProviderRuntime providerRuntime;
         private ProviderLoader<IStorageProvider> storageProviderLoader;
@@ -109,7 +109,7 @@ namespace Orleans.Runtime.Storage
             storageProviderLoader.AddProvider(name, provider, config);
         }
 
-        public IStorageProvider GetService(IServiceProvider services, string key)
+        public IGrainStorage GetService(IServiceProvider services, string key)
         {
             IStorageProvider provider;
             return TryGetProvider(key, out provider) ? provider : default(IStorageProvider);

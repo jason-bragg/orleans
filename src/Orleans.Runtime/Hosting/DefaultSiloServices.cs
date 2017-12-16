@@ -84,8 +84,8 @@ namespace Orleans.Hosting
             // storage providers
             services.TryAddSingleton<StorageProviderManager>();
             services.AddFromExisting<IProviderManager, StorageProviderManager>();
-            services.TryAddFromExisting<IKeyedServiceCollection<string, IStorageProvider>, StorageProviderManager>(); // as named services
-            services.TryAddSingleton<IStorageProvider>(sp => sp.GetRequiredService<StorageProviderManager>().GetDefaultProvider()); // default
+//            services.TryAddFromExisting<IKeyedServiceCollection<string, IGrainStorage>, StorageProviderManager>(); // as named services
+//            services.TryAddSingleton<IGrainStorage>(sp => sp.GetRequiredService<StorageProviderManager>().GetDefaultProvider()); // default
 
             // log concistency providers
             services.TryAddSingleton<LogConsistencyProviderManager>();

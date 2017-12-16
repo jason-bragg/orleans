@@ -25,7 +25,7 @@ namespace Orleans.Runtime.Configuration
             this ClusterConfiguration config,
             string providerName = "AzureTableStore",
             string connectionString = null,
-            string tableName = AzureTableStorage.TableNameDefaultValue,
+            string tableName = AzureTableStorageOptions.TableNameDefaultValue,
             bool deleteOnClear = false,
             bool useJsonFormat = false,
             bool useFullAssemblyNames = false,
@@ -36,10 +36,10 @@ namespace Orleans.Runtime.Configuration
 
             var properties = new Dictionary<string, string>
             {
-                { AzureTableStorage.DataConnectionStringPropertyName, connectionString },
-                { AzureTableStorage.TableNamePropertyName, tableName },
-                { AzureTableStorage.DeleteOnClearPropertyName, deleteOnClear.ToString() },
-                { AzureTableStorage.UseJsonFormatPropertyName, useJsonFormat.ToString() },
+                { AzureTableStorageOptionsBuilder.DataConnectionStringPropertyName, connectionString },
+                { AzureTableStorageOptionsBuilder.TableNamePropertyName, tableName },
+                { AzureTableStorageOptionsBuilder.DeleteOnClearPropertyName, deleteOnClear.ToString() },
+                { AzureTableStorageOptionsBuilder.UseJsonFormatPropertyName, useJsonFormat.ToString() },
             };
 
             if (useJsonFormat)

@@ -2,6 +2,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Storage;
 
@@ -12,8 +13,9 @@ namespace Orleans.Core
     {
         private readonly string name;
         private readonly GrainReference grainRef;
-        private readonly IStorageProvider store;
+        private readonly IGrainStorage store;
         private readonly GrainState<TState> grainState;
+        private readonly ILogger logger;
 
         public TState State
         {
@@ -26,12 +28,14 @@ namespace Orleans.Core
             get { return grainState.ETag; }
         }
 
-        public StateStorageBridge(string name, GrainReference grainRef, IStorageProvider store)
+        public StateStorageBridge(string name, GrainReference grainRef, IGrainStorage store, ILoggerFactory loggerFactory)
         {
             if (name == null) throw new ArgumentNullException(nameof(name));
             if (grainRef == null) throw new ArgumentNullException(nameof(grainRef));
             if (store == null) throw new ArgumentNullException(nameof(store));
+            if (loggerFactory == null) throw new ArgumentNullException(nameof(loggerFactory));
 
+            this.logger = loggerFactory.CreateLogger(store.GetType().FullName);
             this.name = name;
             this.grainRef = grainRef;
             this.store = store;
@@ -50,14 +54,14 @@ namespace Orleans.Core
             {
                 await store.ReadStateAsync(name, grainRef, grainState);
 
-                StorageStatisticsGroup.OnStorageRead(store, name, grainRef, sw.Elapsed);
+                StorageStatisticsGroup.OnStorageRead(name, grainRef, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageReadError(store, name, grainRef);
+                StorageStatisticsGroup.OnStorageReadError(name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
-                store.Log.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
+                this.logger.Error((int)ErrorCode.StorageProvider_ReadFailed, errMsg, exc);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);
@@ -81,13 +85,13 @@ namespace Orleans.Core
                 Stopwatch sw = Stopwatch.StartNew();
                 await store.WriteStateAsync(name, grainRef, grainState);
                 sw.Stop();
-                StorageStatisticsGroup.OnStorageWrite(store, name, grainRef, sw.Elapsed);
+                StorageStatisticsGroup.OnStorageWrite(name, grainRef, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageWriteError(store, name, grainRef);
+                StorageStatisticsGroup.OnStorageWriteError(name, grainRef);
                 string errMsgToLog = MakeErrorMsg(what, exc);
-                store.Log.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, exc);
+                this.logger.Error((int)ErrorCode.StorageProvider_WriteFailed, errMsgToLog, exc);
                 // If error is not specialization of OrleansException, wrap it
                 if (!(exc is OrleansException))
                 {
@@ -114,14 +118,14 @@ namespace Orleans.Core
                 grainState.State = new TState();
 
                 // Update counters
-                StorageStatisticsGroup.OnStorageDelete(store, name, grainRef, sw.Elapsed);
+                StorageStatisticsGroup.OnStorageDelete(name, grainRef, sw.Elapsed);
             }
             catch (Exception exc)
             {
-                StorageStatisticsGroup.OnStorageDeleteError(store, name, grainRef);
+                StorageStatisticsGroup.OnStorageDeleteError(name, grainRef);
 
                 string errMsg = MakeErrorMsg(what, exc);
-                store.Log.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
+                this.logger.Error((int)ErrorCode.StorageProvider_DeleteFailed, errMsg, exc);
                 if (!(exc is OrleansException))
                 {
                     throw new OrleansException(errMsg, exc);

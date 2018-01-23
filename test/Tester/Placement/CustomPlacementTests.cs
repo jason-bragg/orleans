@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -50,7 +50,8 @@ namespace Tester.CustomPlacementTests
 
             private static void ConfigureServices(IServiceCollection services)
             {
-                services.AddSingleton<IPlacementDirector<TestCustomPlacementStrategy>, TestPlacementStrategyFixedSiloDirector>();
+                services.AddSingletonNamedService<PlacementStrategy, TestCustomPlacementStrategy>(nameof(TestCustomPlacementStrategy));
+                services.AddSingletonKeyedService<Type, IPlacementDirector, TestPlacementStrategyFixedSiloDirector>(typeof(TestCustomPlacementStrategy));
             }
         }
 

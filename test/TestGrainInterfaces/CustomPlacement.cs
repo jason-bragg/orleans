@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
@@ -36,16 +36,6 @@ namespace UnitTests.GrainInterfaces
         internal TestCustomPlacementStrategy(CustomPlacementScenario scenario)
         {
             Scenario = scenario;
-        }
-
-        public override bool Equals(object obj)
-        {
-            return obj is TestCustomPlacementStrategy && Scenario == ((TestCustomPlacementStrategy)obj).Scenario;
-        }
-
-        public override int GetHashCode()
-        {
-            return GetType().GetHashCode() ^ Scenario.GetHashCode();
         }
     }
 

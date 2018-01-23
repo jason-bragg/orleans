@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
@@ -6,7 +6,7 @@ using Orleans.Runtime.Placement;
 
 namespace UnitTests.GrainInterfaces
 {
-    public class TestPlacementStrategyFixedSiloDirector : IPlacementDirector<TestCustomPlacementStrategy>
+    public class TestPlacementStrategyFixedSiloDirector : IPlacementDirector
     {
 
         public Task<SiloAddress> OnAddActivation(PlacementStrategy strategy, PlacementTarget target, IPlacementContext context)
@@ -25,7 +25,6 @@ namespace UnitTests.GrainInterfaces
                 default:
                     throw new InvalidOperationException(); // should never get here, only to make compiler happy
             }
-
         }
     }
 }

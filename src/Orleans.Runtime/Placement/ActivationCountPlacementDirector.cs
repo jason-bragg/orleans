@@ -9,7 +9,7 @@ using Orleans.Runtime.Configuration;
 
 namespace Orleans.Runtime.Placement
 {
-    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector<ActivationCountBasedPlacement>
+    internal class ActivationCountPlacementDirector : RandomPlacementDirector, ISiloStatisticsChangeListener, IPlacementDirector
     {
         private class CachedLocalStat
         {

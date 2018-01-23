@@ -128,6 +128,11 @@ namespace Orleans.Hosting
             });
             LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage, SiloDefaultProviderStartStage);
 
+            services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
+            {
+                options.DefaultPlacementStrategy = config.DefaultPlacementStrategy;
+            });
+
             return services;
         }
     }

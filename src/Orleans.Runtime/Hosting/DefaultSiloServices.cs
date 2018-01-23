@@ -33,6 +33,7 @@ using Orleans.ApplicationParts;
 using Orleans.Runtime.Utilities;
 using System;
 using Orleans.Metadata;
+using Microsoft.Extensions.Options;
 
 namespace Orleans.Hosting
 {
@@ -133,15 +134,24 @@ namespace Orleans.Hosting
 
             // Placement
             services.TryAddSingleton<PlacementDirectorsManager>();
-            services.TryAddSingleton<IPlacementDirector<RandomPlacement>, RandomPlacementDirector>();
-            services.TryAddSingleton<IActivationSelector<RandomPlacement>, RandomPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<PreferLocalPlacement>, PreferLocalPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-            services.TryAddSingleton<IActivationSelector<StatelessWorkerPlacement>, StatelessWorkerDirector>();
-            services.TryAddSingleton<IPlacementDirector<ActivationCountBasedPlacement>, ActivationCountPlacementDirector>();
-            services.TryAddSingleton<IPlacementDirector<HashBasedPlacement>, HashBasedPlacementDirector>();
-            services.TryAddSingleton<DefaultPlacementStrategy>();
             services.TryAddSingleton<ClientObserversPlacementDirector>();
+            // Placement strategies
+            services.AddSingletonNamedService<PlacementStrategy, RandomPlacement>(nameof(RandomPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, PreferLocalPlacement>(nameof(PreferLocalPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, StatelessWorkerPlacement>(nameof(StatelessWorkerPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, ActivationCountBasedPlacement>(nameof(ActivationCountBasedPlacement));
+            services.AddSingletonNamedService<PlacementStrategy, HashBasedPlacement>(nameof(HashBasedPlacement));
+            // Default placement stragety
+            services.TryAddSingleton<PlacementStrategy>(PlacementStrategyFactory.Create);
+            // Placement directors
+            services.AddSingletonKeyedService<Type, IPlacementDirector, RandomPlacementDirector>(typeof(RandomPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, PreferLocalPlacementDirector>(typeof(PreferLocalPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, ActivationCountPlacementDirector>(typeof(ActivationCountBasedPlacement));
+            services.AddSingletonKeyedService<Type, IPlacementDirector, HashBasedPlacementDirector>(typeof(HashBasedPlacement));
+            // Activation selectors
+            services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
+            services.AddSingletonKeyedService<Type, IActivationSelector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
 
             // Versions
             services.TryAddSingleton<VersionSelectorManager>();

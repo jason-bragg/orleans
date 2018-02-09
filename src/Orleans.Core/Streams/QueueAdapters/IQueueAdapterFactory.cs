@@ -9,7 +9,7 @@ namespace Orleans.Streams
     /// </summary>
     public interface IQueueAdapterFactory
     {
-        void Init(IProviderConfiguration config, string providerName, IServiceProvider serviceProvider);
+        void Init(string providerName);
 
         /// <summary>
         /// Create queue adapter.

@@ -39,9 +39,6 @@ namespace UnitTests.HaloTests.Streaming
                     legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
                         fireAndForgetDelivery: false,
                         optimizeForImmutableData: false);
-
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
                 });
                 builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             }
@@ -62,7 +59,19 @@ namespace UnitTests.HaloTests.Streaming
                             options.ServiceId = silo.Value.ServiceId.ToString();
                             options.DeleteStateOnClear = true;
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                        }))
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            {
+                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.DeploymentId = silo.Value.ServiceId.ToString();
+                            }))
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
+                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            {
+                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                options.DeploymentId = silo.Value.ServiceId.ToString();
+                            }));
                 }
             }
 

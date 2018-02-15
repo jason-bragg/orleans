@@ -17,18 +17,11 @@ namespace Tester.StreamingTests
     public class PluggableQueueBalancerTestBase : OrleansTestingBase
     {
         private static Type QueueBalancerType = typeof(LeaseBasedQueueBalancerForTest);
-        private static PersistentStreamProviderConfig CustomPersistentProviderConfig = CreateConfigWithCustomBalancerType();
 
-        public static void ConfigureCustomQueueBalancer(Dictionary<string, string> streamProviderSettings, ClusterConfiguration config)
+        public static PersistentStreamOptions ConfigWithCustomBalancerType(PersistentStreamOptions options)
         {
-            CustomPersistentProviderConfig.WriteProperties(streamProviderSettings);
-        }
-
-        private static PersistentStreamProviderConfig CreateConfigWithCustomBalancerType()
-        {
-            var config = new PersistentStreamProviderConfig();
-            config.BalancerType = QueueBalancerType;
-            return config;
+            options.BalancerType = QueueBalancerType;
+            return options;
         }
 
         public virtual async Task ShouldUseInjectedQueueBalancerAndBalanceCorrectly(BaseTestClusterFixture fixture, string streamProviderName, int siloCount, int totalQueueCount)

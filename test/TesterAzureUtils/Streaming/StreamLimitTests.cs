@@ -16,6 +16,7 @@ using Tester;
 using Orleans.Hosting;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Providers.Streams.AzureQueue;
 
 namespace UnitTests.StreamingTests
 {
@@ -50,9 +51,6 @@ namespace UnitTests.StreamingTests
                 legacy.ClusterConfiguration.AddSimpleMessageStreamProvider("SMSProviderDoNotOptimizeForImmutableData",
                     fireAndForgetDelivery: false,
                     optimizeForImmutableData: false);
-
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider(AzureQueueStreamProviderName);
-                legacy.ClusterConfiguration.AddAzureQueueStreamProvider("AzureQueueProvider2");
             });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         }
@@ -73,7 +71,19 @@ namespace UnitTests.StreamingTests
                         options.ServiceId = silo.Value.ServiceId.ToString();
                         options.DeleteStateOnClear = true;
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }));
+                    }))
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
+                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.DeploymentId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }))
+                    .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
+                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        {
+                            options.DeploymentId = silo.Value.ServiceId.ToString();
+                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        }));
             }
         }
 

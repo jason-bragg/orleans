@@ -1,5 +1,9 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Providers.Streams.AzureQueue;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using Tester.StreamingTests;
@@ -20,12 +24,31 @@ namespace Tester.AzureUtils.Streaming
                 {
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("Default");
                     legacy.ClusterConfiguration.AddMemoryStorageProvider("PubSubStore");
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName);
-                    legacy.ClusterConfiguration.AddAzureQueueStreamProviderV2(StreamProviderName2);
                 });
+                builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             }
 
-            public override void Dispose()
+            private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
+            {
+                public void Configure(ISiloHostBuilder hostBuilder)
+                {
+                    hostBuilder
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName,
+                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            {
+                                options.DeploymentId = silo.Value.ServiceId.ToString();
+                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            }))
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2,
+                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            {
+                                options.DeploymentId = silo.Value.ServiceId.ToString();
+                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            }));
+                }
+            }
+
+        public override void Dispose()
             {
                 base.Dispose();
                 var clusterId = this.HostedCluster?.Options.ClusterId;

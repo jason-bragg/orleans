@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.EventHubs;
 using Microsoft.Extensions.Logging;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -32,8 +33,7 @@ namespace Orleans.ServiceBus.Providers.Testing
         /// <param name="settings"></param>
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
-        public SimpleStreamEventDataGenerator(IStreamIdentity streamId, EventHubGeneratorStreamProviderSettings settings,
-            ILogger logger, SerializationManager serializationManager)
+        public SimpleStreamEventDataGenerator(IStreamIdentity streamId, ILogger<SimpleStreamEventDataGenerator> logger, SerializationManager serializationManager)
         {
             this.StreamId = streamId;
             this.logger = logger;
@@ -90,29 +90,29 @@ namespace Orleans.ServiceBus.Providers.Testing
     public class EventHubPartitionDataGenerator : IDataGenerator<EventData>, IStreamDataGeneratingController
     {
         //differnt stream in the same partition should use the same sequenceNumberCounter
-        private IntCounter sequenceNumberCounter = new IntCounter();
-        private ILogger logger;
+        private readonly EventDataGeneratorStreamOptions options;
+        private readonly IntCounter sequenceNumberCounter = new IntCounter();
+        private readonly ILogger logger;
+        private Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory;
         private List<IStreamDataGenerator<EventData>> generators;
-        private SerializationManager serializationManager;
-        private EventHubGeneratorStreamProviderSettings settings;
+
         /// <summary>
         /// Constructor
         /// </summary>
         /// <param name="logger"></param>
         /// <param name="serializationManager"></param>
         /// <param name="settings"></param>
-        public EventHubPartitionDataGenerator(ILogger logger, SerializationManager serializationManager, EventHubGeneratorStreamProviderSettings settings)
+        public EventHubPartitionDataGenerator(EventDataGeneratorStreamOptions options, Func<IStreamIdentity, IStreamDataGenerator<EventData>> generatorFactory, ILogger logger)
         {
-            this.logger = logger;
+            this.options = options;
+            this.generatorFactory = generatorFactory;
             this.generators = new List<IStreamDataGenerator<EventData>>();
-            this.serializationManager = serializationManager;
-            this.settings = settings;
+            this.logger = logger;
         }
         /// <inheritdoc />
         public void AddDataGeneratorForStream(IStreamIdentity streamId)
         {
-            var generator = (IStreamDataGenerator<EventData>)Activator.CreateInstance(settings.StreamDataGeneratorType,
-                streamId, settings, this.logger, this.serializationManager);
+            var generator =  this.generatorFactory(streamId);
             generator.SequenceNumberCounter = sequenceNumberCounter;
             this.logger.Info($"Data generator set up on stream {streamId.Namespace}-{streamId.Guid.ToString()}.");
             this.generators.Add(generator);

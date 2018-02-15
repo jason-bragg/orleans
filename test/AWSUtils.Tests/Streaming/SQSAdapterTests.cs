@@ -17,6 +17,7 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
+using Orleans.Hosting;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -53,19 +54,17 @@ namespace AWSUtils.Tests.Streaming
         [SkippableFact]
         public async Task SendAndReceiveFromSQS()
         {
-            var properties = new Dictionary<string, string>
-                {
-                    {SQSAdapterFactory.DataConnectionStringPropertyName, AWSTestConstants.DefaultSQSConnectionString},
-                    {SQSAdapterFactory.DeploymentIdPropertyName, this.clusterId}
-                };
-            var config = new ProviderConfiguration(properties, "type", "name");
-
-            var adapterFactory = new SQSAdapterFactory();
-            adapterFactory.Init(config, SQS_STREAM_PROVIDER_NAME, this.fixture.Services);
-            await SendAndReceiveFromQueueAdapter(adapterFactory, config);
+            var options = new SqsStreamOptions
+            {
+                DataConnectionString = AWSTestConstants.DefaultSQSConnectionString,
+                DeploymentId = this.clusterId
+            };
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, null, null, null);
+            adapterFactory.Init();
+            await SendAndReceiveFromQueueAdapter(adapterFactory);
         }
 
-        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory, IProviderConfiguration config)
+        private async Task SendAndReceiveFromQueueAdapter(IQueueAdapterFactory adapterFactory)
         {
             IQueueAdapter adapter = await adapterFactory.CreateAdapter();
             IQueueAdapterCache cache = adapterFactory.GetQueueAdapterCache();

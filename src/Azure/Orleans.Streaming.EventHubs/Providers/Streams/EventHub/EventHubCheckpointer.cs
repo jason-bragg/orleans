@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs;
+using Orleans.Hosting;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -31,14 +32,14 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="partition"></param>
         /// <param name="loggerFactory"></param>
         /// <returns></returns>
-        public static async Task<IStreamQueueCheckpointer<string>> Create(ICheckpointerSettings settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        public static async Task<IStreamQueueCheckpointer<string>> Create(EventHubStreamOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
-            var checkpointer = new EventHubCheckpointer(settings, streamProviderName, partition, loggerFactory);
+            var checkpointer = new EventHubCheckpointer(options, streamProviderName, partition, loggerFactory);
             await checkpointer.Initialize();
             return checkpointer;
         }
 
-        private EventHubCheckpointer(ICheckpointerSettings settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        private EventHubCheckpointer(EventHubStreamOptions settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
             if (settings == null)
             {
@@ -52,8 +53,8 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentNullException(nameof(partition));
             }
-            persistInterval = settings.PersistInterval;
-            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(settings.TableName, settings.DataConnectionString, loggerFactory);
+            persistInterval = settings.CheckpointPersistInterval;
+            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(settings.CheckpointTableName, settings.CheckpointDataConnectionString, loggerFactory);
             entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, settings.CheckpointNamespace, partition);
         }
 

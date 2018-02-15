@@ -18,7 +18,6 @@ namespace Orleans.Providers
     public class LegacyProviderConfigurator
     {
         public const string InitStageName = "ProviderInitStage";
-        public const string StartStageName = "ProviderStartStage";
         // Optional task scheduling behavior, may not always be set.
         internal delegate Task ScheduleTask(Func<Task> taskFunc);
     }
@@ -30,7 +29,7 @@ namespace Orleans.Providers
         /// Legacy way to configure providers. Will need to move to a legacy package in the future
         /// </summary>
         /// <returns></returns>
-        internal static void ConfigureServices(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, IServiceCollection services, int defaultInitStage, int defaultStartStage)
+        internal static void ConfigureServices(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, IServiceCollection services, int defaultInitStage)
         {
             // if already added providers or nothing to add, skipp
             if (services.Any(s => s.ServiceType == typeof(ProviderTypeLookup))
@@ -45,7 +44,7 @@ namespace Orleans.Providers
                 {
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IStreamProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                        RegisterProvider<IStreamProvider>(providerConfig, services, defaultInitStage);
                     }
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME)
@@ -53,7 +52,7 @@ namespace Orleans.Providers
                     services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IGrainStorage>(providerConfig, services, defaultInitStage, defaultStartStage);
+                        RegisterProvider<IGrainStorage>(providerConfig, services, defaultInitStage);
                     }
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME)
@@ -61,14 +60,14 @@ namespace Orleans.Providers
                     services.AddSingleton<ILogConsistencyProvider>(sp => sp.GetServiceByName<ILogConsistencyProvider>(ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<ILogConsistencyProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                        RegisterProvider<ILogConsistencyProvider>(providerConfig, services, defaultInitStage);
                     }
                 }
                 else
                 {
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IProvider>(providerConfig, services, defaultInitStage, defaultStartStage);
+                        RegisterProvider<IProvider>(providerConfig, services, defaultInitStage);
                     }
                 }
             }
@@ -83,17 +82,14 @@ namespace Orleans.Providers
             private readonly LegacyProviderConfigurator.ScheduleTask schedule;
             private readonly int defaultInitStage;
             private int initStage;
-            private readonly int defaultStartStage;
-            private int startStage;
             private Lazy<IProvider> provider;
 
-            public ProviderLifecycleParticipant(IProviderConfiguration config, IServiceProvider services, ILoggerFactory loggerFactory, int defaultInitStage, int defaultStartStage)
+            public ProviderLifecycleParticipant(IProviderConfiguration config, IServiceProvider services, ILoggerFactory loggerFactory, int defaultInitStage)
             {
                 this.logger = loggerFactory.CreateLogger(config.Type);
                 this.services = services;
                 this.config = config;
                 this.defaultInitStage = defaultInitStage;
-                this.defaultStartStage = defaultStartStage;
                 this.schedule = services.GetService<LegacyProviderConfigurator.ScheduleTask>();
                 this.provider = new Lazy<IProvider>(() => services.GetServiceByName<TService>(this.config.Name) as IProvider);
             }
@@ -102,8 +98,6 @@ namespace Orleans.Providers
             {
                 this.initStage = this.config.GetIntProperty(LegacyProviderConfigurator.InitStageName, this.defaultInitStage);
                 lifecycle.Subscribe(this.initStage, this.Init, this.ProviderClose);
-                this.startStage = this.config.GetIntProperty(LegacyProviderConfigurator.StartStageName, this.defaultStartStage);
-                lifecycle.Subscribe(this.startStage, this.Start, this.StreamProviderClose);
 
             }
 
@@ -144,44 +138,6 @@ namespace Orleans.Providers
                 }
             }
 
-            private async Task StreamProviderClose(CancellationToken ct)
-            {
-                var stopWatch = Stopwatch.StartNew();
-                try
-                {
-                    IProvider provider = this.provider.Value;
-                    if (!(provider is IStreamProvider)) return; // only stream providers are closed here
-                    await Schedule(() => provider.Close());
-                    stopWatch.Stop();
-                    this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
-                }
-                catch (Exception ex)
-                {
-                    stopWatch.Stop();
-                    this.logger.Error(ErrorCode.Provider_ErrorFromStop, $"Close failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
-                    throw;
-                }
-            }
-
-            private async Task Start(CancellationToken ct)
-            {
-                var stopWatch = Stopwatch.StartNew();
-                try
-                {
-                    IStreamProviderImpl provider = this.provider.Value as IStreamProviderImpl;
-                    if (provider == null) return;
-                    await Schedule(() => provider.Start());
-                    stopWatch.Stop();
-                    this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Starting stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");
-                }
-                catch (Exception ex)
-                {
-                    stopWatch.Stop();
-                    this.logger.Error(ErrorCode.Provider_ErrorFromStart, $"Start failed for stream provider {this.config.Name} of type {this.config.Type} in stage {this.startStage} in {stopWatch.ElapsedMilliseconds} Milliseconds.", ex);
-                    throw;
-                }
-            }
-
             private Task Schedule(Func<Task> taskFunc)
             {
                 return this.schedule != null
@@ -190,14 +146,14 @@ namespace Orleans.Providers
             }
         }
 
-        private static void RegisterProvider<TService>(IProviderConfiguration config, IServiceCollection services, int defaultInitStage, int defaultStartStage)
+        private static void RegisterProvider<TService>(IProviderConfiguration config, IServiceCollection services, int defaultInitStage)
             where TService : class
         {
             services.AddSingletonNamedService<TService>(config.Name, (s, n) => {
                 Type providerType = s.GetRequiredService<ProviderTypeLookup>().GetType(config.Type);
                 return Activator.CreateInstance(providerType) as TService;
             });
-            services.AddSingletonNamedService<ILifecycleParticipant<TLifecycle>>(config.Name, (s, n) => new ProviderLifecycleParticipant<TService>(config, s, s.GetRequiredService<ILoggerFactory>(), defaultInitStage, defaultStartStage));
+            services.AddSingletonNamedService<ILifecycleParticipant<TLifecycle>>(config.Name, (s, n) => new ProviderLifecycleParticipant<TService>(config, s, s.GetRequiredService<ILoggerFactory>(), defaultInitStage));
             services.AddSingletonNamedService(config.Name, (s, n) => s.GetServiceByName<TService>(n) as IControllable);
         }
     }

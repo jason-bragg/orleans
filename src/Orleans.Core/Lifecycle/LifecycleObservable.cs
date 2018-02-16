@@ -23,6 +23,9 @@ namespace Orleans
         private readonly ILogger logger;
         private int? highStage = null;
 
+        // Horrifying hack - please ignor - not for ci
+        public Func<Func<Task>,Task> ScheduleTask { get; set; }
+
         public LifecycleObservable(ILoggerFactory loggerFactory)
         {
             this.logger = loggerFactory?.CreateLogger(GetType().FullName);
@@ -91,9 +94,9 @@ namespace Orleans
             this.subscribers.TryRemove(key, out OrderedObserver o);
         }
 
-        private static async Task WrapExecution(CancellationToken ct, Func<CancellationToken, Task> action)
+        private async Task WrapExecution(CancellationToken ct, Func<CancellationToken, Task> action)
         {
-            await action(ct);
+            await (this.ScheduleTask?.Invoke(() => action(ct)) ?? action(ct));
         }
 
         private class Disposable : IDisposable

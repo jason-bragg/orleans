@@ -10,7 +10,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 {
     using Orleans.Serialization;
 
-    public class SimpleMessageStreamProvider : IStreamProvider, IInternalStreamProvider, IStreamSubscriptionManagerRetriever
+    public class SimpleMessageStreamProvider : IStreamProvider, IProvider, IInternalStreamProvider, IStreamSubscriptionManagerRetriever
     {
         public string                       Name { get; private set; }
 

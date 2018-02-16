@@ -44,9 +44,11 @@ namespace Orleans.Hosting
         public RunState StartupState = DEFAULT_STARTUP_STATE;
         public const RunState DEFAULT_STARTUP_STATE = RunState.AgentsStarted;
 
-        public int InitStage { get; set; }
+        public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+        public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        public int StartStage { get; set; }
+        public int StartStage { get; set; } = DEFAULT_START_STAGE;
+        public const int DEFAULT_START_STAGE = ServiceLifecycleStage.Active;
     }
 
     public class PersistentStreamOptionsFormatter

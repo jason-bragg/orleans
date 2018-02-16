@@ -80,7 +80,7 @@ namespace Orleans.Runtime
         private readonly object lockable = new object();
         private readonly GrainFactory grainFactory;
         private readonly IGrainRuntime grainRuntime;
-        private readonly ILifecycleObserver siloLifecycle;
+        private readonly SiloLifecycle siloLifecycle;
 
         private readonly ILoggerFactory loggerFactory;
         /// <summary>
@@ -362,6 +362,8 @@ namespace Orleans.Runtime
             // SystemTarget for provider init calls
             this.fallbackScheduler = Services.GetRequiredService<FallbackSystemTarget>();
             RegisterSystemTarget(fallbackScheduler);
+            // Horrifying hack - please ignore - not for ci
+            this.siloLifecycle.ScheduleTask = (taskFunc) => scheduler.QueueTask(taskFunc, this.fallbackScheduler.SchedulingContext);
 
             // SystemTarget for startup tasks
             var startupTaskTarget = Services.GetRequiredService<StartupTaskSystemTarget>();
@@ -723,6 +725,8 @@ namespace Orleans.Runtime
 
         private async Task OnRuntimeGrainServicesStop(CancellationToken cancellationToken)
         {
+            // Horrifying hack - please ignore - not for ci
+            this.siloLifecycle.ScheduleTask = null;
             bool gracefully = !cancellationToken.IsCancellationRequested;
             string operation = gracefully ? "Shutdown()" : "Stop()";
             try
@@ -850,9 +854,9 @@ namespace Orleans.Runtime
 
         private void Participate(ISiloLifecycle lifecycle)
         {
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
-            lifecycle.Subscribe(SiloLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeServices, OnRuntimeServicesStart, OnRuntimeServicesStop);
+            lifecycle.Subscribe(ServiceLifecycleStage.RuntimeGrainServices, OnRuntimeGrainServicesStart, OnRuntimeGrainServicesStop);
             
         }
     }

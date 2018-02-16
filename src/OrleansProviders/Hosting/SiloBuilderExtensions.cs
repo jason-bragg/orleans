@@ -43,6 +43,7 @@ namespace Orleans.Hosting
             where TSerializer : class, IMemoryMessageBodySerializer
         {
             return services.TryConfigureFormatterResolver<MemoryStreamOptions, MemoryStreamOptionsFormatterResolver>()
+                           .ConfigureNamedOptionForLogging<MemoryStreamOptions>(name)
                            .AddSiloPersistentStreams<MemoryStreamOptions>(name, MemoryAdapterFactory<TSerializer>.Create, configureOptions);
         }
     }

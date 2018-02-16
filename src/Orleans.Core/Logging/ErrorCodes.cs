@@ -392,7 +392,7 @@ namespace Orleans
         LifecycleStopFailure            = SiloBase + 51,
         SiloStartPerfMeasure            = SiloBase + 52,
 
-        CatalogBase                     = Runtime + 500,
+        CatalogBase = Runtime + 500,
         CatalogNonExistingActivation1   = CatalogBase + 1,
         Catalog_UnregisterManyAsync     = CatalogBase + 2,
         Catalog_DestroyActivations       = CatalogBase + 3,

@@ -43,6 +43,7 @@ namespace Orleans.Hosting
             where TDataAdapter : IPubSubDataAdapter
         {
             return services.TryConfigureFormatterResolver<PubSubStreamOptions, PubSubStreamOptionsFormatterResolver>()
+                           .ConfigureNamedOptionForLogging<PubSubStreamOptions>(name)
                            .AddClusterClientPersistentStreams<PubSubStreamOptions>(name, PubSubAdapterFactory<TDataAdapter>.Create, configureOptions);
         }
     }

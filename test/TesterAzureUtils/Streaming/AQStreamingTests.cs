@@ -30,9 +30,6 @@ namespace Tester.AzureUtils.Streaming
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider();
-
-                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
-                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SmsStreamProviderName, fireAndForgetDelivery: false);
             });
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
@@ -43,6 +40,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
+                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
                         builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                         {
@@ -57,6 +55,7 @@ namespace Tester.AzureUtils.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddSimpleMessageStreamProvider(SmsStreamProviderName)
                     .AddAzureTableGrainStorage("AzureStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                     {
                         options.ServiceId = silo.Value.ServiceId.ToString();

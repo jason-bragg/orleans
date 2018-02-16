@@ -53,10 +53,6 @@ namespace UnitTests.Streaming.Reliability
             builder.ConfigureLegacyConfiguration(legacy =>
             {
                 legacy.ClusterConfiguration.AddMemoryStorageProvider("MemoryStore", numStorageGrains: 1);
-
-                legacy.ClusterConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
-
-                legacy.ClientConfiguration.AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME, fireAndForgetDelivery: false);
             });
 
             builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
@@ -76,7 +72,8 @@ namespace UnitTests.Streaming.Reliability
                     {
                         options.DeploymentId = silo.Value.ServiceId.ToString();
                         options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }));
+                    }))
+                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME);
             }
         }
 
@@ -95,6 +92,7 @@ namespace UnitTests.Streaming.Reliability
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.DeleteStateOnClear = true;
                     }))
+                .AddSimpleMessageStreamProvider(SMS_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
                 {
                     options.ServiceId = silo.Value.ServiceId.ToString();

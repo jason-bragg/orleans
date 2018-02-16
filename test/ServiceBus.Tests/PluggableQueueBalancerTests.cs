@@ -1,10 +1,9 @@
-using Microsoft.Extensions.DependencyInjection;
+using System.Threading.Tasks;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;
 using Orleans.Storage;
 using Orleans.TestingHost;
-using System.Threading.Tasks;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
@@ -32,14 +31,6 @@ namespace ServiceBus.Tests
                 });
             }
 
-            private class SiloBuilderConfigurator : ISiloBuilderConfigurator
-            {
-                public void Configure(ISiloHostBuilder hostBuilder)
-                {
-                    hostBuilder.ConfigureServices(services => services.AddTransient<LeaseBasedQueueBalancerForTest>());
-                }
-            }
-
             private static void AdjustClusterConfiguration(ClusterConfiguration config)
             {
                 // register stream provider
@@ -50,12 +41,14 @@ namespace ServiceBus.Tests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName,
-                        EventDataGeneratorAdapterFactory.Create,
-                        options =>
-                    {
-                        options.EventHubPartitionCount = TotalQueueCount;
-                    });
+                    hostBuilder
+                        .AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName,
+                            EventDataGeneratorAdapterFactory.Create,
+                            options =>
+                            {
+                                options.EventHubPartitionCount = TotalQueueCount;
+                                options.BalancerType = typeof(LeaseBasedQueueBalancerForTest);
+                            });
                 }
             }
         }

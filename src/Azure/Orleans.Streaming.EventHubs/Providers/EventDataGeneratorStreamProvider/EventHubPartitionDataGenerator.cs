@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.EventHubs;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -81,6 +82,11 @@ namespace Orleans.ServiceBus.Providers.Testing
             var events = new List<int>();
             events.Add(sequenceNumber);
             return events;
+        }
+        
+        public static Func<IStreamIdentity, IStreamDataGenerator<EventData>> CreateFactory(IServiceProvider services)
+        {
+            return (streamIdentity) => ActivatorUtilities.CreateInstance<SimpleStreamEventDataGenerator>(services, streamIdentity);
         }
     }
 

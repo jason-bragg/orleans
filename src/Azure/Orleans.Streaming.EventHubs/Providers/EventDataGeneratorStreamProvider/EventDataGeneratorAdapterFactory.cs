@@ -52,7 +52,9 @@ namespace Orleans.ServiceBus.Providers.Testing
 
         private Task<IEventHubReceiver> EHGeneratorReceiverFactory(EventHubPartitionSettings settings, string offset, ILogger logger, ITelemetryProducer telemetryProducer)
         {
-            var generator = new EventHubPartitionDataGenerator(this.ehGeneratorOptions, this.serviceProvider.GetRequiredServiceByName<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(this.Name), logger);
+            Func<IStreamIdentity, IStreamDataGenerator<EventData>> streamGeneratorFactory = this.serviceProvider.GetServiceByName<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(this.Name)
+                ?? SimpleStreamEventDataGenerator.CreateFactory(this.serviceProvider);
+            var generator = new EventHubPartitionDataGenerator(this.ehGeneratorOptions, streamGeneratorFactory, logger);
             var generatorReceiver = new EventHubPartitionGeneratorReceiver(generator);
             return Task.FromResult<IEventHubReceiver>(generatorReceiver);
         }

@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using Microsoft.Azure.EventHubs;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Storage;
@@ -12,6 +13,7 @@ using Xunit;
 using ServiceBus.Tests.SlowConsumingTests;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
+using Orleans.ServiceBus.Providers.Testing;
 
 namespace ServiceBus.Tests.MonitorTests
 {
@@ -44,11 +46,16 @@ namespace ServiceBus.Tests.MonitorTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, options =>
-                    {
-                        options.StatisticMonitorWriteInterval = monitorWriteInterval;
-                        options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                    });
+                    hostBuilder
+                        .AddPersistentStreams<EventDataGeneratorStreamOptions>(StreamProviderName, EHStreamProviderForMonitorTestsAdapterFactory.Create, options =>
+                        {
+                            options.StatisticMonitorWriteInterval = monitorWriteInterval;
+                            options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
+                        })
+                        .ConfigureServices(services =>
+                        {
+                            services.AddTransientNamedService<Func<IStreamIdentity, IStreamDataGenerator<EventData>>>(StreamProviderName, (s, n) => SimpleStreamEventDataGenerator.CreateFactory(s));
+                        });
                 }
             }
 

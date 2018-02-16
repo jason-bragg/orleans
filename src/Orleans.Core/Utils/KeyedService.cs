@@ -27,7 +27,7 @@ namespace Orleans.Runtime
         }
     }
 
-    public class KeyedService<TKey, TService, TInstance> : KeyedSingletonService<TKey, TService>
+    public class KeyedService<TKey, TService, TInstance> : KeyedService<TKey, TService>
         where TInstance : TService
         where TService : class
     {

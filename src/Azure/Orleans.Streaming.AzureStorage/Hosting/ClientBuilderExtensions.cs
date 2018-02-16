@@ -43,6 +43,7 @@ namespace Orleans.Hosting
             where TDataAdapter : IAzureQueueDataAdapter
         {
             return services.TryConfigureFormatterResolver<AzureQueueStreamOptions, AzureQueueStreamOptionsFormatterResolver>()
+                           .ConfigureNamedOptionForLogging<AzureQueueStreamOptions>(name)
                            .AddClusterClientPersistentStreams<AzureQueueStreamOptions>(name, AzureQueueAdapterFactory<TDataAdapter>.Create, configureOptions);
         }
     }

@@ -25,11 +25,13 @@ namespace Orleans.Providers
     internal static class LegacyProviderConfigurator<TLifecycle>
         where TLifecycle : ILifecycleObservable
     {
+        public const int DefaultStage = ServiceLifecycleStage.RuntimeStorageServices;
+
         /// <summary>
         /// Legacy way to configure providers. Will need to move to a legacy package in the future
         /// </summary>
         /// <returns></returns>
-        internal static void ConfigureServices(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, IServiceCollection services, int defaultInitStage)
+        internal static void ConfigureServices(IDictionary<string, ProviderCategoryConfiguration> providerConfigurations, IServiceCollection services)
         {
             // if already added providers or nothing to add, skipp
             if (services.Any(s => s.ServiceType == typeof(ProviderTypeLookup))
@@ -44,7 +46,7 @@ namespace Orleans.Providers
                 {
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IStreamProvider>(providerConfig, services, defaultInitStage);
+                        RegisterProvider<IStreamProvider>(providerConfig, services, DefaultStage);
                     }
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.STORAGE_PROVIDER_CATEGORY_NAME)
@@ -52,7 +54,7 @@ namespace Orleans.Providers
                     services.TryAddSingleton<IGrainStorage>(sp => sp.GetServiceByName<IGrainStorage>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IGrainStorage>(providerConfig, services, defaultInitStage);
+                        RegisterProvider<IGrainStorage>(providerConfig, services, DefaultStage);
                     }
                 }
                 else if (providerGroup.Key == ProviderCategoryConfiguration.LOG_CONSISTENCY_PROVIDER_CATEGORY_NAME)
@@ -60,14 +62,14 @@ namespace Orleans.Providers
                     services.AddSingleton<ILogConsistencyProvider>(sp => sp.GetServiceByName<ILogConsistencyProvider>(ProviderConstants.DEFAULT_LOG_CONSISTENCY_PROVIDER_NAME));
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<ILogConsistencyProvider>(providerConfig, services, defaultInitStage);
+                        RegisterProvider<ILogConsistencyProvider>(providerConfig, services, DefaultStage);
                     }
                 }
                 else
                 {
                     foreach (IProviderConfiguration providerConfig in providerGroup.SelectMany(kvp => kvp.Value.Providers.Values))
                     {
-                        RegisterProvider<IProvider>(providerConfig, services, defaultInitStage);
+                        RegisterProvider<IProvider>(providerConfig, services, DefaultStage);
                     }
                 }
             }
@@ -125,7 +127,6 @@ namespace Orleans.Providers
                 try
                 {
                     IProvider provider = this.provider.Value;
-                    if (provider is IStreamProvider) return; // stream providers are closed in StreamProviderClose
                     await Schedule(() => provider.Close());
                     stopWatch.Stop();
                     this.logger.Info(ErrorCode.SiloStartPerfMeasure, $"Closing provider {this.config.Name} of type {this.config.Type} in stage {this.initStage} took {stopWatch.ElapsedMilliseconds} Milliseconds.");

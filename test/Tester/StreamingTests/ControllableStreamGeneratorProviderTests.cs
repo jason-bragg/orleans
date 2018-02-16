@@ -3,6 +3,7 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
@@ -45,7 +46,10 @@ namespace UnitTests.StreamingTests
                                 options.TotalQueueCount = TotalQueueCount;
                                 options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
                                 options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            });
+                            })
+                        .ConfigureServices(services => services
+                            .TryConfigureFormatterResolver<GeneratedStreamOptions, GeneratedStreamOptionsFormatterResolver>()
+                            .ConfigureNamedOptionForLogging<GeneratedStreamOptions>(StreamProviderName));
                 }
             }
         }

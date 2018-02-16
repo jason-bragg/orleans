@@ -12,12 +12,6 @@ namespace Orleans.Hosting
     /// </summary>
     public class EventHubStreamOptions : RecoverableStreamOptions
     {
-        public EventHubStreamOptions()
-        {
-            base.InitStage = SiloLifecycleStage.ApplicationServices;
-            base.StartStage = SiloLifecycleStage.SiloActive;
-        }
-
         /// <summary>
         /// EventHub connection string.
         /// </summary>

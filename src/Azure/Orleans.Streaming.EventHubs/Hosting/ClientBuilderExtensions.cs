@@ -40,6 +40,7 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<EventHubStreamOptions>> configureOptions = null)
         {
             return services.TryConfigureFormatterResolver<EventHubStreamOptions, EventHubStreamOptionsFormatterResolver>()
+                           .ConfigureNamedOptionForLogging<EventHubStreamOptions>(name)
                            .AddClusterClientPersistentStreams<EventHubStreamOptions>(name, EventHubAdapterFactory.Create, configureOptions);
         }
     }

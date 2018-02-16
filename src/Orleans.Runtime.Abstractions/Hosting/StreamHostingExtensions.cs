@@ -46,7 +46,6 @@ namespace Orleans.Hosting
             where TOptions : PersistentStreamOptions, new()
         {
             configureOptions?.Invoke(services.AddOptions<TOptions>(name));
-            services.ConfigureNamedOptionForLogging<TOptions>(name);
             return services.AddSingletonNamedService<IStreamProvider>(name, PersistentStreamProvider.Create<TOptions>)
                            .AddSingletonNamedService<ILifecycleParticipant<ISiloLifecycle>>(name, (s, n) => ((PersistentStreamProvider)s.GetRequiredServiceByName<IStreamProvider>(n)).ParticipateIn<ISiloLifecycle>())
                            .AddSingletonNamedService<IQueueAdapterFactory>(name, adapterFactory)

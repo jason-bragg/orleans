@@ -6,7 +6,6 @@ using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -35,13 +34,8 @@ namespace ServiceBus.Tests.StreamingTests
 
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
-            builder.ConfigureLegacyConfiguration(legacy =>
-            {
-                AdjustConfig(legacy.ClusterConfiguration);
-            });
             builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
             builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
-
         }
 
         private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
@@ -49,6 +43,12 @@ namespace ServiceBus.Tests.StreamingTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
+                    .AddAzureBlobGrainStorage(
+                    ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName,
+                    (AzureBlobStorageOptions options) =>
+                    {
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
                     .AddEventHubStreams(StreamProviderName,
                     options =>
                     {
@@ -194,16 +194,6 @@ namespace ServiceBus.Tests.StreamingTests
             {
                 await producers[j].OnNextAsync(new GeneratedEvent { EventType = GeneratedEvent.GeneratedEventType.Report, Payload = new int[payloadSize] });
             }
-        }
-
-        private static void AdjustConfig(ClusterConfiguration config)
-        {
-            // register stream provider
-<<<<<<< 3e9e5c55bf805bdf6ab1b3e0a473b4634fd81cd9
-            config.Globals.RegisterStreamProvider<EventHubStreamProvider>(StreamProviderName, BuildProviderSettings());
-=======
-            config.AddAzureBlobStorageProvider(ImplicitSubscription_RecoverableStream_CollectorGrain.StorageProviderName);
->>>>>>> Moved persistent stream provider to use options and lifecycle.
         }
     }
 }

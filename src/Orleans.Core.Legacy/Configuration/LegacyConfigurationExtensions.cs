@@ -11,8 +11,6 @@ namespace Orleans.Configuration
 {
     public static class LegacyConfigurationExtensions
     {
-        private const int ClusterClientDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
-
         public static IServiceCollection AddLegacyClientConfigurationSupport(this IServiceCollection services, ClientConfiguration configuration = null)
         {
             if (TryGetClientConfiguration(services) != null)
@@ -82,7 +80,7 @@ namespace Orleans.Configuration
             LegacyGatewayListProviderConfigurator.ConfigureServices(configuration, services);
 
             // Register providers
-            LegacyProviderConfigurator<IClusterClientLifecycle>.ConfigureServices(configuration.ProviderConfigurations, services, ClusterClientDefaultProviderInitStage);
+            LegacyProviderConfigurator<IClusterClientLifecycle>.ConfigureServices(configuration.ProviderConfigurations, services);
 
             return services;
         }

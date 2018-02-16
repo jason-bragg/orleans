@@ -15,8 +15,6 @@ namespace Orleans.Hosting
 {
     public static class LegacyClusterConfigurationExtensions
     {
-        private const int SiloDefaultProviderInitStage = ServiceLifecycleStage.RuntimeStorageServices;
-
         /// <summary>
         /// Specifies the configuration to use for this silo.
         /// </summary>
@@ -214,14 +212,7 @@ namespace Orleans.Hosting
                 };
             });
 
-            services.TryAddSingleton<LegacyProviderConfigurator.ScheduleTask>(sp =>
-            {
-                OrleansTaskScheduler scheduler = sp.GetRequiredService<OrleansTaskScheduler>();
-                SystemTarget fallbackSystemTarget = sp.GetRequiredService<FallbackSystemTarget>();
-                return (taskFunc) => scheduler.QueueTask(taskFunc, fallbackSystemTarget.SchedulingContext);
-            });
-
-            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services, SiloDefaultProviderInitStage);
+            LegacyProviderConfigurator<ISiloLifecycle>.ConfigureServices(configuration.Globals.ProviderConfigurations, services);
 
             services.AddOptions<GrainPlacementOptions>().Configure<GlobalConfiguration>((options, config) =>
             {

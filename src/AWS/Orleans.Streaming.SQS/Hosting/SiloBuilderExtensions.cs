@@ -39,6 +39,7 @@ namespace Orleans.Hosting
             Action<OptionsBuilder<SqsStreamOptions>> configureOptions = null)
         {
             return services.TryConfigureFormatterResolver<SqsStreamOptions, SqsStreamOptionsFormatterResolver>()
+                           .ConfigureNamedOptionForLogging<SqsStreamOptions>(name)
                            .AddSiloPersistentStreams<SqsStreamOptions>(name, SQSAdapterFactory.Create, configureOptions);
         }
     }

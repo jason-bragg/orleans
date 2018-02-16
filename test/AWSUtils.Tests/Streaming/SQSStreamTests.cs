@@ -68,11 +68,11 @@ namespace AWSUtils.Tests.Streaming
                 hostBuilder
                     .AddSqsStreams("SQSProvider", options =>
                     {
-                        options.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                     })
                     .AddSqsStreams("SQSProvider2", options =>
                      {
-                         options.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                         options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                      });
             }
         }
@@ -84,7 +84,7 @@ namespace AWSUtils.Tests.Streaming
                 clientBuilder
                     .AddSqsStreams("SQSProvider", options =>
                     {
-                        options.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
                     });
             }
         }

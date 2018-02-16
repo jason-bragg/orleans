@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace Orleans.Providers
 {

@@ -2,6 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.WindowsAzure.Storage.Table;
 using Orleans;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
@@ -15,10 +18,8 @@ using TestGrainInterfaces;
 using TestGrains;
 using UnitTests.Grains;
 using Xunit;
-using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Hosting;
-using Microsoft.Extensions.Configuration;
+using Orleans.Configuration;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -57,7 +58,7 @@ namespace ServiceBus.Tests.StreamingTests
                         options.Path = EHPath;
                         options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
                         options.PubSubType = StreamPubSubType.ImplicitOnly;
-                        options.CheckpointDataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.CheckpointTableName = EHCheckpointTable;
                         options.CheckpointNamespace = CheckpointNamespace;
                         options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);

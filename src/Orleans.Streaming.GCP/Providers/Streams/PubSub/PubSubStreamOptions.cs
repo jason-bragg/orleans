@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     public class PubSubStreamOptions : PersistentStreamOptions
     {
@@ -10,7 +10,7 @@ namespace Orleans.Hosting
 
         public string TopicId { get; set; }
 
-        public string DeploymentId { get; set; }
+        public string ClusterId { get; set; }
 
         public string CustomEndpoint { get; set; }
 
@@ -64,7 +64,7 @@ namespace Orleans.Hosting
                 {
                     OptionFormattingUtilities.Format(nameof(this.options.ProjectId), this.options.ProjectId),
                     OptionFormattingUtilities.Format(nameof(this.options.TopicId), this.options.TopicId),
-                    OptionFormattingUtilities.Format(nameof(this.options.DeploymentId), this.options.DeploymentId),
+                    OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId),
                     OptionFormattingUtilities.Format(nameof(this.options.CustomEndpoint), this.options.CustomEndpoint),
                     OptionFormattingUtilities.Format(nameof(this.options.CacheSize), this.options.CacheSize),
                     OptionFormattingUtilities.Format(nameof(this.options.NumSubscriptions), this.options.NumSubscriptions),

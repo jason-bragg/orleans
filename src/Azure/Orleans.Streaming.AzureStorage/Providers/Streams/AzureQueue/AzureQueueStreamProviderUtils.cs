@@ -3,7 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.AzureQueue

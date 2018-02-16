@@ -46,13 +46,12 @@ namespace Tester.AzureUtils.Streaming
             {
                 hostBuilder
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(adapterName,
-                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        options => 
                         {
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.DeploymentId = silo.Value.ServiceId.ToString();
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.SiloMaturityPeriod = SILO_IMMATURE_PERIOD;
                             options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
-                        }));
+                        });
             }
         }
 

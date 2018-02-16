@@ -2,11 +2,11 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization;
 using Orleans.Streams;
 using Orleans.Providers.Streams.Common;
-using Orleans.Hosting;
-using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 
 namespace Orleans.Providers.Streams.AzureQueue
 {
@@ -16,6 +16,7 @@ namespace Orleans.Providers.Streams.AzureQueue
     {
         private readonly string providerName;
         private readonly AzureQueueStreamOptions options;
+        private readonly SiloOptions siloOptions;
         private readonly ILoggerFactory loggerFactory;
         private readonly Func<TDataAdapter> dataAadaptorFactory;
         private HashRingBasedStreamQueueMapper streamQueueMapper;
@@ -31,10 +32,11 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// </summary>
         protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
 
-        public AzureQueueAdapterFactory(string name, AzureQueueStreamOptions options, IServiceProvider serviceProvider, SerializationManager serializationManager, ILoggerFactory loggerFactory)
+        public AzureQueueAdapterFactory(string name, AzureQueueStreamOptions options, IServiceProvider serviceProvider, IOptions<SiloOptions> siloOptions, SerializationManager serializationManager, ILoggerFactory loggerFactory)
         {
             this.providerName = name;
             this.options = options ?? throw new ArgumentNullException(nameof(options));
+            this.siloOptions = siloOptions.Value;
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
             this.loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
             this.dataAadaptorFactory = () => ActivatorUtilities.GetServiceOrCreateInstance<TDataAdapter>(serviceProvider);
@@ -52,7 +54,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>Creates the Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new AzureQueueAdapter<TDataAdapter>(this.dataAadaptorFactory(), this.SerializationManager, this.streamQueueMapper, this.loggerFactory, this.options.DataConnectionString, this.options.DeploymentId, this.providerName, this.options.MessageVisibilityTimeout);
+            var adapter = new AzureQueueAdapter<TDataAdapter>(this.dataAadaptorFactory(), this.SerializationManager, this.streamQueueMapper, this.loggerFactory, this.options.ConnectionString, this.options.ClusterId ?? this.siloOptions.ClusterId, this.providerName, this.options.MessageVisibilityTimeout);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

@@ -51,11 +51,10 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder
-                    .AddSqsStreams(SQSStreamProviderName, builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    .AddSqsStreams(SQSStreamProviderName, options =>
                     {
-                        options.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                        options.DeploymentId = silo.Value.ClusterId;
-                    }));
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
             }
         }
 
@@ -64,11 +63,10 @@ namespace AWSUtils.Tests.Streaming
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
                 clientBuilder
-                    .AddSqsStreams(SQSStreamProviderName, builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    .AddSqsStreams(SQSStreamProviderName, options =>
                     {
-                        options.DataConnectionString = AWSTestConstants.DefaultSQSConnectionString;
-                        options.DeploymentId = silo.Value.ClusterId;
-                    }));
+                        options.ConnectionString = AWSTestConstants.DefaultSQSConnectionString;
+                    });
             }
         }
 

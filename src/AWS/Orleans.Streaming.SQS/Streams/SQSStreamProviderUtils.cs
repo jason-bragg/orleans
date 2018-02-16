@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using OrleansAWSUtils.Storage;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace OrleansAWSUtils.Streams
 {

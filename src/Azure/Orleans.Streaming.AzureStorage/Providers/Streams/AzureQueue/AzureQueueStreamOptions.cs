@@ -4,16 +4,16 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Azure queue stream provider options.
     /// </summary>
     public class AzureQueueStreamOptions : PersistentStreamOptions
     {
-        public string DataConnectionString { get; set; }
+        public string ConnectionString { get; set; }
 
-        public string DeploymentId { get; set; }
+        public string ClusterId { get; set; }
 
         public TimeSpan? MessageVisibilityTimeout { get; set; }
 
@@ -57,8 +57,8 @@ namespace Orleans.Hosting
                 List<string> formatted = this.parentFormatter.FormatSharedOptions();
                 formatted.AddRange(new[]
                 {
-                    OptionFormattingUtilities.Format(nameof(this.options.DataConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString)),
-                    OptionFormattingUtilities.Format(nameof(this.options.DeploymentId), this.options.DeploymentId),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
+                    OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId),
                     OptionFormattingUtilities.Format(nameof(this.options.MessageVisibilityTimeout), this.options.MessageVisibilityTimeout),
                     OptionFormattingUtilities.Format(nameof(this.options.CacheSize), this.options.CacheSize),
                     OptionFormattingUtilities.Format(nameof(this.options.NumQueues), this.options.NumQueues),

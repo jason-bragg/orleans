@@ -1,23 +1,22 @@
-﻿using Orleans.Providers;
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams;
-using OrleansAWSUtils.Streams;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
+using Orleans.Providers.Streams.Common;
+using Orleans.Runtime;
+using Orleans.Streams;
+using OrleansAWSUtils.Streams;
+using AWSUtils.Tests.StorageTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using OrleansAWSUtils.Storage;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace AWSUtils.Tests.Streaming
 {
@@ -56,10 +55,10 @@ namespace AWSUtils.Tests.Streaming
         {
             var options = new SqsStreamOptions
             {
-                DataConnectionString = AWSTestConstants.DefaultSQSConnectionString,
-                DeploymentId = this.clusterId
+                ConnectionString = AWSTestConstants.DefaultSQSConnectionString,
+                ClusterId = this.clusterId
             };
-            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, null, null, null);
+            var adapterFactory = new SQSAdapterFactory(SQS_STREAM_PROVIDER_NAME, options, null, Options.Create(new SiloOptions()), null, null);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

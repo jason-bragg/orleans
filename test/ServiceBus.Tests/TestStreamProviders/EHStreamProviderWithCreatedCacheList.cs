@@ -12,7 +12,7 @@ using Orleans.Serialization;
 using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers.Testing;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {

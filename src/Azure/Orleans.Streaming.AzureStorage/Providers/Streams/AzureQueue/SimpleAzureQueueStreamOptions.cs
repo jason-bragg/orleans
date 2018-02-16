@@ -3,14 +3,14 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Simple Azure queue stream provider options.
     /// </summary>
     public class SimpleAzureQueueStreamOptions : PersistentStreamOptions
     {
-        public string DataConnectionString { get; set; }
+        public string ConnectionString { get; set; }
 
         public string QueueName { get; set; }
     }
@@ -48,7 +48,7 @@ namespace Orleans.Hosting
                 List<string> formatted = this.parentFormatter.FormatSharedOptions();
                 formatted.AddRange(new[]
                 {
-                    OptionFormattingUtilities.Format(nameof(this.options.DataConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.DataConnectionString)),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.ConnectionString)),
                     OptionFormattingUtilities.Format(nameof(this.options.QueueName), this.options.QueueName),
                 });
                 return formatted;

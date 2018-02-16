@@ -4,10 +4,13 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Configuration;
+using Orleans;
+using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Streaming.EventHubs;
 using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
-using Orleans.ServiceBus.Providers;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
@@ -15,9 +18,6 @@ using ServiceBus.Tests.TestStreamProviders.EventHub;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
-using Microsoft.Extensions.Configuration;
-using Orleans;
-using Orleans.Hosting;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -56,7 +56,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                             options.BalancerType = StreamQueueBalancerType.StaticClusterConfigDeploymentBalancer;
-                            options.CheckpointDataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);

@@ -1,7 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Streams;
 
@@ -24,7 +24,7 @@ namespace Orleans.Providers.Streams.AzureQueue
         /// <summary>Creates the Simple Azure Queue based adapter.</summary>
         public virtual Task<IQueueAdapter> CreateAdapter()
         {
-            var adapter = new SimpleAzureQueueAdapter(this.loggerFactory, this.options.DataConnectionString, this.providerName, this.options.QueueName);
+            var adapter = new SimpleAzureQueueAdapter(this.loggerFactory, this.options.ConnectionString, this.providerName, this.options.QueueName);
             return Task.FromResult<IQueueAdapter>(adapter);
         }
 

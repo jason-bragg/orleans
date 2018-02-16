@@ -59,7 +59,7 @@ namespace ServiceBus.Tests.Streaming
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                            options.CheckpointDataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);
@@ -69,7 +69,7 @@ namespace ServiceBus.Tests.Streaming
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                            options.CheckpointDataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace2;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);

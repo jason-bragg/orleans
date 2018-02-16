@@ -6,8 +6,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Hosting;
-using RunState = Orleans.Hosting.PersistentStreamOptions.RunState;
+using Orleans.Configuration;
+using RunState = Orleans.Configuration.PersistentStreamOptions.RunState;
 
 namespace Orleans.Streams
 {

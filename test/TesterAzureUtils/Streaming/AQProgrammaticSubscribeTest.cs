@@ -34,17 +34,15 @@ namespace Tester.AzureUtils.Streaming
                 {
                     hostBuilder
                         .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName,
-                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            options =>
                             {
-                                options.DeploymentId = silo.Value.ServiceId.ToString();
-                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            }))
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            })
                         .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamProviderName2,
-                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            options =>
                             {
-                                options.DeploymentId = silo.Value.ServiceId.ToString();
-                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            }));
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            });
                 }
             }
 

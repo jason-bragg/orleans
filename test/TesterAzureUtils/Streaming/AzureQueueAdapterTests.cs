@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage.Queue;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Providers.Streams.AzureQueue;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -16,7 +17,6 @@ using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
 using Orleans.Configuration;
-using Orleans.Hosting;
 using Orleans.Serialization;
 
 namespace Tester.AzureUtils.Streaming
@@ -53,11 +53,11 @@ namespace Tester.AzureUtils.Streaming
         {
             var options = new AzureQueueStreamOptions
             {
-                DataConnectionString = TestDefaultConfiguration.DataConnectionString,
-                DeploymentId = this.clusterId,
+                ConnectionString = TestDefaultConfiguration.DataConnectionString,
+                ClusterId = this.clusterId,
                 MessageVisibilityTimeout = TimeSpan.FromSeconds(30)
             };
-            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options, this.fixture.Services, this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
+            var adapterFactory = new AzureQueueAdapterFactory<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME, options, this.fixture.Services, this.fixture.Services.GetService<IOptions<SiloOptions>>(), this.fixture.Services.GetRequiredService<SerializationManager>(), loggerFactory);
             adapterFactory.Init();
             await SendAndReceiveFromQueueAdapter(adapterFactory);
         }

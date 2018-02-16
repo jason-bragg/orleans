@@ -2,10 +2,9 @@
 using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.Options;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// EventHub settings for a specific hub
@@ -55,7 +54,7 @@ namespace Orleans.Hosting
         /// <summary>
         /// Azure table storage connections string.
         /// </summary>
-        public string CheckpointDataConnectionString { get; set; }
+        public string CheckpointConnectionString { get; set; }
         /// <summary>
         /// Azure table name.
         /// </summary>
@@ -105,7 +104,7 @@ namespace Orleans.Hosting
                 List<string> formatted = this.parentFormatter.FormatSharedOptions();
                 formatted.AddRange(new[]
                 {
-                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), "<-Redacted->"),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), "<--SNIP-->"),
                     OptionFormattingUtilities.Format(nameof(this.options.ConsumerGroup), this.options.ConsumerGroup),
                     OptionFormattingUtilities.Format(nameof(this.options.Path), this.options.Path),
                     OptionFormattingUtilities.Format(nameof(this.options.PrefetchCount), this.options.PrefetchCount),
@@ -113,7 +112,7 @@ namespace Orleans.Hosting
                     OptionFormattingUtilities.Format(nameof(this.options.SlowConsumingMonitorFlowControlThreshold), this.options.SlowConsumingMonitorFlowControlThreshold),
                     OptionFormattingUtilities.Format(nameof(this.options.SlowConsumingMonitorPressureWindowSize), this.options.SlowConsumingMonitorPressureWindowSize),
                     OptionFormattingUtilities.Format(nameof(this.options.AveragingCachePressureMonitorFlowControlThreshold), this.options.AveragingCachePressureMonitorFlowControlThreshold),
-                    OptionFormattingUtilities.Format(nameof(this.options.CheckpointDataConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.CheckpointDataConnectionString)),
+                    OptionFormattingUtilities.Format(nameof(this.options.CheckpointConnectionString), ConfigUtilities.RedactConnectionStringInfo(this.options.CheckpointConnectionString)),
                     OptionFormattingUtilities.Format(nameof(this.options.CheckpointTableName), this.options.CheckpointTableName),
                     OptionFormattingUtilities.Format(nameof(this.options.CheckpointPersistInterval), this.options.CheckpointPersistInterval),
                     OptionFormattingUtilities.Format(nameof(this.options.CheckpointNamespace), this.options.CheckpointNamespace),

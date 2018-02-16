@@ -1,15 +1,15 @@
-using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
-using Orleans.ServiceBus.Providers;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.ServiceBus.Providers.Testing;
 using System;
 using System.Threading.Tasks;
-using Orleans.Serialization;
-using Microsoft.Extensions.Logging;
-using ServiceBus.Tests.MonitorTests;
-using Orleans.Hosting;
+using Orleans.Providers.Streams.Common;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Logging;
+using Orleans.Runtime;
+using Orleans.ServiceBus.Providers;
+using Orleans.ServiceBus.Providers.Testing;
+using Orleans.Serialization;
+using Orleans.Configuration;
+using ServiceBus.Tests.MonitorTests;
 
 namespace ServiceBus.Tests.TestStreamProviders
 {

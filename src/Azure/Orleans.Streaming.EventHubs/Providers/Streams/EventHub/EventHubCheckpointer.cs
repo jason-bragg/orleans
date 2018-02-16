@@ -3,7 +3,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans.Streaming.EventHubs;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -39,11 +39,11 @@ namespace Orleans.ServiceBus.Providers
             return checkpointer;
         }
 
-        private EventHubCheckpointer(EventHubStreamOptions settings, string streamProviderName, string partition, ILoggerFactory loggerFactory)
+        private EventHubCheckpointer(EventHubStreamOptions options, string streamProviderName, string partition, ILoggerFactory loggerFactory)
         {
-            if (settings == null)
+            if (options == null)
             {
-                throw new ArgumentNullException(nameof(settings));
+                throw new ArgumentNullException(nameof(options));
             }
             if (string.IsNullOrWhiteSpace(streamProviderName))
             {
@@ -53,9 +53,9 @@ namespace Orleans.ServiceBus.Providers
             {
                 throw new ArgumentNullException(nameof(partition));
             }
-            persistInterval = settings.CheckpointPersistInterval;
-            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(settings.CheckpointTableName, settings.CheckpointDataConnectionString, loggerFactory);
-            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, settings.CheckpointNamespace, partition);
+            persistInterval = options.CheckpointPersistInterval;
+            dataManager = new AzureTableDataManager<EventHubPartitionCheckpointEntity>(options.CheckpointTableName, options.CheckpointConnectionString, loggerFactory);
+            entity = EventHubPartitionCheckpointEntity.Create(streamProviderName, options.CheckpointNamespace, partition);
         }
 
         private Task Initialize()

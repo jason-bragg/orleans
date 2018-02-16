@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;

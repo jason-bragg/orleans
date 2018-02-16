@@ -1,4 +1,5 @@
 using System.Threading.Tasks;
+using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Runtime.Configuration;
 using Orleans.ServiceBus.Providers.Testing;

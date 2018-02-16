@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
-using Orleans.Hosting;
+using Orleans.Configuration;
 using Orleans.Runtime;
 
 namespace Orleans.Streams

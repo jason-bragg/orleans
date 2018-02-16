@@ -1,8 +1,8 @@
 ﻿
-using Microsoft.Extensions.Options;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// This configuration class is used to configure the MemoryStreamProvider.

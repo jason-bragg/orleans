@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
-using Orleans.Hosting;
+using Orleans.Configuration;
 
 namespace Orleans.ServiceBus.Providers
 {

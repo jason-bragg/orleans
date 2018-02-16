@@ -1,16 +1,11 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Storage;
-using Orleans.Streams;
-using Orleans.TestingHost;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.Threading.Tasks;
-using Orleans.TestingHost.Utils;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Hosting;
+using Orleans.TestingHost;
 using TestExtensions;
 using Xunit;
+using Orleans.Configuration;
 
 namespace Tester.StreamingTests
 {

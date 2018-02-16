@@ -2,7 +2,11 @@ using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.WindowsAzure.Storage.Table;
+using Microsoft.Extensions.Configuration;
 using Orleans.Runtime;
+using Orleans.Hosting;
+using Orleans;
+using Orleans.Configuration;
 using Orleans.Runtime.Configuration;
 using Orleans.Streaming.EventHubs;
 using Orleans.TestingHost;
@@ -12,9 +16,6 @@ using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
-using Orleans.Hosting;
-using Microsoft.Extensions.Configuration;
-using Orleans;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -57,7 +58,7 @@ namespace ServiceBus.Tests.StreamingTests
                         options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                         options.ConsumerGroup = EHConsumerGroup;
                         options.Path = EHPath;
-                        options.CheckpointDataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                         options.CheckpointTableName = EHCheckpointTable;
                         options.CheckpointNamespace = CheckpointNamespace;
                         options.CheckpointPersistInterval = TimeSpan.FromSeconds(10);

@@ -3,7 +3,7 @@ using Orleans.Streams;
 using System;
 using System.Collections.Generic;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     public class PersistentStreamOptions
     {

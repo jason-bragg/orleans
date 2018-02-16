@@ -71,7 +71,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.Path = EHPath;
                             options.BalancerType = StreamQueueBalancerType.DynamicClusterConfigDeploymentBalancer;
                             options.PubSubType = StreamPubSubType.ImplicitOnly;
-                            options.CheckpointDataConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            options.CheckpointConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.CheckpointTableName = EHCheckpointTable;
                             options.CheckpointNamespace = CheckpointNamespace;
                             options.CheckpointPersistInterval = TimeSpan.FromSeconds(1);

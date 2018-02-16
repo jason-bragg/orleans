@@ -1,13 +1,13 @@
 ﻿using System.Collections.Generic;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     public class SqsStreamOptions : PersistentStreamOptions
     {
-        public string DeploymentId { get; set; }
+        public string ClusterId { get; set; }
 
-        public string DataConnectionString { get; set; }
+        public string ConnectionString { get; set; }
 
         public int CacheSize { get; set; } = CacheSizeDefaultValue;
         public const int CacheSizeDefaultValue = 4096;
@@ -50,8 +50,8 @@ namespace Orleans.Hosting
                 List<string> formatted = this.parentFormatter.FormatSharedOptions();
                 formatted.AddRange(new[]
                 {
-                    OptionFormattingUtilities.Format(nameof(this.options.DeploymentId), this.options.DeploymentId),
-                    OptionFormattingUtilities.Format(nameof(this.options.DeploymentId), "<-Redacted->"),
+                    OptionFormattingUtilities.Format(nameof(this.options.ConnectionString), "<--SNIP-->"),
+                    OptionFormattingUtilities.Format(nameof(this.options.ClusterId), this.options.ClusterId),
                     OptionFormattingUtilities.Format(nameof(this.options.CacheSize), this.options.CacheSize),
                     OptionFormattingUtilities.Format(nameof(this.options.NumQueues), this.options.NumQueues),
                 });

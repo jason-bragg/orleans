@@ -72,11 +72,10 @@ namespace UnitTests.Streaming.Reliability
                     gatewayOptions.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 })
                 .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME,
-                    builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    options =>
                     {
-                        options.DeploymentId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }));
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
             }
         }
 
@@ -102,17 +101,15 @@ namespace UnitTests.Streaming.Reliability
                     options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                 }))
                 .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AZURE_QUEUE_STREAM_PROVIDER_NAME,
-                    builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    options =>
                     {
-                        options.DeploymentId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }))
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    })
                 .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
-                    builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                    options =>
                     {
-                        options.DeploymentId = silo.Value.ServiceId.ToString();
-                        options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                    }));
+                        options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                    });
             }
         }
 

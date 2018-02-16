@@ -61,17 +61,15 @@ namespace UnitTests.HaloTests.Streaming
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                         }))
                         .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
-                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            options =>
                             {
-                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                options.DeploymentId = silo.Value.ServiceId.ToString();
-                            }))
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            })
                         .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
-                            builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                            options =>
                             {
-                                options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                                options.DeploymentId = silo.Value.ServiceId.ToString();
-                            }));
+                                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                            });
                 }
             }
 

@@ -52,11 +52,10 @@ namespace Tester.AzureUtils.Streaming
             {
                 clientBuilder
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
-                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        options =>
                         {
-                            options.DeploymentId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
         }
 
@@ -66,11 +65,10 @@ namespace Tester.AzureUtils.Streaming
             {
                 hostBuilder
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AQStreamProviderName,
-                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        options =>
                         {
-                            options.DeploymentId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
         }
 

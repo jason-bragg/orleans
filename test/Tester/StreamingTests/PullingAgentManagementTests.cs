@@ -33,11 +33,10 @@ namespace UnitTests.StreamingTests
             private class MySiloBuilderConfigurator : ISiloBuilderConfigurator
             {
                 public void Configure(ISiloHostBuilder hostBuilder) => hostBuilder
-                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        .AddAzureQueueStreams<AzureQueueDataAdapterV2>(StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME, options =>
                         {
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                            options.DeploymentId = silo.Value.ClusterId;
-                        }));
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
 
             protected override void CheckPreconditionsOrThrow()

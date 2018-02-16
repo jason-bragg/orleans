@@ -73,17 +73,15 @@ namespace UnitTests.StreamingTests
                         options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                     }))
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>(AzureQueueStreamProviderName,
-                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        options =>
                         {
-                            options.DeploymentId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }))
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        })
                     .AddAzureQueueStreams<AzureQueueDataAdapterV2>("AzureQueueProvider2",
-                        builder => builder.Configure<IOptions<SiloOptions>>((options, silo) =>
+                        options =>
                         {
-                            options.DeploymentId = silo.Value.ServiceId.ToString();
-                            options.DataConnectionString = TestDefaultConfiguration.DataConnectionString;
-                        }));
+                            options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                        });
             }
         }
 

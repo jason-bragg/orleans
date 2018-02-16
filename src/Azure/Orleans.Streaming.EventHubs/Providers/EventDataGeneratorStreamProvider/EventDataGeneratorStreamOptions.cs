@@ -2,7 +2,7 @@
 using System.Linq;
 using Microsoft.Extensions.Options;
 
-namespace Orleans.Hosting
+namespace Orleans.Configuration
 {
     /// <summary>
     /// Setting class for EHGeneratorStreamProvider

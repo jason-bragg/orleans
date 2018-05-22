@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
@@ -11,7 +12,7 @@ namespace Orleans.Runtime
         private const int DEFAULT_MAX_SUSTAINED_RECEIVE_BUFFER_SIZE = 1024 * Kb; // 1mg
         private const int GROW_MAX_BLOCK_SIZE = 1024 * Kb; // 1mg
         private static readonly ArraySegment<byte>[] EmptyBuffers = {new ArraySegment<byte>(new byte[0]), };
-        private readonly List<ArraySegment<byte>> readBuffer;
+        private readonly DriftingLinkedList readBuffer;
         private readonly int maxSustainedBufferSize;
         private int currentBufferSize;
 
@@ -43,7 +44,7 @@ namespace Orleans.Runtime
             currentBufferSize = receiveBufferSize;
             maxSustainedBufferSize = maxSustainedReceiveBufferSize;
             lengthBuffer = new byte[Message.LENGTH_HEADER_SIZE];
-            readBuffer = BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize);
+            readBuffer = new DriftingLinkedList(BufferPool.GlobalPool.GetMultiBuffer(currentBufferSize));
             receiveOffset = 0;
             decodeOffset = 0;
             headerLength = 0;
@@ -54,7 +55,7 @@ namespace Orleans.Runtime
             };
         }
 
-        public List<ArraySegment<byte>> BuildReceiveBuffer()
+        public IList<ArraySegment<byte>> BuildReceiveBuffer()
         {
             // Opportunistic reset to start of buffer
             if (decodeOffset == receiveOffset)
@@ -62,7 +63,7 @@ namespace Orleans.Runtime
                 decodeOffset = 0;
                 receiveOffset = 0;
             }
-            return ByteArrayBuilder.BuildSegmentList(readBuffer, receiveOffset);
+            return readBuffer.After(receiveOffset);
         }
 
         // Copies receive buffer into read buffer for futher processing
@@ -288,6 +289,230 @@ namespace Orleans.Runtime
             int growBlockSize = Math.Min(currentBufferSize, GROW_MAX_BLOCK_SIZE);
             readBuffer.AddRange(BufferPool.GlobalPool.GetMultiBuffer(growBlockSize));
             currentBufferSize += growBlockSize;
+        }
+
+        /// <summary>
+        /// Linked list of array segments rooted at the last item accessed.
+        /// </summary>
+        private class DriftingLinkedList : IList<ArraySegment<byte>>
+        {
+            private class Node
+            {
+                public ArraySegment<byte> segment;
+                public Node prev;
+                public Node next;
+            }
+            private Node root;
+            private int count;
+            private int idx;
+
+            public DriftingLinkedList(IList<ArraySegment<byte>> segments)
+            {
+                AddRange(segments);
+            }
+
+            public IList<ArraySegment<byte>> After(int offset)
+            {
+                if (offset == 0)
+                {
+                    return this;
+                }
+
+                var result = new List<ArraySegment<byte>>();
+                var lengthSoFar = 0;
+                foreach (var segment in this)
+                {
+                    var bytesStillToSkip = offset - lengthSoFar;
+                    lengthSoFar += segment.Count;
+                    if (segment.Count <= bytesStillToSkip) // Still skipping past this buffer
+                    {
+                        continue;
+                    }
+                    if (bytesStillToSkip > 0) // This is the first buffer, so just take part of it
+                    {
+                        result.Add(new ArraySegment<byte>(segment.Array, bytesStillToSkip, segment.Count - bytesStillToSkip));
+                    }
+                    else // Take the whole buffer
+                    {
+                        result.Add(segment);
+                    }
+                }
+                return result;
+            }
+
+            public void AddRange(IList<ArraySegment<byte>> items)
+            {
+                foreach (ArraySegment<byte> item in items)
+                {
+                    Add(item);
+                }
+            }
+
+            public bool IsFixedSize => false;
+
+            public bool IsReadOnly => false;
+
+            public int Count => this.count;
+
+            public bool IsSynchronized => false;
+
+            public object syncRoot = new object();
+            public object SyncRoot => this.syncRoot;
+
+            public ArraySegment<byte> this[int index]
+            {
+                get
+                {
+                    Node found = this.root;
+                    int offset = this.idx;
+                    if (index >= offset)
+                        while (index >= offset && found != null)
+                        {
+                            if (index == offset)
+                            {
+                                this.idx = offset;
+                                this.root = found;
+                                return this.root.segment;
+                            }
+                            offset++;
+                            found = found.next;
+                        }
+                    else if (index <= offset)
+                        while (index <= offset && found != null)
+                        {
+                            if (index == offset)
+                            {
+                                this.idx = offset;
+                                this.root = found;
+                                return this.root.segment;
+                            }
+                            offset--;
+                            found = found.prev;
+                        }
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+                set
+                {
+                    Node found = this.root;
+                    int offset = this.idx;
+                    if (index >= offset)
+                        while (index >= offset && found != null)
+                        {
+                            if (index == offset)
+                            {
+                                this.idx = offset;
+                                this.root = found;
+                                this.root.segment = value;
+                            }
+                            offset++;
+                            found = found.next;
+                        }
+                    else if (index <= offset)
+                        while (index <= offset && found != null)
+                        {
+                            if (index == offset)
+                            {
+                                this.idx = offset;
+                                this.root = found;
+                                this.root.segment = value;
+                            }
+                            offset--;
+                            found = found.prev;
+                        }
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+            }
+
+            public void Clear()
+            {
+                this.root = null;
+                this.count = 0;
+                this.idx = 0;
+            }
+
+            public IEnumerator<ArraySegment<byte>> GetEnumerator()
+            {
+                throw new NotImplementedException();
+            }
+
+            public void RemoveAt(int index)
+            {
+                throw new NotImplementedException();
+            }
+
+            public int IndexOf(ArraySegment<byte> item)
+            {
+                // look forward
+                Node current = this.root;
+                int index = idx;
+                while (current != null)
+                {
+                    if (Equals(current.segment, item))
+                        return index;
+                    current = current.next;
+                    index++;
+                }
+                // look backwards
+                current = this.root;
+                index = idx;
+                while (current != null)
+                {
+                    if (Equals(current.segment, item))
+                        return index;
+                    current = current.prev;
+                    index--;
+                }
+                return -1;
+            }
+
+            public void Insert(int index, ArraySegment<byte> item)
+            {
+                throw new NotImplementedException();
+            }
+
+            public void Add(ArraySegment<byte> item)
+            {
+                if (this.root == null)
+                {
+                    this.root = new Node { segment = item };
+                    this.count = 1;
+                    this.idx = 0;
+                }
+
+                // find end
+                while (this.root.next != null)
+                {
+                    this.root = root.next;
+                    this.idx++;
+                }
+
+                this.root.next = new Node { segment = item, prev = this.root };
+                this.count++;
+                this.idx++;
+            }
+
+            public bool Contains(ArraySegment<byte> item)
+            {
+                return IndexOf(item) != -1;
+            }
+
+            public void CopyTo(ArraySegment<byte>[] array, int arrayIndex)
+            {
+                for (int i = arrayIndex; i < count; i++)
+                {
+                    array.SetValue(this[i], i);
+                }
+            }
+
+            public bool Remove(ArraySegment<byte> item)
+            {
+                throw new NotImplementedException();
+            }
+
+            IEnumerator IEnumerable.GetEnumerator()
+            {
+                return this.GetEnumerator();
+            }
         }
     }
 }

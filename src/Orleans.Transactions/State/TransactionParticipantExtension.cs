@@ -1,9 +1,8 @@
 ﻿
-using Orleans.Transactions.Abstractions;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Newtonsoft.Json;
+using Orleans.Transactions.Abstractions;
 
 namespace Orleans.Transactions
 {
@@ -16,44 +15,15 @@ namespace Orleans.Transactions
             this.localParticipants.Add(resourceId, localTransactionParticipant);
         }
 
-        public Task Abort(string resourceId, Guid transactionId)
-        {
-            return localParticipants[resourceId].Abort(transactionId);
-        }
-
-        public Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)
-        {
-            return localParticipants[resourceId].Cancel(transactionId, timeStamp, status);
-        }
-
-        public Task<TransactionalStatus> CommitReadOnly(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
-        {
-            return localParticipants[resourceId].CommitReadOnly(transactionId, accessCount, timeStamp);
-        }
-
-        public Task Confirm(string resourceId, Guid transactionId, DateTime timeStamp)
-        {
-            return localParticipants[resourceId].Confirm(transactionId, timeStamp);
-        }
-
-        public Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ITransactionParticipant participant)
-        {
-            return localParticipants[resourceId].Ping(transactionId, timeStamp, participant);
-        }
-
-        public Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionParticipant transactionManager)
+        public Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount,
+            DateTime timeStamp, ITransactionManager transactionManager)
         {
             return localParticipants[resourceId].Prepare(transactionId, accessCount, timeStamp, transactionManager);
         }
 
-        public Task<TransactionalStatus> PrepareAndCommit(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
+        public Task Commit(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
-            return localParticipants[resourceId].PrepareAndCommit(transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
-        }
-
-        public Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ITransactionParticipant participant, TransactionalStatus status)
-        {
-            return localParticipants[resourceId].Prepared(transactionId, timestamp, participant, status);
+            return localParticipants[resourceId].Commit(transactionId, timeStamp, status);
         }
     }
 }

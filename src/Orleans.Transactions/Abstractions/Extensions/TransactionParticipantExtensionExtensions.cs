@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
-using Orleans.CodeGeneration;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -70,43 +68,14 @@ namespace Orleans.Transactions.Abstractions.Extensions
                 }
             }
 
-            public Task Abort(Guid transactionId)
-            {
-                return extension.Abort(resourceId, transactionId);
-            }
-
-            public Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
-            {
-                return extension.Cancel(resourceId, transactionId, timeStamp, status);
-            }
-
-            public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
-            {
-                return extension.CommitReadOnly(resourceId, transactionId, accessCount, timeStamp);
-            }
-
-            public Task Confirm(Guid transactionId, DateTime timeStamp)
-            {
-                return extension.Confirm(resourceId, transactionId, timeStamp);
-            }
-            public Task Ping(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant)
-            {
-                return extension.Ping(resourceId, transactionId, timeStamp, participant);
-            }
-
-            public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionParticipant transactionManager)
+            public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionManager transactionManager)
             {
                 return extension.Prepare(resourceId, transactionId, accessCount, timeStamp, transactionManager);
             }
 
-            public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
+            public Task Commit(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
             {
-                return extension.PrepareAndCommit(resourceId, transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
-            }
-
-            public Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status)
-            {
-                return extension.Prepared(resourceId, transactionId, timeStamp, participant, status);
+                return extension.Commit(resourceId, transactionId, timeStamp, status);
             }
         }
     }

@@ -372,7 +372,7 @@ namespace Orleans.Runtime
                         if (startNewTransaction)
                         {
                             OrleansTransactionAbortedException abortException = transactionInfo.MustAbort(serializationManager);
-                            this.transactionAgent.Abort(transactionInfo, abortException);
+                            await this.transactionAgent.ResolveTransaction(transactionInfo, true);
                             exc1 = abortException;
                         }
                     }
@@ -413,17 +413,10 @@ namespace Orleans.Runtime
                         // or if it must abort, tell participants that it aborted
                         if (startNewTransaction)
                         {
-                            if (transactionException == null)
+                            var status = await this.transactionAgent.ResolveTransaction(transactionInfo, transactionException != null);
+                            if (status != TransactionalStatus.Ok)
                             {
-                                var status = await this.transactionAgent.Commit(transactionInfo);
-                                if (status != TransactionalStatus.Ok)
-                                {
-                                    transactionException = status.ConvertToUserException(transactionInfo.Id);
-                                }
-                            }
-                            else
-                            {
-                                this.transactionAgent.Abort(transactionInfo, (OrleansTransactionAbortedException) transactionException);
+                                transactionException = status.ConvertToUserException(transactionInfo.Id);
                             }
                             TransactionContext.Clear();
                         }

@@ -1,12 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans.Concurrency;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.Abstractions.Extensions;
 
 namespace Orleans.Transactions
 {
@@ -15,7 +13,7 @@ namespace Orleans.Transactions
     /// </summary>
     public interface ITransactionalStateStorageEvents<TState> where TState : class, new()
     {
-        void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp, ITransactionParticipant transactionManager, TState state);
+        void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp, ITransactionManager transactionManager, TState state);
 
         void Read(DateTime timestamp);
 
@@ -162,7 +160,7 @@ namespace Orleans.Transactions
         }
 
         public void Prepare(long sequenceNumber, Guid transactionId, DateTime timestamp,
-          ITransactionParticipant transactionManager, TState state)
+          ITransactionManager transactionManager, TState state)
         {
             prepare++;
             total++;

@@ -4,10 +4,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions;
 using Orleans.Storage;
 
 namespace Orleans.Transactions
@@ -20,7 +18,6 @@ namespace Orleans.Transactions
         where TState : class, new()
     {
         private bool detectReentrancy;
-
 
         private async Task StorageWork()
         {
@@ -169,7 +166,7 @@ namespace Orleans.Transactions
                             if (bottom.PrepareIsPersisted && !bottom.LastSent.HasValue)
                             {
                                 // send PreparedMessage to remote TM
-                                bottom.TransactionManager.Prepared(bottom.TransactionId, bottom.Timestamp, thisParticipant, TransactionalStatus.Ok).Ignore();                                
+                                bottom.TransactionManager.Report(bottom.TransactionId, bottom.Timestamp, thisParticipant, TransactionalStatus.Ok).Ignore();                                
                                     
                                 bottom.LastSent = now;
 
@@ -188,7 +185,8 @@ namespace Orleans.Transactions
 
                                 if (bottom.LastSent + RemoteTransactionPingFrequency <= now)
                                 {
-                                    bottom.TransactionManager.Ping(bottom.TransactionId, bottom.Timestamp, thisParticipant);
+                                    // resend PreparedMessage to remote TM
+                                    bottom.TransactionManager.Report(bottom.TransactionId, bottom.Timestamp, thisParticipant, TransactionalStatus.Ok).Ignore();
                                     bottom.LastSent = now;
                                 }
                                 else
@@ -352,7 +350,7 @@ namespace Orleans.Transactions
                         if (entry.LastSent.HasValue)
                             return; // cannot abort anymore if we already sent prepare-ok message
 
-                        entry.TransactionManager.Prepared(entry.TransactionId, entry.Timestamp, thisParticipant, status).Ignore();
+                        entry.TransactionManager.Report(entry.TransactionId, entry.Timestamp, thisParticipant, status).Ignore();
                         break;
                     }
                 case CommitRole.LocalCommit:
@@ -362,13 +360,6 @@ namespace Orleans.Transactions
 
                         // reply to transaction agent
                         entry.PromiseForTA.TrySetResult(status);
-
-                        // tell remote participants
-                        foreach (var p in entry.WriteParticipants)
-                            if (p != thisParticipant)
-                            {
-                                 p.Cancel(entry.TransactionId, entry.Timestamp, status).Ignore();
-                            }
 
                         break;
                     }
@@ -478,7 +469,6 @@ namespace Orleans.Transactions
             ));
         }
 
-
         public string CurrentTransactionId => TransactionContext.GetRequiredTransactionInfo<TransactionInfo>().Id;
 
         /// <summary>
@@ -542,22 +532,7 @@ namespace Orleans.Transactions
                  }));
         }
 
-
-        /// <summary>
-        /// called for transactions that do not enter prepare phase
-        /// </summary>
-        public Task Abort(Guid transactionId)
-        {
-            // release the lock
-            Rollback(transactionId, "abort message from TA", false);
-
-            lockWorker.Notify();
-
-            return Task.CompletedTask; // one-way, no response
-        }
-
-
-        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionParticipant transactionManager)
+        public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ITransactionManager transactionManager)
         {
             var valid = ValidateLock(transactionId, accessCount, out var status, out var record);
 
@@ -580,6 +555,7 @@ namespace Orleans.Transactions
             return Task.CompletedTask; // one-way, no response
         }
 
+        /*
         public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ITransactionParticipant> writeParticipants, int totalParticipants)
         {
             // validate the lock
@@ -604,7 +580,9 @@ namespace Orleans.Transactions
             lockWorker.Notify();
             return record.PromiseForTA.Task;
         }
+        */
 
+        /*
         public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
         {
             // validate the lock
@@ -626,7 +604,9 @@ namespace Orleans.Transactions
             lockWorker.Notify();
             return record.PromiseForTA.Task;
         }
+        */
 
+        /*
         public Task Prepared(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status)
         {
             var pos = commitQueue.Find(transactionId, timeStamp);
@@ -680,8 +660,16 @@ namespace Orleans.Transactions
 
             return Task.CompletedTask; // one-way, no response
         }
+        */
 
-        public async Task Confirm(Guid transactionId, DateTime timeStamp)
+        public Task Commit(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+        {
+            return (status == TransactionalStatus.Ok)
+                ? Confirm(transactionId, timeStamp)
+                : Cancel(transactionId, timeStamp, status);
+        }
+
+        private async Task Confirm(Guid transactionId, DateTime timeStamp)
         {
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);
@@ -693,7 +681,7 @@ namespace Orleans.Transactions
 
                 if (remoteEntry.Role != CommitRole.RemoteCommit)
                 {
-                    logger.Error(666, $"internal error in {nameof(Prepared)}: wrong commit type");
+                    logger.Error(666, $"internal error in {nameof(Commit)}: wrong commit type");
                     throw new InvalidOperationException($"Wrong commit type: {remoteEntry.Role}");
                 }
 
@@ -708,7 +696,7 @@ namespace Orleans.Transactions
                 await remoteEntry.ConfirmationResponsePromise.Task;
         }
 
-        public Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
+        private Task Cancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status)
         {
             // find in queue
             var pos = commitQueue.Find(transactionId, timeStamp);
@@ -727,6 +715,7 @@ namespace Orleans.Transactions
             return Task.CompletedTask;
         }
 
+        /*
         public Task Ping(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant)
         {
             if (commitQueue.Find(transactionId, timeStamp) != -1)
@@ -753,6 +742,7 @@ namespace Orleans.Transactions
             }
             return Task.CompletedTask; // one-way, no response
         }
+        */
 
         private void EnqueueCommit(TransactionRecord<TState> record)
         {
@@ -823,7 +813,7 @@ namespace Orleans.Transactions
                                 if (behindRemoteEntryBySameTM)
                                 {
                                     // can send prepared message immediately after persisting prepare record
-                                    record.TransactionManager.Prepared(record.TransactionId, record.Timestamp, thisParticipant, TransactionalStatus.Ok).Ignore();
+                                    record.TransactionManager.Report(record.TransactionId, record.Timestamp, thisParticipant, TransactionalStatus.Ok).Ignore();
                                     record.LastSent = DateTime.UtcNow;
                                 }
                             });
@@ -869,7 +859,7 @@ namespace Orleans.Transactions
                 {
                     if (p != thisParticipant)
                     {
-                        tasks.Add(p.Confirm(record.TransactionId, record.Timestamp));
+                        tasks.Add(p.Commit(record.TransactionId, record.Timestamp, TransactionalStatus.Ok));
                     }
                 }
 
@@ -890,8 +880,5 @@ namespace Orleans.Transactions
                 logger.Warn(333, $"Could not notify/collect:", e);
             }
         }
-
-
-
     }
 }

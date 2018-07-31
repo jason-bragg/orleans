@@ -62,7 +62,7 @@ namespace Orleans.Transactions
         public TaskCompletionSource<TransactionalStatus> PromiseForTA;
 
         // used for local and remote commit
-        public ITransactionParticipant TransactionManager;
+        public ITransactionManager TransactionManager;
 
         // used for local commit
         public List<ITransactionParticipant> WriteParticipants;

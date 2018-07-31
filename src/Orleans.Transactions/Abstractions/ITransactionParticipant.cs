@@ -11,14 +11,14 @@ namespace Orleans.Transactions.Abstractions
             DateTime timeStamp, ITransactionManager transactionManager);
 
         Task Commit(Guid transactionId, DateTime timeStamp, TransactionalStatus status);
+
+        Task Abort(Guid transactionId);
     }
 
     public interface ITransactionManager
     {
-        Task<TransactionalStatus> Resolve(Guid transactionId, AccessCounter accessCount, DateTime timeStamp,
-            IList<ITransactionParticipant> writeParticipants, int totalParticipants);
-
-        Task Report(Guid transactionId, DateTime timeStamp, ITransactionParticipant participant, TransactionalStatus status);
+        Task<TransactionalStatus> Resolve(Guid transactionId, DateTime timeStamp,
+            IList<ITransactionParticipant> writeParticipants, bool abort);
     }
 
     /// <summary>

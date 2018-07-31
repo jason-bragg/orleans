@@ -364,16 +364,13 @@ namespace Orleans.Runtime
 
                     if (transactionInfo != null)
                     {
-                        transactionInfo.ReconcilePending();
-                        
-                        // Record reason for abort, if not alread set
-                        transactionInfo.RecordException(exc1, serializationManager);
+                        transactionInfo.TryReconcilePending();
 
                         if (startNewTransaction)
                         {
-                            OrleansTransactionAbortedException abortException = transactionInfo.MustAbort(serializationManager);
                             await this.transactionAgent.ResolveTransaction(transactionInfo, true);
-                            exc1 = abortException;
+                            if(!(exc1 is OrleansTransactionException))
+                                exc1 = new OrleansTransactionAbortedException(transactionInfo.Id, exc1);
                         }
                     }
 
@@ -406,17 +403,18 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        transactionInfo.ReconcilePending();
-                        transactionException = transactionInfo.MustAbort(serializationManager);
+                        transactionException = transactionInfo.TryReconcilePending()
+                            ? null
+                            : new OrleansOrphanCallException(transactionInfo.Id);
 
-                        // This request started the transaction, so we try to commit before returning,
+                        // This request started the transaction, so we resolve the transaction before returning,
                         // or if it must abort, tell participants that it aborted
                         if (startNewTransaction)
                         {
                             var status = await this.transactionAgent.ResolveTransaction(transactionInfo, transactionException != null);
                             if (status != TransactionalStatus.Ok)
                             {
-                                transactionException = status.ConvertToUserException(transactionInfo.Id);
+                                transactionException = transactionException ?? status.ConvertToUserException(transactionInfo.Id);
                             }
                             TransactionContext.Clear();
                         }

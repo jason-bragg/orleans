@@ -5,7 +5,6 @@ using System.Linq;
 using System.Collections.Concurrent;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.Abstractions.Extensions;
-using Orleans.Serialization;
 
 namespace Orleans.Transactions
 {
@@ -22,7 +21,6 @@ namespace Orleans.Transactions
         {
             TransactionId = id;
             IsReadOnly = readOnly;
-            OriginalException = null;
             PendingCalls = 0;
             Participants = new Dictionary<ITransactionParticipant, AccessCounter>();
             TimeStamp = timeStamp;
@@ -40,7 +38,6 @@ namespace Orleans.Transactions
         {
             TransactionId = other.TransactionId;
             IsReadOnly = other.IsReadOnly;
-            OriginalException = null;
             PendingCalls = 0;
             Participants = new Dictionary<ITransactionParticipant, AccessCounter>();
             TimeStamp = other.TimeStamp;
@@ -62,9 +59,7 @@ namespace Orleans.Transactions
         public int TMBatchSize { get; set; }
 
         public bool IsReadOnly { get; }
-
-        public byte[] OriginalException { get; set; }
-        
+    
         // counts how many writes were done per each accessed resource
         // zero means the resource was only read
         public Dictionary<ITransactionParticipant, AccessCounter> Participants { get; }
@@ -86,59 +81,24 @@ namespace Orleans.Transactions
             this.joined.Enqueue((TransactionInfo)x);
         }
 
-        public OrleansTransactionAbortedException MustAbort(SerializationManager sm)
-        {
-
-            if (OriginalException != null)
-            {
-                var reader = new BinaryTokenStreamReader(OriginalException);
-                return sm.Deserialize<OrleansTransactionAbortedException>(reader);
-            }
-            else if (PendingCalls != 0)
-            {
-                return new OrleansOrphanCallException(TransactionId.ToString(), PendingCalls);
-            }
-            else
-            {
-                return null;
-            }
-
-        }
-
-        public void RecordException(Exception e, SerializationManager sm)
-        {
-            if (OriginalException == null)
-            {
-                var exception = (e as OrleansTransactionAbortedException)
-                    ?? new OrleansTransactionAbortedException(TransactionId.ToString(), e);
-
-                var writer = new BinaryTokenStreamWriter();
-                sm.Serialize(exception, writer);
-                OriginalException = writer.ToByteArray();
-            }
-        }
-
         /// <summary>
         /// Reconciles all pending calls that have join the transaction.
         /// </summary>
         /// <returns>true if there are no orphans, false otherwise</returns>
-        public void ReconcilePending()
+        public bool TryReconcilePending()
         {
             TransactionInfo transactionInfo;
             while (this.joined.TryDequeue(out transactionInfo))
             {
                 Union(transactionInfo);
-                PendingCalls--;
+                this.PendingCalls--;
             }
+
+            return this.PendingCalls != 0;
         }
 
         private void Union(TransactionInfo other)
         {
-            if (OriginalException == null)
-            {
-                OriginalException = other.OriginalException;
-            }
-
             // Take sum of write counts
             foreach (var grain in other.Participants.Keys)
             {
@@ -200,7 +160,6 @@ namespace Orleans.Transactions
             return string.Join("",
                 $"{TransactionId} {TimeStamp:o}",
                 (IsReadOnly ? " RO" : ""),
-                (OriginalException != null ? " Aborting" : ""),
                 $" {{{string.Join(" ", Participants.Select(kvp => $"{kvp.Key.ToShortString()}:{kvp.Value.Reads},{kvp.Value.Writes}"))}}}",
                 TMCandidate != null ? $" TM={TMCandidate.ToShortString()}({TMBatchSize})" : ""
             );

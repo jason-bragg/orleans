@@ -178,10 +178,10 @@ namespace Orleans.Transactions
     [Serializable]
     public class OrleansOrphanCallException : OrleansTransactionAbortedException
     {
-        public OrleansOrphanCallException(string transactionId, int pendingCalls)
+        public OrleansOrphanCallException(string transactionId)
             : base(
                 transactionId,
-                $"Transaction {transactionId} aborted because method did not await all its outstanding calls ({pendingCalls})")
+                $"Transaction {transactionId} aborted because method did not await all its outstanding calls.")
         {
         }
 

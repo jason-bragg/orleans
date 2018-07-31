@@ -46,33 +46,40 @@ namespace Orleans.Transactions
             return Task.FromResult<ITransactionInfo>(new TransactionInfo(guid, ts, ts));
         }
 
-        public async Task<TransactionalStatus> Commit(ITransactionInfo info)
+        public Task<TransactionalStatus> ResolveTransaction(ITransactionInfo info, bool abort)
         {
             var transactionInfo = (TransactionInfo)info;
+            return abort
+                ? Abort(transactionInfo)
+                : Commit(transactionInfo);
 
-            transactionInfo.TimeStamp = this.clock.MergeUtcNow(transactionInfo.TimeStamp);
+        }
+
+        private async Task<TransactionalStatus> Commit(TransactionInfo info)
+        {
+            info.TimeStamp = this.clock.MergeUtcNow(info.TimeStamp);
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {transactionInfo}");
+                logger.Trace($"{stopwatch.Elapsed.TotalMilliseconds:f2} prepare {info}");
 
             List<ITransactionParticipant> writeParticipants = null;
-            foreach (var p in transactionInfo.Participants)
+            foreach (KeyValuePair<ITransactionParticipant,AccessCounter> kvp in info.Participants)
             {
-                if (p.Value.Writes > 0)
+                if (kvp.Value.Writes > 0)
                 {
                     if (writeParticipants == null)
                     {
                         writeParticipants = new List<ITransactionParticipant>();
                     }
-                    writeParticipants.Add(p.Key);
+                    writeParticipants.Add(kvp.Key);
                 }
             }
 
             try
             {
                 TransactionalStatus status = (writeParticipants == null)
-                    ? await CommitReadOnlyTransaction(transactionInfo)
-                    : await CommitReadWriteTransaction(transactionInfo, writeParticipants);
+                    ? await CommitReadOnlyTransaction(info)
+                    : await CommitReadWriteTransaction(info, writeParticipants);
                 if (status == TransactionalStatus.Ok)
                     this.statistics.TrackTransactionSucceeded();
                 else
@@ -193,21 +200,23 @@ namespace Orleans.Transactions
             return TransactionalStatus.Ok;
         }
 
-        public void Abort(ITransactionInfo info, OrleansTransactionAbortedException reason)
+        private async Task<TransactionalStatus> Abort(TransactionInfo info)
         {
             this.statistics.TrackTransactionFailed();
-            var transactionInfo = (TransactionInfo)info;
-
-            List<ITransactionParticipant> participants = transactionInfo.Participants.Keys.ToList();
+            List<ITransactionParticipant> participants = info.Participants.Keys.ToList();
 
             if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"abort {transactionInfo} {string.Join(",", participants.Select(p => p.ToString()))} {reason}");
+                logger.Trace($"abort {info} {string.Join(",", participants.Select(p => p.ToString()))}");
 
-            // send one-way abort messages to release the locks and roll back any updates
-            foreach (var p in participants)
-            {
-                p.Abort(transactionInfo.TransactionId);
-            }
+            // send abort messages to release the locks and roll back any updates
+            await Task.WhenAll(participants.Select(p => p.Abort(info.TransactionId)));
+
+            return TransactionalStatus.Ok;
+        }
+
+        private ITransactionManager GetTransactionManager(ITransactionInfo info)
+        {
+            throw new NotImplementedException();
         }
     }
 }

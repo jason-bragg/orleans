@@ -11,6 +11,7 @@ namespace Orleans.Transactions
     /// </summary>
     public enum TransactionalStatus
     {
+        UnSet,             // never use this.  It indecates value was not set correctly
         Ok,
 
         PrepareTimeout,    // TM could not finish prepare in time

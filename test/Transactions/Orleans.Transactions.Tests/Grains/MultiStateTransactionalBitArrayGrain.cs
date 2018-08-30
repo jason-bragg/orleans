@@ -153,8 +153,8 @@ namespace Orleans.Transactions.Tests.Correctness
             // Continue with the non-overlapping portion.
             for (; i < result.value.Length; i++)
             {
-                var leftVal = left.value.Length < i ? left.value[i] : 0;
-                var rightVal = right.value.Length < i ? right.value[i] : 0;
+                var leftVal = left.value.Length > i ? left.value[i] : 0;
+                var rightVal = right.value.Length > i ? right.value[i] : 0;
                 result.value[i] = op(leftVal, rightVal);
             }
 
@@ -215,7 +215,8 @@ namespace Orleans.Transactions.Tests.Correctness
         public override Task OnActivateAsync()
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainIdentity().ToString());
-            
+            this.logger.LogInformation($"GrainId : {this.GetPrimaryKey()}.");
+
             return base.OnActivateAsync();
         }
 
@@ -237,7 +238,11 @@ namespace Orleans.Transactions.Tests.Correctness
             var result = new List<BitArrayState>(this.dataArray.Length);
             foreach (var state in this.dataArray)
             {
-                result.Add(await state.PerformRead(s => s));
+                result.Add(await state.PerformRead(s =>
+                {
+                    this.logger.LogInformation($"Get state {s}.");
+                    return s;
+                }));
             }
 
             return result;

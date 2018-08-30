@@ -13,12 +13,12 @@ namespace Orleans.Transactions.Abstractions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
+//        [OneWay]
         Task Abort(string resourceId, Guid transactionId);
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
+//        [OneWay]
         Task Cancel(string resourceId, Guid transactionId, DateTime timeStamp, TransactionalStatus status);
 
         [AlwaysInterleave]
@@ -27,7 +27,7 @@ namespace Orleans.Transactions.Abstractions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
+//        [OneWay]
         Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager);
     }
 }

@@ -14,12 +14,12 @@ namespace Orleans.Transactions.Abstractions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
+//        [OneWay]
         Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status);
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
+//        [OneWay]
         Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource);
     }
 }

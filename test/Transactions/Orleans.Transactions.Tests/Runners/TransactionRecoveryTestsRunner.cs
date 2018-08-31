@@ -18,6 +18,7 @@ namespace Orleans.Transactions.Tests
     public class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
     {
         private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(120);
+        // reduce to or remove once we fix timeouts abort
         private static readonly TimeSpan RetryDelay = TimeSpan.FromSeconds(30);
 
         private readonly Random random;
@@ -104,7 +105,6 @@ namespace Orleans.Transactions.Tests
 
             this.Log($"Waiting for system to recover. Performed {index[0]} transactions on each group.");
             var activePairs = new[] { pairs };
-            await Task.Delay(TimeSpan.FromSeconds(30));
             await TestingUtils.WaitUntilAsync(lastTry => CheckTxResult(activePairs, getIndex, lastTry), RecoveryTimeout, RetryDelay);
             this.Log($"Recovery completed. Performed {index[0]} transactions on each group. Validating results.");
             await ValidateResults(txGrains);

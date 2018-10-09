@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.TestingHost;
 using TestExtensions;
+using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.StreamingTests
@@ -26,8 +27,10 @@ namespace UnitTests.StreamingTests
             {
                 public void Configure(ISiloHostBuilder hostBuilder)
                 {
-                    hostBuilder.AddSimpleMessageStreamProvider(StreamProvider)
-                        .AddMemoryGrainStorage("PubSubStore");
+                    hostBuilder
+                        .AddSimpleMessageStreamProvider(StreamProvider)
+                        .AddMemoryGrainStorage("PubSubStore")
+                        .Configure<Stream_AggregationOptions>(options => options.StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
                 }
             }
             public class ClientConfiguretor : IClientBuilderConfigurator
@@ -89,6 +92,13 @@ namespace UnitTests.StreamingTests
         {
             this.fixture.Logger.Info("************************ SMSSubscribeFromClientTest *********************************");
             await runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Functional"), TestCategory("Streaming")]
+        public async Task Repro_Issues_5034()
+        {
+            this.fixture.Logger.Info("************************ Repro_Issues_5034 *********************************");
+            await runner.Repro_Issues_5034(Guid.NewGuid());
         }
     }
 }

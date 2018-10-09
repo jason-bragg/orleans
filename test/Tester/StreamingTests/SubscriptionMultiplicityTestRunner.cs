@@ -334,6 +334,26 @@ namespace UnitTests.StreamingTests
             await handle.UnsubscribeAsync();
         }
 
+        /// <summary>
+        /// https://github.com/dotnet/orleans/issues/5034
+        /// </summary>
+        public async Task Repro_Issues_5034(Guid streamGuid)
+        {
+            const int expected = 1000; // must be divisible by 2
+            var provider = this.testCluster.Client.ServiceProvider.GetServiceByName<IStreamProvider>(streamProviderName);
+            var intstream = provider.GetStream<int>(streamGuid, Stream_AggregationOptions.Int_Aggregator_StreamNamespace);
+            var stringstream = provider.GetStream<string>(streamGuid, Stream_AggregationOptions.String_Aggregator_StreamNamespace);
+            for(int i=0; i< expected; i++)
+            {
+                await Task.WhenAll(intstream.OnNextAsync(i), stringstream.OnNextAsync(i.ToString()));
+            }
+
+            IStream_Aggregation consumer = this.testCluster.GrainFactory.GetGrain<IStream_Aggregation>(streamGuid);
+
+            // check
+            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(consumer, expected, lastTry), Timeout);
+        }
+
         private async Task<bool> CheckCounters(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int consumerCount, bool assertIsTrue)
         {
             var numProduced = await producer.GetNumberProduced();
@@ -403,6 +423,18 @@ namespace UnitTests.StreamingTests
             }
             logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             return true;
+        }
+
+        private async Task<bool> CheckCounters(IStream_Aggregation consumer, int expected, bool assertIsTrue)
+        {
+            Tuple<int,int> numConsumed = await consumer.GetNumberConsumed();
+            if (assertIsTrue)
+            {
+                Assert.Equal(numConsumed.Item1, numConsumed.Item2);
+                Assert.Equal(expected, numConsumed.Item1);
+                Assert.Equal(expected, numConsumed.Item2);
+            }
+            return numConsumed.Item1 == expected && numConsumed.Item2 == expected;
         }
     }
 }

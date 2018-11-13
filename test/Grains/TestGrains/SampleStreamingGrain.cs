@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Orleans;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -34,6 +35,65 @@ namespace UnitTests.Grains
         {
             hostingGrain.logger.Info("OnErrorAsync({0})", ex);
             return Task.CompletedTask;
+        }
+    }
+
+    public class SimpleStreamConsumer<T> : Grain, ISimpleStreamConsumer<T>
+                where T : class
+    {
+        private readonly ILogger<SimpleStreamConsumer<T>> logger;
+        private T value;
+
+        public SimpleStreamConsumer(ILogger<SimpleStreamConsumer<T>> logger)
+        {
+            this.logger = logger;
+        }
+        public override Task OnActivateAsync()
+        {
+            logger.Info("OnActivateAsync {GraiId}", this.GetGrainIdentity());
+            return Task.CompletedTask;
+        }
+
+        public Task Subscribe(string streamProviderName)
+        {
+            return this.GetStreamProvider(streamProviderName)
+                       .GetStream<T>(this.GetPrimaryKey(), null)
+                       .SubscribeAsync(OnNextAsync);
+        }
+
+        public Task<T> Get()
+        {
+            return Task.FromResult(this.value);
+        }
+
+        private Task OnNextAsync(T value, StreamSequenceToken token)
+        {
+            logger.Info("SimpleStreamConsumer {GraiId} received {Value}", this.GetGrainIdentity(), value);
+            this.value = value;
+            return Task.CompletedTask;
+        }
+    }
+
+    public class SimpleStreamProducer<T> : Grain, ISimpleStreamProducer<T>
+            where T : class
+    {
+        private readonly ILogger<SimpleStreamProducer<T>> logger;
+
+        public SimpleStreamProducer(ILogger<SimpleStreamProducer<T>> logger)
+        {
+            this.logger = logger;
+        }
+        public override Task OnActivateAsync()
+        {
+            logger.Info("OnActivateAsync {GraiId}", this.GetGrainIdentity());
+            return Task.CompletedTask;
+        }
+
+        public Task Send(string streamProviderName, T value)
+        {
+            return this.GetStreamProvider(streamProviderName)
+                       .GetStream<T>(this.GetPrimaryKey(), null)
+                       .OnNextAsync(value);
         }
     }
 

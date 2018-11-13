@@ -31,6 +31,25 @@ namespace UnitTests.StreamingTests
             this.testCluster = testCluster;
         }
 
+        [Serializable]
+        public class Foo
+        {
+            public long Value {get;set;}
+        }
+
+        public async Task SimpleSendFoo()
+        {
+            Guid streamId = Guid.NewGuid();
+            Foo expectedFoo = new Foo { Value = DateTime.UtcNow.Ticks };
+            ISimpleStreamProducer<Foo> producer = this.testCluster.GrainFactory.GetGrain<ISimpleStreamProducer<Foo>>(streamId);
+            ISimpleStreamConsumer<Foo> consumer = this.testCluster.GrainFactory.GetGrain<ISimpleStreamConsumer<Foo>>(streamId);
+
+            await consumer.Subscribe(this.streamProviderName);
+            await producer.Send(this.streamProviderName, expectedFoo);
+
+            await TestingUtils.WaitUntilAsync(lastTry => CheckFoo(consumer, expectedFoo, lastTry), Timeout);
+        }
+
         public async Task MultipleParallelSubscriptionTest(Guid streamGuid, string streamNamespace)
         {
             // get producer and consumer
@@ -403,6 +422,17 @@ namespace UnitTests.StreamingTests
             }
             logger.Info("All counts are equal. numProduced = {0}, numConsumed = {1}", numProduced, numConsumed);
             return true;
+        }
+
+        private async Task<bool> CheckFoo(ISimpleStreamConsumer<Foo> consumer, Foo expected, bool assertIsTrue)
+        {
+            Foo actual = await consumer.Get();
+            if (assertIsTrue)
+            {
+                Assert.NotNull(actual);
+                Assert.Equal(expected.Value, actual?.Value);
+            }
+            return actual != null && actual.Value == expected.Value;
         }
     }
 }

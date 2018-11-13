@@ -66,6 +66,13 @@ namespace ServiceBus.Tests.StreamingTests
         }
 
         [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
+        public async Task EHSimpleSendFoo()
+        {
+            this.fixture.Logger.Info("************************ EHSimpleSendFoo *********************************");
+            await runner.SimpleSendFoo();
+        }
+
+        [Fact, TestCategory("EventHub"), TestCategory("Streaming")]
         public async Task EHMultipleParallelSubscriptionTest()
         {
             this.fixture.Logger.Info("************************ EHMultipleParallelSubscriptionTest *********************************");

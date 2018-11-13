@@ -18,6 +18,19 @@ namespace UnitTests.GrainInterfaces
         Task Produce();
     }
 
+    public interface ISimpleStreamConsumer<T> : IGrainWithGuidKey
+        where T : class
+    {
+        Task Subscribe(string streamProviderName);
+        Task<T> Get();
+    }
+
+    public interface ISimpleStreamProducer<T> : IGrainWithGuidKey
+    where T : class
+    {
+        Task Send(string streamProviderName, T value);
+    }
+
     public interface ISampleStreaming_ConsumerGrain : IGrainWithGuidKey
     {
         Task BecomeConsumer(Guid streamId, string streamNamespace, string providerToUse);

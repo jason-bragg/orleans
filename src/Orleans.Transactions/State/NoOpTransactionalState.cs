@@ -35,6 +35,7 @@ namespace Orleans.Transactions
         private bool detectReentrancy;
 
         private TState state = new TState();
+        private NoOpTransactionalResource resource;
 
         public NoOpTransactionalState(
             ITransactionalStateConfiguration transactionalStateConfiguration,
@@ -67,10 +68,9 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform a read operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+            this.resource.CallTimeStamp = DateTime.UtcNow;
 
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartRead {info}");
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
@@ -102,10 +102,9 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
             }
 
-            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
+            this.resource.CallTimeStamp = DateTime.UtcNow;
 
-            if (logger.IsEnabled(LogLevel.Trace))
-                logger.Trace($"StartWrite {info}");
+            var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
             if (info.IsReadOnly)
             {
@@ -136,10 +135,10 @@ namespace Orleans.Transactions
             lifecycle.Subscribe<TransactionalState<TState>>(GrainLifecycleStage.SetupState, (ct) => OnSetupState(ct, SetupResourceFactory));
         }
 
-        private static void SetupResourceFactory(IGrainActivationContext context, string stateName)
+        private void SetupResourceFactory(IGrainActivationContext context, string stateName)
         {
             // Add resources factory to the grain context
-            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new NoOpTransactionalResource());
+            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => resource);
 
             // Add tm factory to the grain context
             context.RegisterResourceFactory<ITransactionManager>(stateName, () => new NoOpTransactionManager());
@@ -148,10 +147,9 @@ namespace Orleans.Transactions
         internal Task OnSetupState(CancellationToken ct, Action<IGrainActivationContext, string> setupResourceFactory)
         {
             if (ct.IsCancellationRequested) return Task.CompletedTask;
-
             this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
-
-            this.logger = loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
+            this.logger = this.loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
+            this.resource = new NoOpTransactionalResource(this.logger);
 
             setupResourceFactory(this.context, this.config.StateName);
 
@@ -193,6 +191,15 @@ namespace Orleans.Transactions
 
         private class NoOpTransactionalResource : ITransactionalResource
         {
+            private ILogger logger;
+
+            public DateTime CallTimeStamp { get; set; }
+
+            public NoOpTransactionalResource(ILogger logger)
+            {
+                this.logger = logger;
+            }
+
             public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
             {
                 return Task.FromResult(TransactionalStatus.Ok);
@@ -215,6 +222,7 @@ namespace Orleans.Transactions
 
             public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
             {
+                this.logger.LogInformation("Prepare delta {Delta}ms", Math.Floor((DateTime.UtcNow - this.CallTimeStamp).TotalMilliseconds));
                 return Task.CompletedTask;
             }
         }

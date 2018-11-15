@@ -11,6 +11,7 @@ using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Configuration;
+using System.Diagnostics;
 
 namespace Orleans.Transactions
 {
@@ -68,7 +69,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform a read operation from within another operation");
             }
 
-            this.callTime.TimeStamp = DateTime.UtcNow;
+            this.callTime.Watch.Restart();
 
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
@@ -102,7 +103,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
             }
 
-            this.callTime.TimeStamp = DateTime.UtcNow;
+            this.callTime.Watch.Restart();
 
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
@@ -174,24 +175,26 @@ namespace Orleans.Transactions
         private class CallTime
         {
             private readonly ILogger logger;
-            private long max;
+            private long maxMs;
             private long accumulatedMs;
             private long count;
-            public DateTime TimeStamp { get; set; }
+            public Stopwatch Watch { get; set; }
 
             public CallTime(ILogger logger)
             {
+                this.Watch = new Stopwatch();
                 this.logger = logger;
             }
 
             public void Report()
             {
-                long deltaMs = (long)Math.Floor((DateTime.UtcNow - this.TimeStamp).TotalMilliseconds);
-                this.max = Math.Max(this.max, deltaMs);
+                this.Watch.Stop();
+                long deltaMs = this.Watch.ElapsedMilliseconds;
+                this.maxMs = Math.Max(this.maxMs, deltaMs);
                 this.accumulatedMs += deltaMs;
                 this.count++;
-                if (this.count % 10 == 1)
-                    this.logger.LogInformation("Prepare delta {DeltaMs}ms, average {AverageMs}, max {MaxMs}", deltaMs, (long)Math.Floor((double)this.accumulatedMs / this.count), this.max);
+                if (this.count % 5 == 1)
+                    this.logger.LogInformation("Prepare deltaMs: {DeltaMs}ms, averageMs: {AverageMs}, maxMs: {MaxMs}", deltaMs, (long)Math.Floor((double)this.accumulatedMs / this.count), this.maxMs);
             }
         }
 

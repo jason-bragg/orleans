@@ -35,7 +35,7 @@ namespace Orleans.Transactions
         private bool detectReentrancy;
 
         private TState state = new TState();
-        private NoOpTransactionalResource resource;
+        private CallTime callTime;
 
         public NoOpTransactionalState(
             ITransactionalStateConfiguration transactionalStateConfiguration,
@@ -68,7 +68,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform a read operation from within another operation");
             }
 
-            this.resource.CallTimeStamp = DateTime.UtcNow;
+            this.callTime.TimeStamp = DateTime.UtcNow;
 
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
@@ -102,7 +102,7 @@ namespace Orleans.Transactions
                 throw new LockRecursionException("cannot perform an update operation from within another operation");
             }
 
-            this.resource.CallTimeStamp = DateTime.UtcNow;
+            this.callTime.TimeStamp = DateTime.UtcNow;
 
             var info = (TransactionInfo)TransactionContext.GetRequiredTransactionInfo<TransactionInfo>();
 
@@ -138,10 +138,10 @@ namespace Orleans.Transactions
         private void SetupResourceFactory(IGrainActivationContext context, string stateName)
         {
             // Add resources factory to the grain context
-            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => resource);
+            context.RegisterResourceFactory<ITransactionalResource>(stateName, () => new NoOpTransactionalResource(this.callTime));
 
             // Add tm factory to the grain context
-            context.RegisterResourceFactory<ITransactionManager>(stateName, () => new NoOpTransactionManager());
+            context.RegisterResourceFactory<ITransactionManager>(stateName, () => new NoOpTransactionManager(this.callTime));
         }
 
         internal Task OnSetupState(CancellationToken ct, Action<IGrainActivationContext, string> setupResourceFactory)
@@ -149,7 +149,7 @@ namespace Orleans.Transactions
             if (ct.IsCancellationRequested) return Task.CompletedTask;
             this.participantId = new ParticipantId(this.config.StateName, this.context.GrainInstance.GrainReference, ParticipantId.Role.Resource | ParticipantId.Role.Manager);
             this.logger = this.loggerFactory.CreateLogger($"{context.GrainType.Name}.{this.config.StateName}.{this.context.GrainIdentity.IdentityString}");
-            this.resource = new NoOpTransactionalResource(this.logger);
+            this.callTime = new CallTime(this.logger);
 
             setupResourceFactory(this.context, this.config.StateName);
 
@@ -171,10 +171,42 @@ namespace Orleans.Transactions
             return resultCopier.DeepCopy(result);
         }
 
+        private class CallTime
+        {
+            private readonly ILogger logger;
+            private long max;
+            private long accumulatedMs;
+            private long count;
+            public DateTime TimeStamp { get; set; }
+
+            public CallTime(ILogger logger)
+            {
+                this.logger = logger;
+            }
+
+            public void Report()
+            {
+                long deltaMs = (long)Math.Floor((DateTime.UtcNow - this.TimeStamp).TotalMilliseconds);
+                this.max = Math.Max(this.max, deltaMs);
+                this.accumulatedMs += deltaMs;
+                this.count++;
+                if (this.count % 10 == 1)
+                    this.logger.LogInformation("Prepare delta {DeltaMs}ms, average {AverageMs}, max {MaxMs}", deltaMs, (long)Math.Floor((double)this.accumulatedMs / this.count), this.max);
+            }
+        }
+
         private class NoOpTransactionManager : ITransactionManager
         {
+            private readonly CallTime calltime;
+
+            public NoOpTransactionManager(CallTime calltime)
+            {
+                this.calltime = calltime;
+            }
+
             public Task<TransactionalStatus> PrepareAndCommit(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, List<ParticipantId> writeResources, int totalResources)
             {
+                this.calltime.Report();
                 return Task.FromResult(TransactionalStatus.Ok);
             }
 
@@ -191,13 +223,11 @@ namespace Orleans.Transactions
 
         private class NoOpTransactionalResource : ITransactionalResource
         {
-            private ILogger logger;
+            private readonly CallTime calltime;
 
-            public DateTime CallTimeStamp { get; set; }
-
-            public NoOpTransactionalResource(ILogger logger)
+            public NoOpTransactionalResource(CallTime calltime)
             {
-                this.logger = logger;
+                this.calltime = calltime;
             }
 
             public Task<TransactionalStatus> CommitReadOnly(Guid transactionId, AccessCounter accessCount, DateTime timeStamp)
@@ -222,7 +252,7 @@ namespace Orleans.Transactions
 
             public Task Prepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager)
             {
-                this.logger.LogInformation("Prepare delta {Delta}ms", Math.Floor((DateTime.UtcNow - this.CallTimeStamp).TotalMilliseconds));
+                this.calltime.Report();
                 return Task.CompletedTask;
             }
         }

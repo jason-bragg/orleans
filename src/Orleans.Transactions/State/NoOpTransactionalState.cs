@@ -4,13 +4,10 @@ using System.Threading.Tasks;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.State;
-using Orleans.Configuration;
 using System.Diagnostics;
 
 namespace Orleans.Transactions
@@ -174,27 +171,58 @@ namespace Orleans.Transactions
 
         private class CallTime
         {
+            private static Timer _timer;
+            private static long _maxMs;
+            private static long _accumulatedMs;
+            private static long _count;
+            private static ILogger _logger;
+
             private readonly ILogger logger;
             private long maxMs;
             private long accumulatedMs;
-            private long count;
+            private long count = -1;
+            private long lastReportedCount;
+
             public Stopwatch Watch { get; set; }
+
+            static CallTime()
+            {
+                _timer = new Timer(LogReport, null, TimeSpan.FromSeconds(10), TimeSpan.FromSeconds(60));
+            }
 
             public CallTime(ILogger logger)
             {
                 this.Watch = new Stopwatch();
                 this.logger = logger;
+                _logger = _logger ?? logger;
             }
 
             public void Report()
             {
+                if(this.count == -1)
+                {
+                    this.count = 0;
+                    return; // ignore activation
+                }
                 this.Watch.Stop();
                 long deltaMs = this.Watch.ElapsedMilliseconds;
                 this.maxMs = Math.Max(this.maxMs, deltaMs);
                 this.accumulatedMs += deltaMs;
                 this.count++;
-                if (this.count % 5 == 1)
-                    this.logger.LogInformation("Prepare deltaMs: {DeltaMs}ms, averageMs: {AverageMs}, maxMs: {MaxMs}", deltaMs, (long)Math.Floor((double)this.accumulatedMs / this.count), this.maxMs);
+                if (this.count++ % 10 == 1)
+                {
+                    Interlocked.Add(ref _accumulatedMs, this.accumulatedMs);
+                    this.accumulatedMs = 0;
+                    Interlocked.Add(ref _count, this.count - this.lastReportedCount);
+                    this.lastReportedCount = this.count;
+                    Interlocked.Exchange(ref _maxMs, Math.Max(_maxMs, this.maxMs));
+                }
+            }
+
+            private static void LogReport(object o)
+            {
+                if(_count != 0)
+                    _logger.LogInformation("Prepare delta. averageMs: {AverageMs}, count: {Count}, maxMs: {MaxMs}", (long)Math.Floor((double)_accumulatedMs / _count), _count, _maxMs);
             }
         }
 

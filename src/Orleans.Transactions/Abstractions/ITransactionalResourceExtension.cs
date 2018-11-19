@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
@@ -25,7 +25,6 @@ namespace Orleans.Transactions.Abstractions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
         Task Prepare(string resourceId, Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager);
     }
 }

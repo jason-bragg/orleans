@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
@@ -14,12 +14,10 @@ namespace Orleans.Transactions.Abstractions
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
         Task Prepared(string resourceId, Guid transactionId, DateTime timestamp, ParticipantId resource, TransactionalStatus status);
 
         [AlwaysInterleave]
         [Transaction(TransactionOption.Suppress)]
-        [OneWay]
         Task Ping(string resourceId, Guid transactionId, DateTime timeStamp, ParticipantId resource);
     }
 }

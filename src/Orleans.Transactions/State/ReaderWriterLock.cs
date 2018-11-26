@@ -14,7 +14,7 @@ namespace Orleans.Transactions.State
        where TState : class, new()
     {
         private readonly TransactionalStateOptions options;
-        private readonly TransactionQueue<TState> queue;
+        private readonly ITransactionQueue<TState> queue;
         private BatchWorker lockWorker;
         private BatchWorker storageWorker;
         private readonly ILogger logger;
@@ -46,7 +46,7 @@ namespace Orleans.Transactions.State
 
         public ReadWriteLock(
             IOptions<TransactionalStateOptions> options,
-            TransactionQueue<TState> queue,
+            ITransactionQueue<TState> queue,
             BatchWorker storageWorker,
             ILogger logger)
         {
@@ -285,7 +285,7 @@ namespace Orleans.Transactions.State
                         }
 
                         lockWorker.Notify();
-                        storageWorker.Notify();
+                        storageWorker?.Notify();
                     }
 
                     else if (currentGroup.Deadline.HasValue)

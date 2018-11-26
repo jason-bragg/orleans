@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
 
@@ -7,9 +7,9 @@ namespace Orleans.Transactions.State
     internal class TransactionalResource<TState> : ITransactionalResource
                where TState : class, new()
     {
-        private readonly TransactionQueue<TState> queue;
+        private readonly ITransactionQueue<TState> queue;
 
-        public TransactionalResource(TransactionQueue<TState> queue)
+        public TransactionalResource(ITransactionQueue<TState> queue)
         {
             this.queue = queue;
         }

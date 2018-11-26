@@ -18,7 +18,7 @@ namespace Orleans.Transactions
 
         public ITransactionalState<TState> Create<TState>(ITransactionalStateConfiguration config) where TState : class, new()
         {
-            NoOpTransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<NoOpTransactionalState<TState>>(this.context.ActivationServices, config, this.serializerSettings, this.context);
+            LockOnlyTransactionalState<TState> transactionalState = ActivatorUtilities.CreateInstance<LockOnlyTransactionalState<TState>>(this.context.ActivationServices, config, this.serializerSettings, this.context);
             transactionalState.Participate(context.ObservableLifecycle);
             return transactionalState;
         }

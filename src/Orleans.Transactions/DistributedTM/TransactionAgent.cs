@@ -88,7 +88,22 @@ namespace Orleans.Transactions
             try
             {
                 // wait for all responses
-                await Task.WhenAll(tasks);
+                TransactionalStatus[] statuses = await Task.WhenAll(tasks);
+
+                // examine the return status
+                if (status == TransactionalStatus.Ok)
+                {
+                    foreach (var s in statuses)
+                    {
+                        if (s != TransactionalStatus.Ok)
+                        {
+                            status = s;
+                            if (logger.IsEnabled(LogLevel.Debug))
+                                logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
+                            break;
+                        }
+                    }
+                }
             }
             catch (TimeoutException)
             {
@@ -102,18 +117,6 @@ namespace Orleans.Transactions
                     logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} failure {transactionInfo.TransactionId} CommitReadOnly");
                 this.logger.LogWarning(ex, "Unknown error while commiting readonly transaction {TransactionId}", transactionInfo.TransactionId);
                 status = TransactionalStatus.PresumedAbort;
-            }
-
-            // examine the return status
-            if (status == TransactionalStatus.Ok) foreach (var s in tasks)
-            {
-                status = s.Result;
-                if (status != TransactionalStatus.Ok)
-                {
-                    if (logger.IsEnabled(LogLevel.Debug))
-                        logger.Debug($"{stopwatch.Elapsed.TotalMilliseconds:f2} fail {transactionInfo.TransactionId} prepare response status={status}");
-                    break;
-                }
             }
 
             try

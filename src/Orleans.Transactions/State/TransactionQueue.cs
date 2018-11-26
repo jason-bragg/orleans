@@ -12,7 +12,23 @@ using Orleans.Configuration;
 
 namespace Orleans.Transactions.State
 {
-    internal class TransactionQueue<TState>
+    internal interface ITransactionQueue<TState>
+        where TState : class, new()
+    {
+        ReadWriteLock<TState> RWLock { get; }
+        CausalClock Clock { get; }
+
+        Task Ready();
+        Task NotifyOfAbort(TransactionRecord<TState> record, TransactionalStatus brokenLock);
+        Task EnqueueCommit(TransactionRecord<TState> single);
+        Task NotifyOfCancel(Guid transactionId, DateTime timeStamp, TransactionalStatus status);
+        Task NotifyOfConfirm(Guid transactionId, DateTime timeStamp);
+        Task NotifyOfPrepare(Guid transactionId, AccessCounter accessCount, DateTime timeStamp, ParticipantId transactionManager);
+        Task NotifyOfPrepared(Guid transactionId, DateTime timeStamp, TransactionalStatus status);
+        Task NotifyOfPing(Guid transactionId, DateTime timeStamp, ParticipantId resource);
+    }
+
+    internal class TransactionQueue<TState> : ITransactionQueue<TState>
         where TState : class, new()
     {
         private readonly TransactionalStateOptions options;

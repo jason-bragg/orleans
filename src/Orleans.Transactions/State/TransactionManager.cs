@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Transactions.Abstractions;
@@ -8,9 +8,9 @@ namespace Orleans.Transactions.State
     internal class TransactionManager<TState> : ITransactionManager
                where TState : class, new()
     {
-        private readonly TransactionQueue<TState> queue;
+        private readonly ITransactionQueue<TState> queue;
 
-        public TransactionManager(TransactionQueue<TState> queue)
+        public TransactionManager(ITransactionQueue<TState> queue)
         {
             this.queue = queue ?? throw new ArgumentNullException(nameof(queue));
         }

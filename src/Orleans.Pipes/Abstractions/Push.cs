@@ -1,35 +1,30 @@
-﻿using System;
+using System;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
 namespace Orleans.Pipes.Abstractions
 {
-    #region producer
-
-    public interface IOutPushPipeSender<TData>
+    public interface IPushPipeOut<TKey, TData>
     {
+        TKey Id { get; }
         Task Send(TData[] data);
         Task Close(Exception ex = null);
     }
 
-    public interface IOutPushPipe
+    public interface IPushPipeGrainConnector
     {
-        IOutPushPipeSender<TData> CreateSender<TKey, TData>(TKey key, GrainReference grainRef);
+        IPushPipeOut<TKey, TData> Create<TKey, TData>(TKey key, GrainReference grainRef);
     }
 
-    #endregion producer
-    #region consumer
-
-    public interface IPushHandler<TData>
+    public interface IPushPipeIn<TKey, TData>
     {
+        TKey Id { get; }
         Task OnData(TData[] data);
     }
 
-    public interface IInPushPipeListener
+    public interface IPushPipeListener
     {
-        IDisposable Listen<TKey, TData>(TKey key, Func<TKey, IPushHandler<TData>> handlerFactory, Action<TKey, IDisposable> registerAction);
-        IDisposable Listen<TKey, TData>(TKey key, IPushHandler<TData> handler);
+        IDisposable Listen<TKey, TData>(Func<TKey, IPushPipeIn<TKey, TData>> inFactory, Action<TKey, IDisposable> inRegistery);
+        IDisposable Listen<TKey, TData>(TKey key, IPushPipeIn<TKey, TData> pushPipeIn);
     }
-
-    #endregion consumer
 }

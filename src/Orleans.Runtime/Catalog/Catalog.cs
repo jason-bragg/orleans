@@ -97,6 +97,7 @@ namespace Orleans.Runtime
         private readonly ILoggerFactory loggerFactory;
         private readonly IOptions<GrainCollectionOptions> collectionOptions;
         private readonly IOptions<SiloMessagingOptions> messagingOptions;
+        private readonly IActivationRequestScheduler activationRequestScheduler;
         public Catalog(
             ILocalSiloDetails localSiloDetails,
             ILocalGrainDirectory grainDirectory,
@@ -115,7 +116,8 @@ namespace Orleans.Runtime
             ILoggerFactory loggerFactory,
             IOptions<SchedulingOptions> schedulingOptions,
             IOptions<GrainCollectionOptions> collectionOptions,
-            IOptions<SiloMessagingOptions> messagingOptions)
+            IOptions<SiloMessagingOptions> messagingOptions,
+            IActivationRequestScheduler activationRequestScheduler)
             : base(Constants.CatalogId, messageCenter.MyAddress, loggerFactory)
         {
             this.LocalSilo = localSiloDetails.SiloAddress;
@@ -136,6 +138,7 @@ namespace Orleans.Runtime
             this.messagingOptions = messagingOptions;
             this.logger = loggerFactory.CreateLogger<Catalog>();
             this.activationCollector = activationCollector;
+            this.activationRequestScheduler = activationRequestScheduler;
             this.Dispatcher = new Dispatcher(
                 scheduler,
                 messageCenter,
@@ -401,16 +404,6 @@ namespace Orleans.Runtime
             return numActsBefore;
         }
 
-        internal bool CanInterleave(ActivationId running, Message message)
-        {
-            ActivationData target;
-            GrainTypeData data;
-            return TryGetActivationData(running, out target) &&
-                target.GrainInstance != null &&
-                GrainTypeManager.TryGetData(TypeUtils.GetFullName(target.GrainInstanceType), out data) &&
-                (data.IsReentrant || data.MayInterleave((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager)));
-        }
-
         public void GetGrainTypeInfo(int typeCode, out string grainClass, out PlacementStrategy placement, out MultiClusterRegistrationStrategy activationStrategy, string genericArguments = null)
         {
             GrainTypeManager.GetTypeInfo(typeCode, out grainClass, out placement, out activationStrategy, genericArguments);
@@ -488,6 +481,7 @@ namespace Orleans.Runtime
                         this.maxWarningRequestProcessingTime,
                         this.maxRequestProcessingTime,
                         this.RuntimeClient,
+                        this.activationRequestScheduler,
                         this.loggerFactory);
                     RegisterMessageTarget(result);
                 }
@@ -1147,7 +1141,7 @@ namespace Orleans.Runtime
                         activation.RunOnInactive();
                     }
                     // Run message pump to see if there is a new request is queued to be processed
-                    this.Dispatcher.RunMessagePump(activation);
+                    this.activationRequestScheduler.RunMessagePump(activation);
                 }
             }
             catch (Exception exc)
@@ -1319,7 +1313,6 @@ namespace Orleans.Runtime
                 activation.SetState(ActivationState.Activating);
             }
             return scheduler.QueueTask(() => CallGrainActivate(activation, requestContextData), activation.SchedulingContext); // Target grain's scheduler context);
-            // ActivationData will transition out of ActivationState.Activating via Dispatcher.OnActivationCompletedRequest
         }
 
         public bool FastLookup(GrainId grain, out AddressesAndTag addresses)

@@ -87,6 +87,7 @@ namespace Orleans.Hosting
             services.TryAddSingleton<SchedulerStatisticsGroup>();
             services.TryAddSingleton<SerializationStatisticsGroup>();
             services.TryAddSingleton<OverloadDetector>();
+            services.TryAddSingleton<IActivationRequestScheduler,ActivationRequestScheduler>();
 
             services.TryAddSingleton<ExecutorService>();
             // queue balancer contructing related

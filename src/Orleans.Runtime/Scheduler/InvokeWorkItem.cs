@@ -9,9 +9,10 @@ namespace Orleans.Runtime.Scheduler
         private readonly ILogger logger;
         private readonly ActivationData activation;
         private readonly Message message;
-        private readonly Dispatcher dispatcher;
+        private readonly ISiloRuntimeClient runtimeClient;
+        Action<ActivationData, Message> onActivationCompletedRequest;
 
-        public InvokeWorkItem(ActivationData activation, Message message, Dispatcher dispatcher, ILogger logger)
+        public InvokeWorkItem(ActivationData activation, Message message, ISiloRuntimeClient runtimeClient, Action<ActivationData, Message> onActivationCompletedRequest, ILogger logger)
         {
             this.logger = logger;
             if (activation?.GrainInstance == null)
@@ -23,7 +24,8 @@ namespace Orleans.Runtime.Scheduler
 
             this.activation = activation;
             this.message = message;
-            this.dispatcher = dispatcher;
+            this.runtimeClient = runtimeClient;
+            this.onActivationCompletedRequest = onActivationCompletedRequest;
             this.SchedulingContext = activation.SchedulingContext;
             activation.IncrementInFlightCount();
         }
@@ -42,9 +44,8 @@ namespace Orleans.Runtime.Scheduler
         {
             try
             {
-                var grain = activation.GrainInstance;
-                var runtimeClient = this.dispatcher.RuntimeClient;
-                Task task = runtimeClient.Invoke(grain, this.activation, this.message);
+                var grain = this.activation.GrainInstance;
+                Task task = this.runtimeClient.Invoke(grain, this.activation, this.message);
 
                 // Note: This runs for all outcomes of resultPromiseTask - both Success or Fault
                 if (task.IsCompleted)
@@ -67,12 +68,12 @@ namespace Orleans.Runtime.Scheduler
         private void OnComplete()
         {
             activation.DecrementInFlightCount();
-            this.dispatcher.OnActivationCompletedRequest(activation, message);
+            this.onActivationCompletedRequest(this.activation, this.message);
         }
 
         public override string ToString()
         {
-            return String.Format("{0} for activation={1} Message={2}", base.ToString(), activation, message);
+            return string.Format("{0} for activation={1} Message={2}", base.ToString(), activation, message);
         }
     }
 }

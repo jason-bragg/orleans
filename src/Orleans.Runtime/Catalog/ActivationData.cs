@@ -171,7 +171,8 @@ namespace Orleans.Runtime
         private IGrainMethodInvoker lastInvoker;
         private IServiceScope serviceScope;
         private HashSet<IGrainTimer> timers;
-        
+        private IActivationRequestScheduler activationRequestScheduler;
+
         public ActivationData(
             ActivationAddress addr,
             string genericArguments,
@@ -183,6 +184,7 @@ namespace Orleans.Runtime
             TimeSpan maxWarningRequestProcessingTime,
 			TimeSpan maxRequestProcessingTime,
             IRuntimeClient runtimeClient,
+            IActivationRequestScheduler activationRequestScheduler,
             ILoggerFactory loggerFactory)
         {
             if (null == addr) throw new ArgumentNullException(nameof(addr));
@@ -194,6 +196,7 @@ namespace Orleans.Runtime
             this.maxRequestProcessingTime = maxRequestProcessingTime;
             this.maxWarningRequestProcessingTime = maxWarningRequestProcessingTime;
             this.messagingOptions = messagingOptions.Value;
+            this.activationRequestScheduler = activationRequestScheduler;
             ResetKeepAliveRequest();
             Address = addr;
             State = ActivationState.Create;
@@ -215,6 +218,11 @@ namespace Orleans.Runtime
         public IGrainIdentity GrainIdentity => this.Identity;
 
         public IServiceProvider ActivationServices => this.serviceScope.ServiceProvider;
+
+        public ActivationRequestSchedulerResult ScheduleRequest(Message message)
+        {
+            return this.activationRequestScheduler.ScheduleRequest(this, message);
+        }
 
         private ExtensionInvoker extensionInvoker;
         public IGrainMethodInvoker GetInvoker(GrainTypeManager typeManager, int interfaceId, string genericGrainType = null)
@@ -546,18 +554,11 @@ namespace Orleans.Runtime
             }
         }
 
-        public enum EnqueueMessageResult
-        {
-            Success,
-            ErrorInvalidActivation,
-            ErrorStuckActivation,
-        }
-
         /// <summary>
         /// Insert in a FIFO order
         /// </summary>
         /// <param name="message"></param>
-        public EnqueueMessageResult EnqueueMessage(Message message)
+        public ActivationRequestSchedulerResult EnqueueMessage(Message message)
         {
             lock (this)
             {
@@ -565,7 +566,7 @@ namespace Orleans.Runtime
                 {
                     logger.Warn(ErrorCode.Dispatcher_InvalidActivation,
                         "Cannot enqueue message to invalid activation {0} : {1}", this.ToDetailedString(), message);
-                    return EnqueueMessageResult.ErrorInvalidActivation;
+                    return ActivationRequestSchedulerResult.ErrorInvalidActivation;
                 }
                 if (State == ActivationState.Deactivating)
                 {
@@ -574,7 +575,7 @@ namespace Orleans.Runtime
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
                             $"Current activation {ToDetailedString()} marked as Deactivating for {deactivatingTime}. Trying  to enqueue {message}.");
-                        return EnqueueMessageResult.ErrorStuckActivation;
+                        return ActivationRequestSchedulerResult.ErrorStuckActivation;
                     }
                 }
                 if (Running != null)
@@ -584,7 +585,7 @@ namespace Orleans.Runtime
                     {
                         logger.Error(ErrorCode.Dispatcher_StuckActivation,
                             $"Current request has been active for {currentRequestActiveTime} for activation {ToDetailedString()}. Currently executing {Running}.  Trying  to enqueue {message}.");
-                        return EnqueueMessageResult.ErrorStuckActivation;
+                        return ActivationRequestSchedulerResult.ErrorStuckActivation;
                     }
                     // Consider: Handle long request detection for reentrant activations -- this logic only works for non-reentrant activations
                     else if (currentRequestActiveTime > maxWarningRequestProcessingTime)
@@ -597,7 +598,7 @@ namespace Orleans.Runtime
 
                 waiting = waiting ?? new List<Message>();
                 waiting.Add(message);
-                return EnqueueMessageResult.Success;
+                return ActivationRequestSchedulerResult.Success;
             }
         }
 
@@ -607,7 +608,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="log">Logger to use for reporting any overflow condition</param>
         /// <returns>Returns LimitExceededException if overloaded, otherwise <c>null</c>c></returns>
-        public LimitExceededException CheckOverloaded(ILogger log)
+        public void CheckOverloaded(ILogger log)
         {
             string limitName = LimitNames.LIMIT_MAX_ENQUEUED_REQUESTS;
             int maxRequestsHardLimit = this.messagingOptions.MaxEnqueuedRequestsHardLimit;
@@ -619,7 +620,7 @@ namespace Orleans.Runtime
                 maxRequestsSoftLimit = this.messagingOptions.MaxEnqueuedRequestsSoftLimit_StatelessWorker;
             }
 
-            if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return null; // No limits are set
+            if (maxRequestsHardLimit <= 0 && maxRequestsSoftLimit <= 0) return; // No limits are set
 
             int count = GetRequestCount();
 
@@ -629,17 +630,14 @@ namespace Orleans.Runtime
                     String.Format("Overload - {0} enqueued requests for activation {1}, exceeding hard limit rejection threshold of {2}",
                         count, this, maxRequestsHardLimit));
 
-                return new LimitExceededException(limitName, count, maxRequestsHardLimit, this.ToString());
+                throw new LimitExceededException(limitName, count, maxRequestsHardLimit, this.ToString());
             }
             if (maxRequestsSoftLimit > 0 && count > maxRequestsSoftLimit) // Soft limit
             {
                 log.Warn(ErrorCode.Catalog_Warn_ActivationTooManyRequests,
                     String.Format("Hot - {0} enqueued requests for activation {1}, exceeding soft limit warning threshold of {2}",
                         count, this, maxRequestsSoftLimit));
-                return null;
             }
-
-            return null;
         }
 
         internal int GetRequestCount()

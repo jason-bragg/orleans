@@ -31,7 +31,6 @@ namespace Orleans.Runtime
         private readonly SerializationManager serializationManager;
         private readonly CompatibilityDirectorManager compatibilityDirectorManager;
         private readonly SchedulingOptions schedulingOptions;
-        private readonly ILogger invokeWorkItemLogger;
         internal Dispatcher(
             OrleansTaskScheduler scheduler, 
             ISiloMessageCenter transport, 
@@ -50,7 +49,6 @@ namespace Orleans.Runtime
             this.catalog = catalog;
             Transport = transport;
             this.messagingOptions = messagingOptions.Value;
-            this.invokeWorkItemLogger = loggerFactory.CreateLogger<InvokeWorkItem>();
             this.placementDirectorsManager = placementDirectorsManager;
             this.localGrainDirectory = localGrainDirectory;
             this.activationCollector = activationCollector;
@@ -263,74 +261,63 @@ namespace Orleans.Runtime
             {
                 if (targetActivation.State == ActivationState.Invalid)
                 {
-                    ProcessRequestToInvalidActivation(
+                    this.ProcessRequestToInvalidActivation(
                         message,
                         targetActivation.Address,
                         targetActivation.ForwardingAddress,
                         "ReceiveRequest");
+                    return;
                 }
-                else if (!ActivationMayAcceptRequest(targetActivation, message))
+
+                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
                 {
-                    // Check for deadlock before Enqueueing.
-                    if (schedulingOptions.PerformDeadlockDetection && !message.TargetGrain.IsSystemTarget)
+                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
+                    var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
+                    var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
+                    if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
+                        catalog.DeactivateActivationOnIdle(targetActivation);
+                }
+
+                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
+                {
+                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "HandleIncomingRequest");
+                    return;
+                }
+
+                try
+                {
+                    switch (targetActivation.ScheduleRequest(message))
                     {
-                        try
-                        {
-                            CheckDeadlock(message);
-                        }
-                        catch (DeadlockException exc)
-                        {
-                            // Record that this message is no longer flowing through the system
-                            MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Deadlock");
-                            logger.Warn(ErrorCode.Dispatcher_DetectedDeadlock, 
-                                "Detected Application Deadlock: {0}", exc.Message);
-                            // We want to send DeadlockException back as an application exception, rather than as a system rejection.
-                            SendResponse(message, Response.ExceptionResponse(exc));
-                            return;
-                        }
+                        case ActivationRequestSchedulerResult.Success:
+                            // Great, nothing to do
+                            break;
+                        case ActivationRequestSchedulerResult.ErrorInvalidActivation:
+                            ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
+                            break;
+                        case ActivationRequestSchedulerResult.ErrorStuckActivation:
+                            // Avoid any new call to this activation
+                            catalog.DeactivateStuckActivation(targetActivation);
+                            ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
                     }
-                    EnqueueRequest(message, targetActivation);
                 }
-                else
+                catch (DeadlockException deadlockException)
                 {
-                    HandleIncomingRequest(message, targetActivation);
+                    // Record that this message is no longer flowing through the system
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Deadlock");
+                    this.logger.Warn(ErrorCode.Dispatcher_DetectedDeadlock,
+                        "Detected Application Deadlock: {0}", deadlockException.Message);
+                    // We want to send DeadlockException back as an application exception, rather than as a system rejection.
+                    this.SendResponse(message, Response.ExceptionResponse(deadlockException));
+                }
+                catch(LimitExceededException overloadException)
+                {
+                    MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Overload2");
+                    RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
                 }
             }
-        }
-
-        /// <summary>
-        /// Determine if the activation is able to currently accept the given message
-        /// - always accept responses
-        /// For other messages, require that:
-        /// - activation is properly initialized
-        /// - the message would not cause a reentrancy conflict
-        /// </summary>
-        /// <param name="targetActivation"></param>
-        /// <param name="incoming"></param>
-        /// <returns></returns>
-        private bool ActivationMayAcceptRequest(ActivationData targetActivation, Message incoming)
-        {
-            if (targetActivation.State != ActivationState.Valid) return false;
-            if (!targetActivation.IsCurrentlyExecuting) return true;
-            return CanInterleave(targetActivation, incoming);
-        }
-
-        /// <summary>
-        /// Whether an incoming message can interleave 
-        /// </summary>
-        /// <param name="targetActivation"></param>
-        /// <param name="incoming"></param>
-        /// <returns></returns>
-        public bool CanInterleave(ActivationData targetActivation, Message incoming)
-        {
-            bool canInterleave = 
-                   incoming.IsAlwaysInterleave
-                || targetActivation.Running == null
-                || (targetActivation.Running.IsReadOnly && incoming.IsReadOnly)
-                || (schedulingOptions.AllowCallChainReentrancy && targetActivation.ActivationId.Equals(incoming.SendingActivation))
-                || catalog.CanInterleave(targetActivation.ActivationId, incoming);
-
-            return canInterleave;
         }
 
         /// <summary>
@@ -354,115 +341,6 @@ namespace Orleans.Runtime
             }
         }
 
-        /// <summary>
-        /// Check if the current message will cause deadlock.
-        /// Throw DeadlockException if yes.
-        /// </summary>
-        /// <param name="message">Message to analyze</param>
-        private void CheckDeadlock(Message message)
-        {
-            var requestContext = message.RequestContextData;
-            object obj;
-            if (requestContext == null ||
-                !requestContext.TryGetValue(RequestContext.CALL_CHAIN_REQUEST_CONTEXT_HEADER, out obj) ||
-                obj == null) return; // first call in a chain
-
-            var prevChain = ((IList)obj);
-            ActivationId nextActivationId = message.TargetActivation;
-            // check if the target activation already appears in the call chain.
-            foreach (object invocationObj in prevChain)
-            {
-                var prevId = ((RequestInvocationHistory)invocationObj).ActivationId;
-                if (!prevId.Equals(nextActivationId) || catalog.CanInterleave(nextActivationId, message)) continue;
-
-                var newChain = new List<RequestInvocationHistory>();
-                newChain.AddRange(prevChain.Cast<RequestInvocationHistory>());
-                newChain.Add(new RequestInvocationHistory(message.TargetGrain, message.TargetActivation, message.DebugContext));
-
-                throw new DeadlockException(
-                    String.Format(
-                        "Deadlock Exception for grain call chain {0}.",
-                        Utils.EnumerableToString(
-                            newChain,
-                            elem => String.Format("{0}.{1}", elem.GrainId, elem.DebugContext))),
-                    newChain.Select(req => new Tuple<GrainId, string>(req.GrainId, req.DebugContext)).ToList());
-            }
-        }
-
-        /// <summary>
-        /// Handle an incoming message and queue/invoke appropriate handler
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="targetActivation"></param>
-        public void HandleIncomingRequest(Message message, ActivationData targetActivation)
-        {
-            lock (targetActivation)
-            {
-                if (targetActivation.Grain.IsGrain && message.IsUsingInterfaceVersions)
-                {
-                    var request = ((InvokeMethodRequest)message.GetDeserializedBody(this.serializationManager));
-                    var compatibilityDirector = compatibilityDirectorManager.GetDirector(request.InterfaceId);
-                    var currentVersion = catalog.GrainTypeManager.GetLocalSupportedVersion(request.InterfaceId);
-                    if (!compatibilityDirector.IsCompatible(request.InterfaceVersion, currentVersion))
-                        catalog.DeactivateActivationOnIdle(targetActivation);
-                }
-
-                if (targetActivation.State == ActivationState.Invalid || targetActivation.State == ActivationState.Deactivating)
-                {
-                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "HandleIncomingRequest");
-                    return;
-                }
-
-                // Now we can actually scheduler processing of this request
-                targetActivation.RecordRunning(message);
-
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedOk(message);
-                scheduler.QueueWorkItem(new InvokeWorkItem(targetActivation, message, this, this.invokeWorkItemLogger), targetActivation.SchedulingContext);
-            }
-        }
-
-        /// <summary>
-        /// Enqueue message for local handling after transaction completes
-        /// </summary>
-        /// <param name="message"></param>
-        /// <param name="targetActivation"></param>
-        private void EnqueueRequest(Message message, ActivationData targetActivation)
-        {
-            var overloadException = targetActivation.CheckOverloaded(logger);
-            if (overloadException != null)
-            {
-                MessagingProcessingStatisticsGroup.OnDispatcherMessageProcessedError(message, "Overload2");
-                RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + targetActivation);
-                return;
-            }
-
-            switch (targetActivation.EnqueueMessage(message))
-            {
-                case ActivationData.EnqueueMessageResult.Success:
-                    // Great, nothing to do
-                    break;
-                case ActivationData.EnqueueMessageResult.ErrorInvalidActivation:
-                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest");
-                    break;
-                case ActivationData.EnqueueMessageResult.ErrorStuckActivation:
-                    // Avoid any new call to this activation
-                    catalog.DeactivateStuckActivation(targetActivation);
-                    ProcessRequestToInvalidActivation(message, targetActivation.Address, targetActivation.ForwardingAddress, "EnqueueRequest - blocked grain");
-                    break;
-                default:
-                    throw new ArgumentOutOfRangeException();
-            }
-
-            // Dont count this as end of processing. The message will come back after queueing via HandleIncomingRequest.
-
-#if DEBUG
-            // This is a hot code path, so using #if to remove diags from Release version
-            // Note: Caller already holds lock on activation
-            if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_EnqueueMessage,
-                "EnqueueMessage for {0}: targetActivation={1}", message.TargetActivation, targetActivation.DumpStatus());
-#endif
-        }
-
         internal void ProcessRequestToInvalidActivation(
             Message message, 
             ActivationAddress oldAddress, 
@@ -476,9 +354,9 @@ namespace Orleans.Runtime
                 this.localGrainDirectory.InvalidateCacheEntry(oldAddress);
             }
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
-            scheduler.QueueWorkItem(new ClosureWorkItem(
-                () => TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc)),
-                catalog.SchedulingContext);
+            this.scheduler.QueueWorkItem(new ClosureWorkItem(
+                () => this.TryForwardRequest(message, oldAddress, forwardingAddress, failedOperation, exc)),
+                this.catalog.SchedulingContext);
         }
 
         internal void ProcessRequestsToInvalidActivation(
@@ -816,66 +694,6 @@ namespace Orleans.Runtime
             MarkSameCallChainMessageAsInterleaving(sendingActivation, message);
             if (logger.IsEnabled(LogLevel.Trace)) logger.Trace(ErrorCode.Dispatcher_Send_AddressedMessage, "Addressed message {0}", message);
             Transport.SendMessage(message);
-        }
-
-        /// <summary>
-        /// Invoked when an activation has finished a transaction and may be ready for additional transactions
-        /// </summary>
-        /// <param name="activation">The activation that has just completed processing this message</param>
-        /// <param name="message">The message that has just completed processing. 
-        /// This will be <c>null</c> for the case of completion of Activate/Deactivate calls.</param>
-        internal void OnActivationCompletedRequest(ActivationData activation, Message message)
-        {
-            lock (activation)
-            {
-#if DEBUG
-                // This is a hot code path, so using #if to remove diags from Release version
-                if (logger.IsEnabled(LogLevel.Trace))
-                {
-                    logger.Trace(ErrorCode.Dispatcher_OnActivationCompletedRequest_Waiting,
-                        "OnActivationCompletedRequest {0}: Activation={1}", activation.ActivationId, activation.DumpStatus());
-                }
-#endif
-                activation.ResetRunning(message);
-
-                // ensure inactive callbacks get run even with transactions disabled
-                if (!activation.IsCurrentlyExecuting)
-                    activation.RunOnInactive();
-
-                // Run message pump to see if there is a new request arrived to be processed
-                RunMessagePump(activation);
-            }
-        }
-
-        internal void RunMessagePump(ActivationData activation)
-        {
-            // Note: this method must be called while holding lock (activation)
-#if DEBUG
-            // This is a hot code path, so using #if to remove diags from Release version
-            // Note: Caller already holds lock on activation
-            if (logger.IsEnabled(LogLevel.Trace))
-            {
-                logger.Trace(ErrorCode.Dispatcher_ActivationEndedTurn_Waiting,
-                    "RunMessagePump {0}: Activation={1}", activation.ActivationId, activation.DumpStatus());
-            }
-#endif
-            // don't run any messages if activation is not ready or deactivating
-            if (activation.State != ActivationState.Valid) return;
-
-            bool runLoop;
-            do
-            {
-                runLoop = false;
-                var nextMessage = activation.PeekNextWaitingMessage();
-                if (nextMessage == null) continue;
-                if (!ActivationMayAcceptRequest(activation, nextMessage)) continue;
-                
-                activation.DequeueNextWaitingMessage();
-                // we might be over-writing an already running read only request.
-                HandleIncomingRequest(nextMessage, activation);
-                runLoop = true;
-            }
-            while (runLoop);
         }
     }
 }

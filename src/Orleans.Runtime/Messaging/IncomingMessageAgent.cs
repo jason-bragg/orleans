@@ -110,8 +110,10 @@ namespace Orleans.Runtime.Messaging
                             // Response messages are not subject to overload checks.
                             if (msg.Direction != Message.Directions.Response)
                             {
-                                var overloadException = target.CheckOverloaded(Log);
-                                if (overloadException != null)
+                                try
+                                {
+                                    target.CheckOverloaded(Log);
+                                } catch(LimitExceededException overloadException)
                                 {
                                     // Send rejection as soon as we can, to avoid creating additional work for runtime
                                     dispatcher.RejectMessage(msg, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + target);

@@ -10,7 +10,6 @@ namespace Orleans.Streams
     internal class StreamSubscriptionHandleImpl<T> : StreamSubscriptionHandle<T>, IStreamSubscriptionHandle 
     {
         private StreamImpl<T> streamImpl;
-        private readonly IStreamFilterPredicateWrapper filterWrapper;
         private readonly GuidId subscriptionId;
         private readonly bool isRewindable;
 
@@ -29,17 +28,16 @@ namespace Orleans.Streams
         public override Guid HandleId { get { return subscriptionId.Guid; } }
 
         public StreamSubscriptionHandleImpl(GuidId subscriptionId, StreamImpl<T> streamImpl)
-            : this(subscriptionId, null, null, streamImpl, null, null)
+            : this(subscriptionId, null, null, streamImpl, null)
         {
         }
 
-        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, IStreamFilterPredicateWrapper filterWrapper, StreamSequenceToken token)
+        public StreamSubscriptionHandleImpl(GuidId subscriptionId, IAsyncObserver<T> observer, IAsyncBatchObserver<T> batchObserver, StreamImpl<T> streamImpl, StreamSequenceToken token)
         {
             this.subscriptionId = subscriptionId ?? throw new ArgumentNullException("subscriptionId");
             this.observer = observer;
             this.batchObserver = batchObserver;
             this.streamImpl = streamImpl ?? throw new ArgumentNullException("streamImpl");
-            this.filterWrapper = filterWrapper;
             this.isRewindable = streamImpl.IsRewindable;
             if (IsRewindable)
             {
@@ -178,9 +176,6 @@ namespace Orleans.Streams
             if (this.observer == null || !IsValid)
                 return Task.CompletedTask;
 
-            if (filterWrapper != null && !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, typedItem))
-                return Task.CompletedTask;
-
             return this.observer.OnNextAsync(typedItem, token);
         }
 
@@ -192,7 +187,6 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
 
             IList<SequentialItem<T>> batch = items
-                .Where(item => filterWrapper == null || !filterWrapper.ShouldReceive(streamImpl, filterWrapper.FilterData, item))
                 .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 

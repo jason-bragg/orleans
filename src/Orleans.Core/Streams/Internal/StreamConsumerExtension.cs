@@ -7,7 +7,6 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {

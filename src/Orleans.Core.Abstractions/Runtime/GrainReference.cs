@@ -2,6 +2,7 @@ using System;
 using System.Runtime.Serialization;
 using System.Threading.Tasks;
 using Orleans.CodeGeneration;
+using Orleans.Core;
 using Orleans.Serialization;
 
 namespace Orleans.Runtime
@@ -66,6 +67,8 @@ namespace Orleans.Runtime
         internal bool IsBound => this.runtime != null;
 
         internal GrainId GrainId { get; private set; }
+
+        public IGrainIdentity Identity => this.GrainId;
 
         /// <summary>
         /// Called from generated code.

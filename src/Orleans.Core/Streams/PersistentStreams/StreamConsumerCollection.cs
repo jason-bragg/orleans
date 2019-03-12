@@ -6,28 +6,31 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    [Serializable]
     internal class StreamConsumerCollection
     {
-        private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
-        private DateTime lastActivityTime;
-        public bool StreamRegistered { get; set; }
+        private readonly Dictionary<Guid, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData
+        private DateTime lastActivityTimeUtc;
 
-        public StreamConsumerCollection(DateTime now)
+        public StreamId StreamId { get; }
+        public IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> Subscriptions { get; set; }
+        public bool StreamRegistered => this.Subscriptions != null;
+
+        public StreamConsumerCollection(StreamId streamId, DateTime nowUtc)
         {
-            queueData = new Dictionary<GuidId, StreamConsumerData>();
-            lastActivityTime = now;
+            this.StreamId = streamId;
+            this.lastActivityTimeUtc = nowUtc;
+            queueData = new Dictionary<Guid, StreamConsumerData>();
         }
 
-        public StreamConsumerData AddConsumer(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public StreamConsumerData AddConsumer(Guid subscriptionId, IStreamIdentity streamId, IStreamConsumerExtension streamConsumer, DateTime nowUtc)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer);
             queueData.Add(subscriptionId, consumerData);
-            lastActivityTime = DateTime.UtcNow;
+            this.lastActivityTimeUtc = nowUtc;
             return consumerData;
         }
 
-        public bool RemoveConsumer(GuidId subscriptionId, ILogger logger)
+        public bool RemoveConsumer(Guid subscriptionId, ILogger logger)
         {
             StreamConsumerData consumer;
             if (!queueData.TryGetValue(subscriptionId, out consumer)) return false;
@@ -36,12 +39,7 @@ namespace Orleans.Streams
             return queueData.Remove(subscriptionId);
         }
 
-        public bool Contains(GuidId subscriptionId)
-        {
-            return queueData.ContainsKey(subscriptionId);
-        }
-
-        public bool TryGetConsumer(GuidId subscriptionId, out StreamConsumerData data)
+        public bool TryGetConsumer(Guid subscriptionId, out StreamConsumerData data)
         {
             return queueData.TryGetValue(subscriptionId, out data);
         }
@@ -57,6 +55,7 @@ namespace Orleans.Streams
             {
                 consumer.SafeDisposeCursor(logger);
             }
+            this.Subscriptions?.Dispose();
             queueData.Clear();
         }
 
@@ -66,18 +65,18 @@ namespace Orleans.Streams
             get { return queueData.Count; }
         }
 
-        public void RefreshActivity(DateTime now)
+        public void RefreshActivity(DateTime nowUtc)
         {
-            lastActivityTime = now;
+            this.lastActivityTimeUtc = nowUtc;
         }
 
-        public bool IsInactive(DateTime now, TimeSpan inactivityPeriod)
+        public bool IsInactive(DateTime nowUtc, TimeSpan inactivityPeriod)
         {
             // Consider stream inactive (with all its consumers) from the pulling agent perspective if:
             // 1) There were no new events received for that stream in the last inactivityPeriod
             // 2) All consumer for that stream are currently inactive (that is, all cursors are inactive) - 
             //    meaning there is nothing for those consumers in the adapter cache.
-            if (now - lastActivityTime < inactivityPeriod) return false;
+            if (nowUtc - this.lastActivityTimeUtc < inactivityPeriod) return false;
             return !queueData.Values.Any(data => data.State.Equals(StreamConsumerDataState.Active));
         }
     }

@@ -10,7 +10,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-
     internal class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
         private static readonly IBackoffProvider DeliveryBackoffProvider = new ExponentialBackoff(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(1));
@@ -18,8 +17,9 @@ namespace Orleans.Streams
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
         private readonly string streamProviderName;
-        private readonly IStreamPubSub pubSub;
-        private readonly Dictionary<StreamId, StreamConsumerCollection> pubSubCache;
+        private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar;
+        private readonly IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest;
+        private readonly Dictionary<IStreamIdentity, StreamConsumerCollection> pubSubCache;
         private readonly SafeRandom safeRandom;
         private readonly StreamPullingAgentOptions options;
         private readonly ILogger logger;
@@ -44,18 +44,20 @@ namespace Orleans.Streams
             string strProviderName,
             IStreamProviderRuntime runtime,
             ILoggerFactory loggerFactory,
-            IStreamPubSub streamPubSub,
+            IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar,
+            IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest,
             QueueId queueId,
             StreamPullingAgentOptions options)
             : base(id, runtime.ExecutingSiloAddress, true, loggerFactory)
         {
             if (runtime == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: runtime reference should not be null");
-            if (strProviderName == null) throw new ArgumentNullException("runtime", "PersistentStreamPullingAgent: strProviderName should not be null");
+            if (strProviderName == null) throw new ArgumentNullException("strProviderName", "PersistentStreamPullingAgent: strProviderName should not be null");
 
             QueueId = queueId;
             streamProviderName = strProviderName;
-            pubSub = streamPubSub;
-            pubSubCache = new Dictionary<StreamId, StreamConsumerCollection>();
+            this.subscriptionRegistrar = subscriptionRegistrar;
+            this.manifest = manifest;
+            pubSubCache = new Dictionary<IStreamIdentity, StreamConsumerCollection>(StreamIdentityEqualityComparer.Instance);
             safeRandom = new SafeRandom();
             this.options = options;
             numMessages = 0;
@@ -199,7 +201,6 @@ namespace Orleans.Streams
                 tuple.Value.DisposeAll(logger);
                 var streamId = tuple.Key;
                 logger.Info(ErrorCode.PersistentStreamPullingAgent_06, "Unregister PersistentStreamPullingAgent Producer for stream {0}.", streamId);
-                unregisterTasks.Add(pubSub.UnregisterProducer(streamId, streamProviderName, meAsStreamProducer));
             }
 
             try
@@ -216,40 +217,18 @@ namespace Orleans.Streams
             //IntValueStatistic.Delete(new StatisticName(StatisticNames.STREAMS_PERSISTENT_STREAM_QUEUE_CACHE_SIZE, StatisticUniquePostfix));
         }
 
-        public Task AddSubscriber(
-            GuidId subscriptionId,
-            StreamId streamId,
-            IStreamConsumerExtension streamConsumer,
-            IStreamFilterPredicateWrapper filter)
-        {
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_09, "AddSubscriber: Stream={0} Subscriber={1}.", streamId, streamConsumer);
-            // cannot await here because explicit consumers trigger this call, so it could cause a deadlock.
-            AddSubscriber_Impl(subscriptionId, streamId, streamConsumer, null)
-                .LogException(logger, ErrorCode.PersistentStreamPullingAgent_26,
-                    $"Failed to add subscription for stream {streamId}.")
-                .Ignore();
-            return Task.CompletedTask;
-        }
-
         // Called by rendezvous when new remote subscriber subscribes to this stream.
-        private async Task AddSubscriber_Impl(
-            GuidId subscriptionId,
-            StreamId streamId,
+        private async Task AddSubscriber(
+            StreamConsumerCollection streamDataCollection,
+            Guid subscriptionId,
+            IStreamIdentity streamId,
             IStreamConsumerExtension streamConsumer,
-            StreamSequenceToken cacheToken)
+            StreamSequenceToken cacheToken,
+            DateTime nowUtc)
         {
             if (IsShutdown) return;
 
-            StreamConsumerCollection streamDataCollection;
-            if (!pubSubCache.TryGetValue(streamId, out streamDataCollection))
-            {
-                // If stream is not in pubsub cache, then we've received no events on this stream, and will aquire the subscriptions from pubsub when we do.
-                return;
-            }
-
-            StreamConsumerData data;
-            if (!streamDataCollection.TryGetConsumer(subscriptionId, out data))
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer);
+            StreamConsumerData data = streamDataCollection.AddConsumer(subscriptionId, streamId, streamConsumer, nowUtc);
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
@@ -272,7 +251,7 @@ namespace Orleans.Streams
                     requestedHandshakeToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                          i => consumerData.StreamConsumer.GetSequenceToken(consumerData.SubscriptionId),
                          AsyncExecutorWithRetries.INFINITE_RETRIES,
-                         (exception, i) => !(exception is ClientNotAvailableException),
+                         (exception, i) => !(exception is ClientNotAvailableException) && !this.IsShutdown,
                          this.options.MaxEventDeliveryTime,
                          DeliveryBackoffProvider);
 
@@ -283,7 +262,7 @@ namespace Orleans.Streams
                     }
                     else
                     {
-                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, jsut keep using it.
+                        if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, just keep using it.
                             consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
                     }
                 }
@@ -297,7 +276,7 @@ namespace Orleans.Streams
                     if (faultedSubscription) return false;
                 }
             }
-            consumerData.LastToken = requestedHandshakeToken; // use what ever the consumer asked for as LastToken for next handshake (even if he asked for null).
+            consumerData.LastToken = requestedHandshakeToken; // use what ever the consumer asked for as LastToken for next handshake (even if null was asked for).
             // if we don't yet have a cursor (had errors in the handshake or data not available exc), get a cursor at the event that triggered that consumer subscription.
             if (consumerData.Cursor == null && queueCache != null)
             {
@@ -311,27 +290,6 @@ namespace Orleans.Streams
                 }
             }
             return true;
-        }
-
-        public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
-        {
-            RemoveSubscriber_Impl(subscriptionId, streamId);
-            return Task.CompletedTask;
-        }
-
-        public void RemoveSubscriber_Impl(GuidId subscriptionId, StreamId streamId)
-        {
-            if (IsShutdown) return;
-
-            StreamConsumerCollection streamData;
-            if (!pubSubCache.TryGetValue(streamId, out streamData)) return;
-
-            // remove consumer
-            bool removed = streamData.RemoveConsumer(subscriptionId, logger);
-            if (removed && logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_10, "Removed Consumer: subscription={0}, for stream {1}.", subscriptionId, streamId);
-
-            if (streamData.Count == 0)
-                pubSubCache.Remove(streamId);
         }
 
         private async Task AsyncTimerCallback(object state)
@@ -397,12 +355,12 @@ namespace Orleans.Streams
                 return false;
             }
 
-            var now = DateTime.UtcNow;
+            var nowUtc = DateTime.UtcNow;
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
-            if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
+            if ((nowUtc - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
-                lastTimeCleanedPubSubCache = now;
-                CleanupPubSubCache(now);
+                lastTimeCleanedPubSubCache = nowUtc;
+                CleanupPubSubCache(nowUtc);
             }
 
             if (queueCache != null)
@@ -445,31 +403,76 @@ namespace Orleans.Streams
                 .Where(m => m != null)
                 .GroupBy(container => new Tuple<Guid, string>(container.StreamGuid, container.StreamNamespace)))
             {
-                var streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
+                StreamId streamId = StreamId.GetStreamId(group.Key.Item1, queueAdapter.Name, group.Key.Item2);
                 StreamSequenceToken startToken = group.First().SequenceToken;
-                StreamConsumerCollection streamData;
-                if (pubSubCache.TryGetValue(streamId, out streamData))
+                if (pubSubCache.TryGetValue(streamId, out StreamConsumerCollection streamData))
                 {
-                    streamData.RefreshActivity(now);
-                    if (streamData.StreamRegistered)
-                    {
-                        StartInactiveCursors(streamData,
-                            startToken); // if this is an existing stream, start any inactive cursors
-                    }
-                    else
-                    {
-                        if(this.logger.IsEnabled(LogLevel.Debug))
-                            this.logger.LogDebug($"Pulled new messages in stream {streamId} from the queue, but pulling agent haven't succeeded in" +
-                                                   $"RegisterStream yet, will start deliver on this stream after RegisterStream succeeded");
-                    }
-
+                    RefreshStream(streamData, startToken, nowUtc).Ignore();
                 }
                 else
                 {
-                    RegisterStream(streamId, startToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                    RegisterStream(streamId, startToken, nowUtc).Ignore(); // if this is a new stream register as producer of stream in pub sub system
                 }
             }
             return true;
+        }
+
+        private async Task RefreshStream(StreamConsumerCollection streamData, StreamSequenceToken startToken, DateTime nowUtc)
+        {
+            streamData.RefreshActivity(nowUtc);
+            if (streamData.StreamRegistered)
+            {
+                if (!streamData.Subscriptions.NextAsync.IsCompleted)
+                {
+                    // if this is an existing stream and there are no subscription changes, start any inactive cursors
+                    StartInactiveCursors(streamData, startToken); 
+                }
+                else
+                {
+                    // if this is an existing stream and there are subscription changes, handle subscription changes
+                    await HandleSubscriptionChanges(streamData, startToken, nowUtc);
+                }
+            }
+            else
+            {
+                if (this.logger.IsEnabled(LogLevel.Debug))
+                    this.logger.LogDebug("Pulled new messages in stream {StreamId} from the queue, but pulling agent haven't succeeded in" +
+                                           "RegisterStream yet, will start deliver on this stream after RegisterStream succeeded", streamData.StreamId);
+            }
+        }
+
+        private async Task HandleSubscriptionChanges(StreamConsumerCollection streamData, StreamSequenceToken startToken, DateTime nowUtc)
+        {
+            if (!streamData.Subscriptions.NextAsync.IsCompleted)
+                return;
+
+            // update subscriptions
+            streamData.Subscriptions = await streamData.Subscriptions.NextAsync;
+
+            // remove dropped subscriptions
+            foreach (StreamConsumerData consumer in streamData.AllConsumers())
+            {
+                if (!streamData.Subscriptions.Value.Any(s => s.SubscriptionId.Equals(consumer.SubscriptionId)))
+                {
+                    streamData.RemoveConsumer(consumer.SubscriptionId.Guid, this.logger);
+                }
+            }
+
+            StartInactiveCursors(streamData, startToken); // if this is an existing stream, start any inactive cursors
+
+            List<Task> pending = new List<Task>();
+            // add new subscriptions
+            foreach (StreamSubscription<Guid> subscription in streamData.Subscriptions.Value)
+            {
+                if(!streamData.TryGetConsumer(subscription.SubscriptionId, out StreamConsumerData consumer))
+                {
+                    pending.Add(AddSubscriber(streamData, subscription.SubscriptionId, streamData.StreamId, subscription.Consumer.AsReference<IStreamConsumerExtension>(), startToken, nowUtc));
+                }
+            }
+            if(pending.Count == 0)
+            {
+                await Task.WhenAll(pending);
+            }
         }
 
         private void CleanupPubSubCache(DateTime now)
@@ -484,9 +487,9 @@ namespace Orleans.Streams
             });
         }
 
-        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime now)
+        private async Task RegisterStream(StreamId streamId, StreamSequenceToken firstToken, DateTime nowUtc)
         {
-            var streamData = new StreamConsumerCollection(now);
+            var streamData = new StreamConsumerCollection(streamId, nowUtc);
             pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
@@ -496,8 +499,7 @@ namespace Orleans.Streams
 
             try
             {
-                await RegisterAsStreamProducer(streamId, firstToken);
-                streamData.StreamRegistered = true;
+                await MonitorStreamSubscriptions(streamData, firstToken, nowUtc);
             }
             finally
             {
@@ -555,7 +557,7 @@ namespace Orleans.Streams
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
-                                (exception, i) => !(exception is ClientNotAvailableException),
+                                (exception, i) => !(exception is ClientNotAvailableException) && !this.IsShutdown,
                                 this.options.MaxEventDeliveryTime,
                                 DeliveryBackoffProvider);
                             if (newToken != null)
@@ -575,7 +577,7 @@ namespace Orleans.Streams
                         logger.Error(ErrorCode.PersistentStreamPullingAgent_14, message, exc);
                         exceptionOccured = exc is ClientNotAvailableException
                             ? exc
-                            : new StreamEventDeliveryFailureException(consumerData.StreamId);
+                            : new StreamEventDeliveryFailureException(this.streamProviderName, consumerData.StreamId);
                     }
                     // if we failed to deliver a batch
                     if (exceptionOccured != null)
@@ -595,7 +597,7 @@ namespace Orleans.Streams
             }
         }
 
-        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId)
+        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, IStreamIdentity streamId)
         {
             if (this.options.BatchContainerBatchSize <= 1)
             {
@@ -659,7 +661,8 @@ namespace Orleans.Streams
             bool isRequestContextSet = batch.ImportRequestContext();
             try
             {
-                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, consumerData.StreamId, batch.AsImmutable(), consumerData.LastToken);
+                StreamId streamId = StreamId.GetStreamId(consumerData.StreamId.Guid, this.streamProviderName, consumerData.StreamId.Namespace);
+                return consumerData.StreamConsumer.DeliverBatch(consumerData.SubscriptionId, streamId, batch.AsImmutable(), consumerData.LastToken);
             }
             finally
             {
@@ -697,7 +700,7 @@ namespace Orleans.Streams
             {
                 logger.Warn(ErrorCode.Stream_ConsumerIsDead,
                     "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", consumerData.StreamConsumer, consumerData.StreamId);
-                pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId, consumerData.StreamId.ProviderName).Ignore();
+                this.subscriptionRegistrar.Unregister(consumerData.StreamId, consumerData.SubscriptionId.Guid).Ignore();
                 return true;
             }
 
@@ -718,66 +721,47 @@ namespace Orleans.Streams
                        () => streamFailureHandler.OnSubscriptionFailure(
                            consumerData.SubscriptionId, streamProviderName, consumerData.StreamId, token));
             }
-            // if configured to fault on delivery failure and this is not an implicit subscription, fault and remove the subscription
-            if (streamFailureHandler.ShouldFaultSubsriptionOnError && !SubscriptionMarker.IsImplicitSubscription(consumerData.SubscriptionId.Guid))
-            {
-                try
-                {
-                    // notify consumer of faulted subscription, if we can.
-                    await OrleansTaskExtentions.ExecuteAndIgnoreException(
-                        () => DeliverErrorToConsumer(
-                            consumerData, new FaultedSubscriptionException(consumerData.SubscriptionId, consumerData.StreamId), batch));
-                    // mark subscription as faulted.
-                    await pubSub.FaultSubscription(consumerData.StreamId, consumerData.SubscriptionId);
-                }
-                finally
-                {
-                    // remove subscription
-                    RemoveSubscriber_Impl(consumerData.SubscriptionId, consumerData.StreamId);
-                }
-                return true;
-            }
             return false;
         }
 
-        private static async Task<ISet<PubSubSubscriptionState>> PubsubRegisterProducer(IStreamPubSub pubSub, StreamId streamId, string streamProviderName,
+        private static async Task<IAsyncLinkedListNode<IList<StreamSubscription<Guid>>>> MonitorSubscriptions(IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest, StreamId streamId, string streamProviderName,
             IStreamProducerExtension meAsStreamProducer, ILogger logger)
         {
             try
             {
-                var streamData = await pubSub.RegisterProducer(streamId, streamProviderName, meAsStreamProducer);
-                return streamData;
+                return await manifest.MonitorSubscriptions(streamId);
             }
             catch (Exception e)
             {
-                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"RegisterAsStreamProducer failed due to {e}", e);
+                logger.Error(ErrorCode.PersistentStreamPullingAgent_17, $"MonitorSubscriptions failed due to {e}", e);
                 throw e;
             }
         }
 
-        private async Task RegisterAsStreamProducer(StreamId streamId, StreamSequenceToken streamStartToken)
+        private async Task MonitorStreamSubscriptions(StreamConsumerCollection streamData, StreamSequenceToken streamStartToken, DateTime nowUtc)
         {
             try
             {
-                if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetreaveNewStream");
-
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-                ISet<PubSubSubscriptionState> streamData = null;
+                IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions = null;
                 await AsyncExecutorWithRetries.ExecuteWithRetries(
-                                async i => { streamData = 
-                                    await PubsubRegisterProducer(pubSub, streamId, streamProviderName, meAsStreamProducer, logger); },
+                                async i => {
+                                    subscriptions = 
+                                    await MonitorSubscriptions(this.manifest, streamData.StreamId, streamProviderName, meAsStreamProducer, logger); },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,
                                 DeliveryBackoffProvider);
-               
-                
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", streamData.Count, streamId);
 
-                var addSubscriptionTasks = new List<Task>(streamData.Count);
-                foreach (PubSubSubscriptionState item in streamData)
+                streamData.Subscriptions = subscriptions;
+
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", subscriptions.Value.Count, streamData.StreamId);
+
+                var addSubscriptionTasks = new List<Task>(subscriptions.Value.Count);
+                foreach (StreamSubscription<Guid> subscription in subscriptions.Value)
                 {
-                    addSubscriptionTasks.Add(AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, streamStartToken));
+                    IStreamConsumerExtension extension = subscription.Consumer.AsReference<IStreamConsumerExtension>();
+                    addSubscriptionTasks.Add(AddSubscriber(streamData, subscription.SubscriptionId, streamData.StreamId, extension, streamStartToken, nowUtc));
                 }
                 await Task.WhenAll(addSubscriptionTasks);
             }

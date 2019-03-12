@@ -1,4 +1,4 @@
-﻿
+
 using Orleans.Streams;
 
 namespace Orleans.Configuration
@@ -10,8 +10,5 @@ namespace Orleans.Configuration
 
         public bool OptimizeForImmutableData { get; set; } = DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA;
         public const bool DEFAULT_VALUE_OPTIMIZE_FOR_IMMUTABLE_DATA = true;
-
-        public StreamPubSubType PubSubType { get; set; } = DEFAULT_PUBSUB_TYPE;
-        public static StreamPubSubType DEFAULT_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
     }
 }

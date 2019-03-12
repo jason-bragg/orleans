@@ -1,26 +1,22 @@
-﻿using Orleans.Streams;
+using Orleans.Streams;
 using System;
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
-using Orleans.Streams.PubSub;
 
 namespace UnitTests.Grains.ProgrammaticSubscribe
 {
     public interface ISubscribeGrain : IGrainWithGuidKey
     {
-        Task<bool> CanGetSubscriptionManager(string providerName);
+        Task<bool> CanGetSubscriptions(string providerName);
     }
 
     public class SubscribeGrain : Grain, ISubscribeGrain
     {
-        public Task<bool> CanGetSubscriptionManager(string providerName)
+        public Task<bool> CanGetSubscriptions(string providerName)
         {
-            IStreamSubscriptionManager manager;
-            return Task.FromResult(this.ServiceProvider.GetServiceByName<IStreamProvider>(providerName).TryGetStreamSubscrptionManager(out manager));
+            IStreamSubscriptionManifest<Guid,IStreamIdentity> manaifest = this.ServiceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(providerName);
+            return Task.FromResult(manaifest != null);
         }
     }
 

@@ -1,11 +1,7 @@
 using Orleans;
-using Orleans.Runtime;
-using Orleans.Runtime.Configuration;
-using Orleans.Streams.Core;
 using Orleans.TestingHost;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Streams;
 using TestExtensions;
@@ -41,33 +37,20 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             this.output = output;
         }
 
-        private async Task<List<StreamSubscription>> SetupStreamingSubscriptionForStream<TGrainInterface>(IStreamSubscriptionManager subManager, IGrainFactory grainFactory,
+        private async Task<List<StreamSubscription<Guid>>> SetupStreamingSubscriptionForStream<TGrainInterface>(SubscriptionManager subManager, IGrainFactory grainFactory,
             FullStreamIdentity streamIdentity, int grainCount)
             where TGrainInterface : IGrainWithGuidKey
         {
             //generate grain refs
-            List<TGrainInterface> grains = new List<TGrainInterface>();
+            var subscriptions = new List<StreamSubscription<Guid>>();
             while (grainCount > 0)
             {
                 var grainId = Guid.NewGuid();
-                var grain = grainFactory.GetGrain<TGrainInterface>(grainId);
-                grains.Add(grain);
+                var subscription = await subManager.AddSubscription<TGrainInterface>(streamIdentity, grainId);
+                subscriptions.Add(subscription);
                 grainCount--;
             }
 
-            return await SetupStreamingSubscriptionForGrains(subManager, streamIdentity, grains);
-        }
-
-        private async Task<List<StreamSubscription>> SetupStreamingSubscriptionForGrains<TGrainInterface>(IStreamSubscriptionManager subManager,
-            FullStreamIdentity streamIdentity, List<TGrainInterface> grains)
-            where TGrainInterface : IGrainWithGuidKey
-        {
-            var subscriptions = new List<StreamSubscription>();
-            foreach(var grain in grains)
-            {
-                var grainRef = grain as GrainReference;
-                subscriptions.Add(await subManager.AddSubscription(streamIdentity.ProviderName, streamIdentity, grainRef));
-            }
             return subscriptions;
         }
     }

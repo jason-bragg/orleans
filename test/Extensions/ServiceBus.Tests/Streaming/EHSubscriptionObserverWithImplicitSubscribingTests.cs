@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -51,7 +51,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
                         }))
-                        .Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)));
+                        .UseImplicitSubscriptions());
 
                 hostBuilder
                     .AddEventHubStreams(StreamProviderName2, b => b
@@ -66,7 +66,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                             options.PersistInterval = TimeSpan.FromSeconds(10);
                         }))
-                        .Configure<StreamPubSubOptions>(ob => ob.Configure(op => op.PubSubType = StreamPubSubType.ImplicitOnly)));
+                        .UseImplicitSubscriptions());
 
                 hostBuilder
                     .AddMemoryGrainStorage("PubSubStore");

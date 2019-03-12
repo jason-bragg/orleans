@@ -47,7 +47,7 @@ namespace UnitTests.StreamingTests
                             .ConfigurePullingAgent(ob => ob.Configure(options => { options.BatchContainerBatchSize = 10; }))
                             .Configure<HashRingStreamQueueMapperOptions>(ob=>ob.Configure(options => options.TotalQueueCount = TotalQueueCount))
                             .UseDynamicClusterConfigDeploymentBalancer()
-                            .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                            .UseImplicitSubscriptions());
                 }
             }
         }

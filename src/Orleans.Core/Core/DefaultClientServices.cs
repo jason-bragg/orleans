@@ -4,14 +4,12 @@ using Microsoft.Extensions.Options;
 using Orleans.ApplicationParts;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
-using Orleans.Hosting;
 using Orleans.Metadata;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
-using Orleans.Streams.Core;
 
 namespace Orleans
 {
@@ -49,7 +47,6 @@ namespace Orleans
             services.TryAddSingleton<MessageFactory>();
             services.TryAddFromExisting<IStreamProviderRuntime, ClientProviderRuntime>();
             services.TryAddFromExisting<IProviderRuntime, ClientProviderRuntime>();
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin, StreamSubscriptionManagerAdmin>();
             services.TryAddSingleton<IInternalClusterClient, ClusterClient>();
             services.TryAddFromExisting<IClusterClient, IInternalClusterClient>();
 

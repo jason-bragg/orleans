@@ -1,6 +1,5 @@
-﻿using Orleans.Runtime;
+using Orleans.Runtime;
 using System;
-using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {

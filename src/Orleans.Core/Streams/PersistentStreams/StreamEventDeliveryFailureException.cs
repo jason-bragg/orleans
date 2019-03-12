@@ -15,8 +15,8 @@ namespace Orleans.Streams
 
         public StreamEventDeliveryFailureException() { }
         public StreamEventDeliveryFailureException(string message) : base(message) { }
-        internal StreamEventDeliveryFailureException(StreamId streamId)
-            : base(string.Format(ErrorStringFormat, streamId.ProviderName, streamId)) { }
+        internal StreamEventDeliveryFailureException(string provider, IStreamIdentity streamId)
+            : base(string.Format(ErrorStringFormat, provider, streamId)) { }
         public StreamEventDeliveryFailureException(string message, Exception innerException) : base(message, innerException) { }
         public StreamEventDeliveryFailureException(SerializationInfo info, StreamingContext context) : base(info, context) { }
     }

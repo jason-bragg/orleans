@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -70,17 +69,17 @@ namespace Orleans.Streams
             return Task.FromResult(0);
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
+        public Task<List<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
             if (!ImplicitStreamSubscriberTable.IsImplicitSubscribeEligibleNameSpace(streamId.Namespace))
-                return Task.FromResult(new List<StreamSubscription>());
+                return Task.FromResult(new List<StreamSubscription<Guid>>());
 
             if (streamConsumer != null)
             {
                 var subscriptionId = CreateSubscriptionId(streamId, streamConsumer);
-                var grainId = streamConsumer as GrainReference;
-                return Task.FromResult(new List<StreamSubscription>
-                { new StreamSubscription(subscriptionId.Guid, streamId.ProviderName, streamId, grainId.GrainId) });
+                var grainRef = streamConsumer as GrainReference;
+                return Task.FromResult(new List<StreamSubscription<Guid>>
+                { new StreamSubscription<Guid>(subscriptionId.Guid, grainRef) });
             }
             else
             {
@@ -89,7 +88,7 @@ namespace Orleans.Streams
                 {
                     var grainRef = consumer.Value as GrainReference;
                     var subId = consumer.Key;
-                    return new StreamSubscription(subId, streamId.ProviderName, streamId, grainRef.GrainId);
+                    return new StreamSubscription<Guid>(subId, grainRef);
                 }).ToList();
                 return Task.FromResult(subscriptions);
             }   

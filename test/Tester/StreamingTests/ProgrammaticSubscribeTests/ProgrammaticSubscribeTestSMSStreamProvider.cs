@@ -1,12 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Orleans;
 using Orleans.Hosting;
-using Orleans.Runtime.Configuration;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using TestExtensions;
@@ -31,7 +23,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
             public void Configure(ISiloHostBuilder hostBuilder)
             {
                 hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName);
-                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, options => options.PubSubType = StreamPubSubType.ExplicitGrainBasedOnly)
+                hostBuilder.AddSimpleMessageStreamProvider(StreamProviderName2, b=>b.UseExplicitOnlyPubSub())
                     .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
             }

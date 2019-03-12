@@ -63,7 +63,7 @@ namespace ServiceBus.Tests.StreamingTests
                         options.PersistInterval = TimeSpan.FromSeconds(1);
                     }))
                     .UseDynamicClusterConfigDeploymentBalancer()
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                    .UseImplicitSubscriptions());
             }
         }
 
@@ -80,7 +80,7 @@ namespace ServiceBus.Tests.StreamingTests
                         options.ConsumerGroup = EHConsumerGroup;
                         options.Path = EHPath;
                     }))
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                    .UseImplicitSubscriptions());
             }
         }
 

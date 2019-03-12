@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Orleans.Streams.Core;
+using Orleans.Streams;
 using TestExtensions;
 using Xunit;
 using UnitTests.GrainInterfaces;
@@ -30,7 +30,7 @@ namespace Tester.StreamingTests
         public async Task Programmatic_Subscribe_Provider_WithExplicitPubsub_TryGetStreamSubscrptionManager()
         {
             var subGrain = this.fixture.HostedCluster.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
-            Assert.True(await subGrain.CanGetSubscriptionManager(StreamProviderName));
+            Assert.True(await subGrain.CanGetSubscriptions(StreamProviderName));
         }
         
         [SkippableFact]
@@ -51,7 +51,7 @@ namespace Tester.StreamingTests
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-            var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.Consumer.Identity.PrimaryKey)).ToList();
 
             var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -96,8 +96,8 @@ namespace Tester.StreamingTests
             // remove subscription
             await subscriptionManager.RemoveSubscription(streamId, subscription.SubscriptionId);
             var numProducedWhenUnSub = await producer.GetNumberProduced();
-            var consumerUnSub = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscription.GrainId.PrimaryKey);
-            var consumerNormal = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscriptions[1].GrainId.PrimaryKey);
+            var consumerUnSub = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscription.Consumer.Identity.PrimaryKey);
+            var consumerNormal = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscriptions[1].Consumer.Identity.PrimaryKey);
             //assert consumer grain's onAdd func got called.
             Assert.True((await consumerUnSub.GetCountOfOnAddFuncCalled()) > 0);
             await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProducedWhenUnSub, producer, lastTry), _timeout);
@@ -165,7 +165,7 @@ namespace Tester.StreamingTests
 
             //get subscription count now, should be all removed/unsubscribed 
             var subscriptions = await subscriptionManager.GetSubscriptions(streamId);
-            Assert.True( subscriptions.Count<Orleans.Streams.Core.StreamSubscription>()== 0);
+            Assert.True( subscriptions.Count()== 0);
             // clean up tests
         }
 
@@ -177,7 +177,7 @@ namespace Tester.StreamingTests
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-            var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.Consumer.Identity.PrimaryKey)).ToList();
 
             var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -221,7 +221,7 @@ namespace Tester.StreamingTests
             var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
             //set up subscription for 10 consumer grains
             var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
-            var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId.PrimaryKey)).ToList();
+            var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.Consumer.Identity.PrimaryKey)).ToList();
 
             var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
             await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
@@ -297,48 +297,76 @@ namespace Tester.StreamingTests
 
     public class SubscriptionManager
     {
+        private class SubManager
+        {
+            public SubManager(string name, IServiceProvider serviceProvider)
+            {
+                this.Registrar = serviceProvider.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name);
+                this.Manifest = serviceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name);
+            }
+            public IStreamSubscriptionRegistrar<Guid, IStreamIdentity> Registrar { get; }
+            public IStreamSubscriptionManifest<Guid, IStreamIdentity> Manifest { get; }
+        }
 
-        private IGrainFactory grainFactory;
-        private IServiceProvider serviceProvider;
-        private IStreamSubscriptionManager subManager;
+        private readonly IGrainFactory grainFactory;
+        private readonly IServiceProvider serviceProvider;
+        private readonly Dictionary<string, SubManager> managers;
+
         public SubscriptionManager(TestCluster cluster)
         {
             this.grainFactory = cluster.GrainFactory;
             this.serviceProvider = cluster.ServiceProvider;
-            this.subManager = serviceProvider.GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
+            this.managers = new Dictionary<string, SubManager>();
         }
 
-        public async Task<List<StreamSubscription>> SetupStreamingSubscriptionForStream<TGrainInterface>(FullStreamIdentity streamIdentity, int grainCount)
+        public async Task<List<StreamSubscription<Guid>>> SetupStreamingSubscriptionForStream<TGrainInterface>(FullStreamIdentity streamId, int grainCount)
             where TGrainInterface : IGrainWithGuidKey
         {
-            var subscriptions = new List<StreamSubscription>();
+            var subscriptions = new List<StreamSubscription<Guid>>();
             while (grainCount > 0)
             {
                 var grainId = Guid.NewGuid();
-                var grainRef = this.grainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
-                subscriptions.Add(await subManager.AddSubscription(streamIdentity.ProviderName, streamIdentity, grainRef));
+                StreamSubscription<Guid> subscription = await GetSubManager(streamId.ProviderName)
+                    .Registrar
+                    .AddSubscription<TGrainInterface>(this.grainFactory, streamId, grainId);
+                subscriptions.Add(subscription);
                 grainCount--;
             }
             return subscriptions;
         }
 
-        public async Task<StreamSubscription> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
+        public Task<StreamSubscription<Guid>> AddSubscription<TGrainInterface>(FullStreamIdentity streamId, Guid grainId)
             where TGrainInterface : IGrainWithGuidKey
         {
-            var grainRef = this.grainFactory.GetGrain<TGrainInterface>(grainId) as GrainReference;
-            var sub = await this.subManager
-                .AddSubscription(streamId.ProviderName, streamId, grainRef);
-            return sub;
+            return GetSubManager(streamId.ProviderName)
+                .Registrar
+                .AddSubscription<TGrainInterface>(this.grainFactory, streamId, grainId);
         }
 
-        public Task<IEnumerable<StreamSubscription>> GetSubscriptions(FullStreamIdentity streamIdentity)
+        public async Task<IEnumerable<StreamSubscription<Guid>>> GetSubscriptions(FullStreamIdentity streamId)
         {
-            return subManager.GetSubscriptions(streamIdentity.ProviderName, streamIdentity);
+            using (IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions = await GetSubManager(streamId.ProviderName)
+                .Manifest
+                .MonitorSubscriptions(streamId))
+            {
+                return subscriptions.Value;
+            }
         }
 
-        public async Task RemoveSubscription(FullStreamIdentity streamId, Guid subscriptionId)
+        public Task RemoveSubscription(FullStreamIdentity streamId, Guid subscriptionId)
         {
-            await subManager.RemoveSubscription(streamId.ProviderName, streamId, subscriptionId);
+            return GetSubManager(streamId.ProviderName)
+                .Registrar.Unregister(streamId, subscriptionId);
+        }
+
+        private SubManager GetSubManager(string name)
+        {
+            if (!this.managers.TryGetValue(name, out SubManager subManager))
+            {
+                subManager = new SubManager(name, this.serviceProvider);
+                this.managers.Add(name, subManager);
+            }
+            return subManager;
         }
     }
 }

@@ -186,12 +186,6 @@ namespace Orleans
 
         public IServiceProvider ServiceProvider { get; private set; }
 
-        private async Task StreamingInitialize()
-        {
-            var implicitSubscriberTable = await transport.GetImplicitStreamSubscriberTable(this.InternalGrainFactory);
-            clientProviderRuntime.StreamingInitialize(implicitSubscriberTable);
-        }
-
         public async Task Start(Func<Exception, Task<bool>> retryFilter = null)
         {
             // Deliberately avoid capturing the current synchronization context during startup and execute on the default scheduler.
@@ -266,8 +260,6 @@ namespace Orleans
 
             ClientStatistics.Start(transport, clientId);
             
-            await ExecuteWithRetries(StreamingInitialize, retryFilter);
-
             async Task ExecuteWithRetries(Func<Task> task, Func<Exception, Task<bool>> shouldRetry)
             {
                 while (true)

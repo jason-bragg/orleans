@@ -33,7 +33,7 @@ namespace UnitTests.StreamingTests
                     hostBuilder
                         .AddPersistentStreams(StreamProviderName,
                             ControllableTestAdapterFactory.Create, b=>b
-                         .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly)
+                         .UseImplicitSubscriptions()
                          .UseDynamicClusterConfigDeploymentBalancer());
                 }
             }

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -53,7 +52,7 @@ namespace Orleans.Streams
             return streamRendezvous.ConsumerCount(streamId);
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
+        public Task<List<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
             return streamRendezvous.GetAllSubscriptions(streamId, streamConsumer);

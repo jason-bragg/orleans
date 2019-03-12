@@ -4,7 +4,6 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -17,7 +16,7 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly IStreamProviderRuntime     providerRuntime;
         [NonSerialized]
-        private readonly IStreamPubSub              pubSub;
+        private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar;
         private StreamConsumerExtension             myExtension;
         private IStreamConsumerExtension            myGrainReference;
         [NonSerialized]
@@ -25,13 +24,19 @@ namespace Orleans.Streams
         [NonSerialized]
         private readonly ILogger logger;
 
-        public StreamConsumer(StreamImpl<T> stream, string streamProviderName, IStreamProviderRuntime runtime, IStreamPubSub pubSub, ILogger logger, bool isRewindable)
+        public StreamConsumer(
+            StreamImpl<T> stream,
+            string streamProviderName,
+            IStreamProviderRuntime runtime,
+            IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar,
+            ILogger logger,
+            bool isRewindable)
         {
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             this.stream = stream ?? throw new ArgumentNullException(nameof(stream));
             this.streamProviderName = streamProviderName;
             this.providerRuntime = runtime ?? throw new ArgumentNullException(nameof(runtime));
-            this.pubSub = pubSub ?? throw new ArgumentNullException(nameof(pubSub));
+            this.registrar = registrar ?? throw new ArgumentNullException(nameof(registrar));
             this.IsRewindable = isRewindable;
             this.myExtension = null;
             this.myGrainReference = null;
@@ -73,11 +78,10 @@ namespace Orleans.Streams
                 throw new ArgumentException("On-behalf subscription via grain references is not supported. Only passing of object references is allowed.", nameof(batchObserver));
 
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe Token={Token}", token);
-            await BindExtensionLazy();
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Subscribe - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
-                pubSub, myGrainReference, token);
 
-            GuidId subscriptionId = pubSub.CreateSubscriptionId(stream.StreamId, myGrainReference);
+            var consumer = myGrainReference as GrainReference;
+            Guid subscription = this.registrar.CreateSubscription(stream.StreamId, consumer);
+            GuidId subscriptionId = GuidId.GetGuidId(subscription);
 
             // Optimistic Concurrency: 
             // In general, we should first register the subsription with the pubsub (pubSub.RegisterConsumer)
@@ -94,7 +98,7 @@ namespace Orleans.Streams
             var subriptionHandle = myExtension.SetObserver(subscriptionId, stream, observer, batchObserver, token);
             try
             {
-                await pubSub.RegisterConsumer(subscriptionId, stream.StreamId, streamProviderName, myGrainReference);
+                await registrar.Register(stream.StreamId, subscription, consumer);
                 return subriptionHandle;
             }
             catch (Exception)
@@ -135,8 +139,8 @@ namespace Orleans.Streams
             if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume Token={Token}", token);
             await BindExtensionLazy();
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous {0} My GrainRef={1} Token={2}",
-                pubSub, myGrainReference, token);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Resume - Connecting to Rendezvous. My GrainRef={0} Token={1}",
+                myGrainReference, token);
 
             StreamSubscriptionHandle<T> newHandle = myExtension.SetObserver(oldHandleImpl.SubscriptionId, stream, observer, batchObserver, token);
 
@@ -157,10 +161,10 @@ namespace Orleans.Streams
             myExtension.RemoveObserver(handleImpl.SubscriptionId);
             // UnregisterConsumer from pubsub even if does not have this handle localy, to allow UnsubscribeAsync retries.
 
-            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe - Disconnecting from Rendezvous {0} My GrainRef={1}",
-                pubSub, myGrainReference);
+            if (logger.IsEnabled(LogLevel.Debug)) logger.Debug("Unsubscribe - Disconnecting from Rendezvous.  My GrainRef={0}",
+                myGrainReference);
 
-            await pubSub.UnregisterConsumer(handleImpl.SubscriptionId, stream.StreamId, streamProviderName);
+            await this.registrar.Unregister(stream.StreamId, handleImpl.SubscriptionId.Guid);
 
             handleImpl.Invalidate();
         }
@@ -169,9 +173,10 @@ namespace Orleans.Streams
         {
             await BindExtensionLazy();
 
-            List<StreamSubscription> subscriptions= await pubSub.GetAllSubscriptions(stream.StreamId, myGrainReference);
-            return subscriptions.Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
-                                  .ToList<StreamSubscriptionHandle<T>>();
+            IList<StreamSubscription<Guid>> subscriptions = await this.registrar.GetConsumerSubscriptions(stream.StreamId, (GrainReference)this.myGrainReference);
+            return subscriptions
+                .Select(sub => new StreamSubscriptionHandleImpl<T>(GuidId.GetGuidId(sub.SubscriptionId), stream))
+                .ToList<StreamSubscriptionHandle<T>>();
         }
 
         public async Task Cleanup()
@@ -185,7 +190,7 @@ namespace Orleans.Streams
             foreach (var handle in allHandles)
             {
                 myExtension.RemoveObserver(handle.SubscriptionId);
-                tasks.Add(pubSub.UnregisterConsumer(handle.SubscriptionId, stream.StreamId, streamProviderName));
+                tasks.Add(this.registrar.Unregister(stream.StreamId, handle.SubscriptionId.Guid));
             }
             try
             {

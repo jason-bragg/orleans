@@ -1,27 +1,19 @@
-﻿using Orleans.Core;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Runtime;
 
-namespace Orleans.Streams.Core
+namespace Orleans.Streams
 {
     [Serializable]
     [Immutable]
-    public class StreamSubscription
+    public class StreamSubscription<TSubscriptionId>
     {
-        public StreamSubscription(Guid subscriptionId, string streamProviderName, IStreamIdentity streamId, IGrainIdentity grainId)
+        public StreamSubscription(TSubscriptionId subscriptionId, GrainReference consumer)
         {
             this.SubscriptionId = subscriptionId;
-            this.StreamProviderName = streamProviderName;
-            this.StreamId = streamId;
-            this.GrainId = grainId;
+            this.Consumer = consumer;
         }
-        public Guid SubscriptionId { get; set; }
-        public string StreamProviderName { get; set; }
-        public IStreamIdentity StreamId { get; set; }
-        public IGrainIdentity GrainId { get; set; }
+        public TSubscriptionId SubscriptionId { get; }
+        public GrainReference Consumer { get; }
     }
 }

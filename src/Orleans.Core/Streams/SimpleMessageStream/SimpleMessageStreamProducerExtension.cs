@@ -6,7 +6,6 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
-using System.Threading;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
@@ -22,16 +21,16 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
     {
         private readonly Dictionary<StreamId, StreamConsumerExtensionCollection> remoteConsumers;
         private readonly IStreamProviderRuntime     providerRuntime;
-        private readonly IStreamPubSub              streamPubSub;
+        private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar;
         private readonly bool                       fireAndForgetDelivery;
         private readonly bool                       optimizeForImmutableData;
         private readonly ILogger                    logger;
         private readonly ILoggerFactory             loggerFactory;
 
-        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamPubSub pubsub, ILoggerFactory loggerFactory, bool fireAndForget, bool optimizeForImmutable)
+        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar, ILoggerFactory loggerFactory, bool fireAndForget, bool optimizeForImmutable)
         {
             providerRuntime = providerRt;
-            streamPubSub = pubsub;
+            this.registrar = registrar;
             fireAndForgetDelivery = fireAndForget;
             optimizeForImmutableData = optimizeForImmutable;
             remoteConsumers = new Dictionary<StreamId, StreamConsumerExtensionCollection>();
@@ -46,7 +45,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             // so this call is only made once, when StreamProducer is created.
             if (remoteConsumers.TryGetValue(streamId, out obs)) return;
 
-            obs = new StreamConsumerExtensionCollection(streamPubSub, this.loggerFactory);
+            obs = new StreamConsumerExtensionCollection(this.registrar, this.loggerFactory);
             remoteConsumers.Add(streamId, obs);
         }
 
@@ -55,7 +54,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             remoteConsumers.Remove(streamId);
         }
 
-        internal void AddSubscribers(StreamId streamId, ICollection<PubSubSubscriptionState> newSubscribers)
+        internal void AddSubscribers(StreamId streamId, IEnumerable<StreamSubscription<Guid>> newSubscribers)
         {
             if (logger.IsEnabled(LogLevel.Debug))
                 logger.Debug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);
@@ -65,7 +64,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 foreach (var newSubscriber in newSubscribers)
                 {
-                    consumers.AddRemoteSubscriber(newSubscriber.SubscriptionId, newSubscriber.Consumer);
+                    consumers.AddRemoteSubscriber(GuidId.GetGuidId(newSubscriber.SubscriptionId), newSubscriber.Consumer.AsReference<IStreamConsumerExtension>());
                 }
             }
             else
@@ -165,12 +164,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         internal class StreamConsumerExtensionCollection
         {
             private readonly ConcurrentDictionary<GuidId, IStreamConsumerExtension> consumers;
-            private readonly IStreamPubSub streamPubSub;
+            private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar;
             private readonly ILogger logger;
 
-            internal StreamConsumerExtensionCollection(IStreamPubSub pubSub, ILoggerFactory loggerFactory)
+            internal StreamConsumerExtensionCollection(IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar, ILoggerFactory loggerFactory)
             {
-                streamPubSub = pubSub;
+                this.registrar = registrar;
                 this.logger = loggerFactory.CreateLogger<StreamConsumerExtensionCollection>();
                 consumers = new ConcurrentDictionary<GuidId, IStreamConsumerExtension>();
             }
@@ -217,7 +216,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 {
                     if (consumers.TryRemove(subscriptionId, out IStreamConsumerExtension discard))
                     {
-                        streamPubSub.UnregisterConsumer(subscriptionId, streamId, streamId.ProviderName).Ignore();
+                        this.registrar.Unregister(streamId, subscriptionId.Guid).Ignore();
                         logger.Warn(ErrorCode.Stream_ConsumerIsDead,
                             "Consumer {0} on stream {1} is no longer active - permanently removing Consumer.", remoteConsumer, streamId);
                     }

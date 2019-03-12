@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 using Orleans.Providers;
 
 namespace Orleans.Streams
@@ -120,8 +119,6 @@ namespace Orleans.Streams
         {
             counterConsumersAdded.Increment();
             PubSubSubscriptionState pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
-            if (pubSubState != null && pubSubState.IsFaulted)
-                throw new FaultedSubscriptionException(subscriptionId, streamId);
             try
             {
                 if (pubSubState == null)
@@ -309,27 +306,25 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public Task<List<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             var grainRef = streamConsumer as GrainReference;
             if (grainRef != null)
             {
-                List<StreamSubscription> subscriptions =
+                List<StreamSubscription<Guid>> subscriptions =
                     State.Consumers.Where(c => !c.IsFaulted && c.Consumer.Equals(streamConsumer))
                         .Select(
                             c =>
-                                new StreamSubscription(c.SubscriptionId.Guid, streamId.ProviderName, streamId,
-                                    grainRef.GrainId)).ToList();
+                                new StreamSubscription<Guid>(c.SubscriptionId.Guid, grainRef)).ToList();
                 return Task.FromResult(subscriptions);
             }
             else
             {
-                List<StreamSubscription> subscriptions =
+                List<StreamSubscription<Guid>> subscriptions =
                     State.Consumers.Where(c => !c.IsFaulted)
                         .Select(
                             c =>
-                                new StreamSubscription(c.SubscriptionId.Guid, streamId.ProviderName, streamId,
-                                    c.consumerReference.GrainId)).ToList();
+                                new StreamSubscription<Guid>(c.SubscriptionId.Guid, grainRef)).ToList();
                 return Task.FromResult(subscriptions);
             }
 

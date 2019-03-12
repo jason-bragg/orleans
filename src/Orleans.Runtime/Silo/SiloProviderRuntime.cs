@@ -9,7 +9,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Hosting;
 
 namespace Orleans.Runtime.Providers
 {
@@ -20,9 +19,6 @@ namespace Orleans.Runtime.Providers
         private readonly ActivationDirectory activationDirectory;
         private readonly IConsistentRingProvider consistentRingProvider;
         private readonly ISiloRuntimeClient runtimeClient;
-        private readonly IStreamPubSub grainBasedPubSub;
-        private readonly IStreamPubSub implictPubSub;
-        private readonly IStreamPubSub combinedGrainBasedAndImplicitPubSub;
         private readonly ILoggerFactory loggerFactory;
         private readonly ILogger logger;
         public IGrainFactory GrainFactory => this.runtimeClient.InternalGrainFactory;
@@ -51,10 +47,6 @@ namespace Orleans.Runtime.Providers
             this.ServiceId = clusterOptions.Value.ServiceId;
             this.SiloIdentity = siloDetails.SiloAddress.ToLongString();
             this.logger = this.loggerFactory.CreateLogger<SiloProviderRuntime>();
-            this.grainBasedPubSub = new GrainBasedPubSubRuntime(this.GrainFactory);
-            var tmp = new ImplicitStreamPubSub(this.runtimeClient.InternalGrainFactory, implicitStreamSubscriberTable);
-            this.implictPubSub = tmp;
-            this.combinedGrainBasedAndImplicitPubSub = new StreamPubSubImpl(this.grainBasedPubSub, tmp);
         }
 
         public SiloAddress ExecutingSiloAddress => this.siloStatusOracle.SiloAddress;
@@ -76,21 +68,6 @@ namespace Orleans.Runtime.Providers
             scheduler.UnregisterWorkContext(systemTarget.SchedulingContext);
         }
 
-        public IStreamPubSub PubSub(StreamPubSubType pubSubType)
-        {
-            switch (pubSubType)
-            {
-                case StreamPubSubType.ExplicitGrainBasedAndImplicit:
-                    return combinedGrainBasedAndImplicitPubSub;
-                case StreamPubSubType.ExplicitGrainBasedOnly:
-                    return grainBasedPubSub;
-                case StreamPubSubType.ImplicitOnly:
-                    return implictPubSub;
-                default:
-                    return null;
-            }
-        }
-
         public IConsistentRingProviderForGrains GetConsistentRingProvider(int mySubRangeIndex, int numSubRanges)
         {
             return new EquallyDividedRangeRingProvider(this.consistentRingProvider, this.loggerFactory, mySubRangeIndex, numSubRanges);
@@ -103,9 +80,10 @@ namespace Orleans.Runtime.Providers
         {
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
-            var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
-            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, this.PubSub(pubsubOptions.PubSubType), adapterFactory, queueBalancer, pullingAgentOptions, this.loggerFactory);
+            var subscriptionRegistrar = this.ServiceProvider.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(streamProviderName);
+            var manifest = this.ServiceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(streamProviderName);
+            var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, subscriptionRegistrar, manifest, adapterFactory, queueBalancer, pullingAgentOptions, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.
             var pullingAgentManager = manager.AsReference<IPersistentStreamPullingManager>();

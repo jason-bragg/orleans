@@ -42,20 +42,19 @@ namespace ServiceBus.Tests.StreamingTests
                 {
                     hostBuilder
                         .AddEventHubStreams(StreamProviderName, b=>b
-                        .ConfigureEventHub(ob => ob.Configure(options =>
-                          {
-                              options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
-                              options.ConsumerGroup = EHConsumerGroup;
-                              options.Path = EHPath;
-                          }))
-                        .UseEventHubCheckpointer(ob => ob.Configure(options =>
-                          {
-                              options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
-                              options.PersistInterval = TimeSpan.FromSeconds(1);
-                          }))
-                        .UseDynamicClusterConfigDeploymentBalancer()
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
-                    hostBuilder
+                            .ConfigureEventHub(ob => ob.Configure(options =>
+                              {
+                                  options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
+                                  options.ConsumerGroup = EHConsumerGroup;
+                                  options.Path = EHPath;
+                              }))
+                            .UseEventHubCheckpointer(ob => ob.Configure(options =>
+                              {
+                                  options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                                  options.PersistInterval = TimeSpan.FromSeconds(1);
+                              }))
+                            .UseDynamicClusterConfigDeploymentBalancer()
+                            .UseImplicitSubscriptions())
                         .AddMemoryGrainStorageAsDefault();
                 }
             }
@@ -71,7 +70,7 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
                         }))
-                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
+                        .UseImplicitSubscriptions());
                 }
             }
         }

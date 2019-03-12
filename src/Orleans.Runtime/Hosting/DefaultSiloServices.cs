@@ -22,7 +22,6 @@ using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
 using Orleans.Statistics;
 using Orleans.Streams;
-using Orleans.Streams.Core;
 using Orleans.Timers;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
@@ -206,7 +205,6 @@ namespace Orleans.Hosting
             services.TryAddScoped<ActivationData.GrainActivationContextFactory>();
             services.TryAddScoped<IGrainActivationContext>(sp => sp.GetRequiredService<ActivationData.GrainActivationContextFactory>().Context);
 
-            services.TryAddSingleton<IStreamSubscriptionManagerAdmin>(sp => new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.TryAddSingleton<IConsistentRingProvider>(
                 sp =>
                 {

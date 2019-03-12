@@ -4,7 +4,7 @@ using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
 {
-    internal interface IPersistentStreamPullingAgent : ISystemTarget, IStreamProducerExtension
+    internal interface IPersistentStreamPullingAgent : ISystemTarget
     {
         // The queue adapter have to be Immutable<>, since we want deliberately to pass it by reference.
         Task Initialize(Immutable<IQueueAdapter> queueAdapter, Immutable<IQueueAdapterCache> queueAdapterCache, Immutable<IStreamFailureHandler> deliveryFailureHandler);

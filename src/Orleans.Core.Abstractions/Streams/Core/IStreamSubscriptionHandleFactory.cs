@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
 using Orleans.Runtime;
 
-namespace Orleans.Streams.Core
+namespace Orleans.Streams
 {
     public interface IStreamSubscriptionHandleFactory
     {

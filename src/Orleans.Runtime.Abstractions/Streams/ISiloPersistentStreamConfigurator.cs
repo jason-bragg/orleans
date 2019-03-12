@@ -8,10 +8,17 @@ namespace Orleans.Streams
 
     public static class SiloPersistentStreamConfiguratorExtensions
     {
-        public static ISiloPersistentStreamConfigurator ConfigureStreamPubSub(this ISiloPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
+        public static ISiloPersistentStreamConfigurator UsePubSub(this ISiloPersistentStreamConfigurator configurator)
         {
-            configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
-            return configurator;
+            throw new NotImplementedException();
+        }
+        public static ISiloPersistentStreamConfigurator UseExplicitOnlyPubSub(this ISiloPersistentStreamConfigurator configurator)
+        {
+            throw new NotImplementedException();
+        }
+        public static ISiloPersistentStreamConfigurator UseImplicitSubscriptions(this ISiloPersistentStreamConfigurator configurator)
+        {
+            throw new NotImplementedException();
         }
         public static ISiloPersistentStreamConfigurator ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
         {

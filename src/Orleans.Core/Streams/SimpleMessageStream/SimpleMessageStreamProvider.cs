@@ -4,27 +4,33 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.Streams;
-using Orleans.Streams.Core;
 using Orleans.Serialization;
 using Orleans.Configuration;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamProvider, IStreamSubscriptionManagerRetriever
+    public class SimpleMessageStreamProvider : IInternalStreamProvider, IStreamProvider
     {
         public string                       Name { get; private set; }
 
         private ILogger                      logger;
         private IStreamProviderRuntime      providerRuntime;
         private IRuntimeClient              runtimeClient;
-        private IStreamSubscriptionManager  streamSubscriptionManager;
         private ILoggerFactory              loggerFactory;
+        private IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar;
+        private IStreamSubscriptionManifest<Guid, IStreamIdentity> subscriptionManifest;
         private SerializationManager        serializationManager;
         private SimpleMessageStreamProviderOptions options;
         public bool IsRewindable { get { return false; } }
 
-        public SimpleMessageStreamProvider(string name, SimpleMessageStreamProviderOptions options,
-            ILoggerFactory loggerFactory, IProviderRuntime providerRuntime, SerializationManager serializationManager)
+        public SimpleMessageStreamProvider(
+            string name,
+            SimpleMessageStreamProviderOptions options,
+            IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar,
+            IStreamSubscriptionManifest<Guid, IStreamIdentity> subscriptionManifest,
+            ILoggerFactory loggerFactory,
+            IProviderRuntime providerRuntime,
+            SerializationManager serializationManager)
         {
             this.loggerFactory = loggerFactory;
             this.Name = name;
@@ -33,22 +39,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             this.providerRuntime = providerRuntime as IStreamProviderRuntime;
             this.runtimeClient = providerRuntime.ServiceProvider.GetService<IRuntimeClient>();
             this.serializationManager = serializationManager;
-            if (this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit
-                || this.options.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
-            {
-                this.streamSubscriptionManager = this.providerRuntime.ServiceProvider
-                    .GetService<IStreamSubscriptionManagerAdmin>()
-                    .GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-            }
+            this.subscriptionRegistrar = subscriptionRegistrar;
+            this.subscriptionManifest = subscriptionManifest;
             logger.Info(
-                "Initialized SimpleMessageStreamProvider with name {0} and with property FireAndForgetDelivery: {1}, OptimizeForImmutableData: {2} " +
-                "and PubSubType: {3}", Name, this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData,
-                this.options.PubSubType);
-        }
-
-        public IStreamSubscriptionManager GetStreamSubscriptionManager()
-        {
-            return this.streamSubscriptionManager;
+                "Initialized SimpleMessageStreamProvider with name {Name} and with property FireAndForgetDelivery: {FireAndForgetDelivery}, OptimizeForImmutableData: {OptimizeForImmutableData}", Name, this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData);
         }
 
         public IAsyncStream<T> GetStream<T>(Guid id, string streamNamespace)
@@ -62,8 +56,9 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         IInternalAsyncBatchObserver<T> IInternalStreamProvider.GetProducerInterface<T>(IAsyncStream<T> stream)
         {
             return new SimpleMessageStreamProducer<T>((StreamImpl<T>)stream, Name, providerRuntime,
-                this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData, providerRuntime.PubSub(this.options.PubSubType), IsRewindable,
-                this.serializationManager, this.loggerFactory);
+                this.options.FireAndForgetDelivery, this.options.OptimizeForImmutableData,
+                this.subscriptionRegistrar, this.subscriptionManifest,
+                IsRewindable, this.serializationManager, this.loggerFactory);
         }
 
         IInternalAsyncObservable<T> IInternalStreamProvider.GetConsumerInterface<T>(IAsyncStream<T> streamId)
@@ -74,12 +69,19 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
             return new StreamConsumer<T>((StreamImpl<T>)stream, Name, providerRuntime,
-                providerRuntime.PubSub(this.options.PubSubType), this.logger, IsRewindable);
+                this.subscriptionRegistrar, this.logger, IsRewindable);
         }
 
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
-            return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(services, name, services.GetService<IOptionsSnapshot<SimpleMessageStreamProviderOptions>>().Get(name));
+            var subscriptionRegistrar = services.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name);
+            var subscriptionManifest = services.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name);
+            var options = services.GetService<IOptionsSnapshot<SimpleMessageStreamProviderOptions>>().Get(name);
+            return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(services,
+                name,
+                subscriptionRegistrar,
+                subscriptionManifest,
+                options);
         }
     }
 }

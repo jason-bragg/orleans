@@ -1,11 +1,6 @@
-﻿using Orleans.Runtime;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 
-namespace Orleans.Streams.Core
+namespace Orleans.Streams
 {
     public interface IStreamSubscriptionObserver
     {

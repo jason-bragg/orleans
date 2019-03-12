@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -18,13 +17,15 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly SerializationManager serializationManager;
 
         [NonSerialized]
-        private readonly IStreamPubSub                  pubSub;
+        private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar;
+        [NonSerialized]
+        private readonly IStreamSubscriptionManifest<Guid, IStreamIdentity> subscriptionManifest;
 
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
         private SimpleMessageStreamProducerExtension    myExtension;
         private IStreamProducerExtension                myGrainReference;
-        private bool                                    connectedToRendezvous;
+        private IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions;
         private readonly bool                           fireAndForgetDelivery;
         private readonly bool                           optimizeForImmutableData;
         [NonSerialized]
@@ -37,17 +38,24 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly ILoggerFactory loggerFactory;
         internal bool IsRewindable { get; private set; }
 
-        internal SimpleMessageStreamProducer(StreamImpl<T> stream, string streamProviderName,
-            IStreamProviderRuntime providerUtilities, bool fireAndForgetDelivery, bool optimizeForImmutableData,
-            IStreamPubSub pubSub, bool isRewindable, SerializationManager serializationManager,
+        internal SimpleMessageStreamProducer(
+            StreamImpl<T> stream,
+            string streamProviderName,
+            IStreamProviderRuntime providerUtilities,
+            bool fireAndForgetDelivery,
+            bool optimizeForImmutableData,
+            IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar,
+            IStreamSubscriptionManifest<Guid, IStreamIdentity> subscriptionManifest,
+            bool isRewindable,
+            SerializationManager serializationManager,
             ILoggerFactory loggerFactory)
         {
             this.stream = stream;
             this.streamProviderName = streamProviderName;
             providerRuntime = providerUtilities;
-            this.pubSub = pubSub;
+            this.subscriptionRegistrar = subscriptionRegistrar;
+            this.subscriptionManifest = subscriptionManifest;
             this.serializationManager = serializationManager;
-            connectedToRendezvous = false;
             this.fireAndForgetDelivery = fireAndForgetDelivery;
             this.optimizeForImmutableData = optimizeForImmutableData;
             IsRewindable = isRewindable;
@@ -58,18 +66,15 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             ConnectToRendezvous().Ignore();
         }
 
-        private async Task<ISet<PubSubSubscriptionState>> RegisterProducer()
+        private async Task BindExtensions()
         {
             var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, pubSub, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
+                () => new SimpleMessageStreamProducerExtension(providerRuntime, this.subscriptionRegistrar, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
 
             myExtension = tup.Item1;
             myGrainReference = tup.Item2;
 
             myExtension.AddStream(stream.StreamId);
-
-            // Notify streamRendezvous about new stream streamProducer. Retreave the list of RemoteSubscribers.
-            return await pubSub.RegisterProducer(stream.StreamId, streamProviderName, myGrainReference);
         }
 
         private async Task ConnectToRendezvous()
@@ -80,11 +85,11 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             // the caller should check _connectedToRendezvous before calling this method.
             using (await initLock.LockAsync())
             {
-                if (!connectedToRendezvous) // need to re-check again.
+                if (this.subscriptions == null) // need to re-check again.
                 {
-                    var remoteSubscribers = await RegisterProducer();
-                    myExtension.AddSubscribers(stream.StreamId, remoteSubscribers);
-                    connectedToRendezvous = true;
+                    await BindExtensions();
+                    this.subscriptions = await this.subscriptionManifest.MonitorSubscriptions(stream.StreamId);
+                    myExtension.AddSubscribers(stream.StreamId, this.subscriptions.Value);
                 }
             }
         }
@@ -97,7 +102,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnNextAsync"));
 
-            if (!connectedToRendezvous)
+            if (this.subscriptions == null)
             {
                 if (!this.optimizeForImmutableData)
                 {
@@ -123,7 +128,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnCompletedAsync"));
 
-            if (!connectedToRendezvous)
+            if (this.subscriptions == null)
                 await ConnectToRendezvous();
 
             await myExtension.CompleteStream(stream.StreamId);
@@ -133,7 +138,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnErrorAsync"));
 
-            if (!connectedToRendezvous)
+            if (this.subscriptions == null)
                 await ConnectToRendezvous();
 
             await myExtension.ErrorInStream(stream.StreamId, exc);
@@ -141,20 +146,23 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         internal Action OnDisposeTestHook { get; set; }
 
-        public async Task Cleanup()
+        public Task Cleanup()
         {
             if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
 
             myExtension.RemoveStream(stream.StreamId);
 
-            if (isDisposed) return;
+            if (isDisposed)
+            {
+                return Task.CompletedTask;
+            }
 
-            if (connectedToRendezvous)
+            if (this.subscriptions != null)
             {
                 try
                 {
-                    await pubSub.UnregisterProducer(stream.StreamId, streamProviderName, myGrainReference);
-                    connectedToRendezvous = false;
+                    this.subscriptions.Dispose();
+                    this.subscriptions = null;
                 }
                 catch (Exception exc)
                 {
@@ -167,6 +175,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             Action onDisposeTestHook = OnDisposeTestHook; // capture
             if (onDisposeTestHook != null)
                 onDisposeTestHook();
+            return Task.CompletedTask;
         }
     }
 }

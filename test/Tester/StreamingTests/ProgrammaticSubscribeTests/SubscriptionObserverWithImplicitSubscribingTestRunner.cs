@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -29,7 +29,7 @@ namespace Tester.StreamingTests.ProgrammaticSubscribeTests
         public async Task StreamingTests_ImplicitSubscribProvider_DontHaveSubscriptionManager()
         {
             var subGrain = this.fixture.GrainFactory.GetGrain<ISubscribeGrain>(Guid.NewGuid());
-            Assert.False(await subGrain.CanGetSubscriptionManager(StreamProviderName));
+            Assert.False(await subGrain.CanGetSubscriptions(StreamProviderName));
         }
 
         [SkippableFact]

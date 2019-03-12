@@ -25,12 +25,6 @@ namespace Orleans.Configuration
         public const int DEFAULT_START_STAGE = ServiceLifecycleStage.Active;
     }
 
-    public class StreamPubSubOptions
-    {
-        public StreamPubSubType PubSubType { get; set; } = DEFAULT_STREAM_PUBSUB_TYPE;
-        public const StreamPubSubType DEFAULT_STREAM_PUBSUB_TYPE = StreamPubSubType.ExplicitGrainBasedAndImplicit;
-    }
-
     public class StreamPullingAgentOptions
     {
         public int BatchContainerBatchSize { get; set; } = DEFAULT_BATCH_CONTAINER_BATCH_SIZE;

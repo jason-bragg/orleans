@@ -1,7 +1,6 @@
 using System;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using Orleans.Providers.Streams.Common;
 
 namespace Orleans.Streams
@@ -16,10 +15,19 @@ namespace Orleans.Streams
             return configurator;
         }
 
-        public static IClusterClientPersistentStreamConfigurator ConfigureStreamPubSub(this IClusterClientPersistentStreamConfigurator configurator, StreamPubSubType pubsubType = StreamPubSubOptions.DEFAULT_STREAM_PUBSUB_TYPE)
+        public static IClusterClientPersistentStreamConfigurator UsePubSub(this IClusterClientPersistentStreamConfigurator configurator)
         {
-            configurator.Configure<StreamPubSubOptions>(ob => ob.Configure(options => options.PubSubType = pubsubType));
-            return configurator;
+            throw new NotImplementedException();
+        }
+
+        public static IClusterClientPersistentStreamConfigurator UseExplicitOnlyPubSub(this IClusterClientPersistentStreamConfigurator configurator)
+        {
+            throw new NotImplementedException();
+        }
+
+        public static IClusterClientPersistentStreamConfigurator UseImplicitSubscriptions(this IClusterClientPersistentStreamConfigurator configurator)
+        {
+            throw new NotImplementedException();
         }
     }
 

@@ -5,8 +5,6 @@ namespace Orleans.Streams
 {
     public interface IStreamFailureHandler
     {
-        bool ShouldFaultSubsriptionOnError { get; }
-
         /// <summary>
         /// Should be called once all measures to deliver an event to a consumer have been exhausted.
         /// </summary>

@@ -1,10 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
-using Orleans.Streams.Core;
 
 namespace Orleans.Streams
 {
@@ -31,12 +29,6 @@ namespace Orleans.Streams
 
         void UnregisterSystemTarget(ISystemTarget target);
 
-        /// <summary>
-        /// A Pub Sub runtime interface.
-        /// </summary>
-        /// <returns></returns>
-        IStreamPubSub PubSub(StreamPubSubType pubSubType);
-
         /// <summary>A consistent ring interface.</summary>
         /// <param name="mySubRangeIndex">Index of the silo in the ring.</param>
         /// <param name="numSubRanges">Total number of sub ranges within this silo range.</param>
@@ -56,13 +48,6 @@ namespace Orleans.Streams
             IQueueAdapter queueAdapter);
     }
 
-    public enum StreamPubSubType
-    {
-        ExplicitGrainBasedAndImplicit,
-        ExplicitGrainBasedOnly,
-        ImplicitOnly,
-    }
-
     internal interface IStreamPubSub // Compare with: IPubSubRendezvousGrain
     {
         Task<ISet<PubSubSubscriptionState>> RegisterProducer(StreamId streamId, string streamProvider, IStreamProducerExtension streamProducer);
@@ -77,7 +62,7 @@ namespace Orleans.Streams
 
         Task<int> ConsumerCount(Guid streamId, string streamProvider, string streamNamespace);
 
-        Task<List<StreamSubscription>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
+        Task<List<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null);
 
         GuidId CreateSubscriptionId(StreamId streamId, IStreamConsumerExtension streamConsumer);
 

@@ -18,8 +18,8 @@ namespace Orleans.Streams
         private readonly Dictionary<QueueId, PersistentStreamPullingAgent> queuesToAgentsMap;
         private readonly string streamProviderName;
         private readonly IStreamProviderRuntime providerRuntime;
-        private readonly IStreamPubSub pubSub;
-
+        private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar;
+        private readonly IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest;
         private readonly StreamPullingAgentOptions options;
         private readonly AsyncSerialExecutor nonReentrancyGuarantor; // for non-reentrant execution of queue change notifications.
         private readonly ILogger logger;
@@ -38,7 +38,8 @@ namespace Orleans.Streams
             GrainId id, 
             string strProviderName, 
             IStreamProviderRuntime runtime,
-            IStreamPubSub streamPubSub,
+            IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar,
+            IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest,
             IQueueAdapterFactory adapterFactory,
             IStreamQueueBalancer streamQueueBalancer,
             StreamPullingAgentOptions options,
@@ -49,28 +50,17 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("strProviderName");
             }
-            if (runtime == null)
-            {
-                throw new ArgumentNullException("runtime", "IStreamProviderRuntime runtime reference should not be null");
-            }
-            if (streamPubSub == null)
-            {
-                throw new ArgumentNullException("streamPubSub", "StreamPubSub reference should not be null");
-            }
-            if (streamQueueBalancer == null)
-            {
-                throw new ArgumentNullException("streamQueueBalancer", "IStreamQueueBalancer streamQueueBalancer reference should not be null");
-            }
 
             queuesToAgentsMap = new Dictionary<QueueId, PersistentStreamPullingAgent>();
             streamProviderName = strProviderName;
-            providerRuntime = runtime;
-            pubSub = streamPubSub;
+            providerRuntime = runtime ?? throw new ArgumentNullException(nameof(runtime), "IStreamProviderRuntime runtime reference should not be null");
+            this.subscriptionRegistrar = subscriptionRegistrar ?? throw new ArgumentNullException(nameof(subscriptionRegistrar), "Subscription registrar reference should not be null");
+            this.manifest = manifest ?? throw new ArgumentNullException(nameof(manifest), "Subscription manifest reference should not be null");
             this.options = options;
             nonReentrancyGuarantor = new AsyncSerialExecutor();
             latestRingNotificationSequenceNumber = 0;
             latestCommandNumber = 0;
-            queueBalancer = streamQueueBalancer;
+            queueBalancer = streamQueueBalancer ?? throw new ArgumentNullException(nameof(streamQueueBalancer), "IStreamQueueBalancer streamQueueBalancer reference should not be null");
             this.adapterFactory = adapterFactory;
 
             queueAdapterCache = adapterFactory.GetQueueAdapterCache();
@@ -216,7 +206,7 @@ namespace Orleans.Streams
                 try
                 {
                     var agentId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENT_SYSTEM_TARGET_TYPE_CODE);
-                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, pubSub, queueId, this.options);
+                    var agent = new PersistentStreamPullingAgent(agentId, streamProviderName, providerRuntime, this.loggerFactory, this.subscriptionRegistrar, this.manifest, queueId, this.options);
                     providerRuntime.RegisterSystemTarget(agent);
                     queuesToAgentsMap.Add(queueId, agent);
                     agents.Add(agent);

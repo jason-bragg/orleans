@@ -8,7 +8,6 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
-using Orleans.Streams.Core;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -29,7 +28,7 @@ namespace Orleans.Providers.Streams.Common
     /// <summary>
     /// Persistent stream provider that uses an adapter for persistence
     /// </summary>
-    public class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, IStreamSubscriptionManagerRetriever, ILifecycleParticipant<ILifecycleObservable>
+    public class PersistentStreamProvider : IStreamProvider, IInternalStreamProvider, IControllable, ILifecycleParticipant<ILifecycleObservable>
     {
         private readonly ILogger logger;
         private readonly IStreamProviderRuntime runtime;
@@ -39,18 +38,27 @@ namespace Orleans.Providers.Streams.Common
         private IQueueAdapterFactory    adapterFactory;
         private IQueueAdapter           queueAdapter;
         private IPersistentStreamPullingManager pullingAgentManager;
-        private IStreamSubscriptionManager streamSubscriptionManager;
-        private readonly StreamPubSubOptions pubsubOptions;
         private readonly StreamLifecycleOptions lifeCycleOptions;
+        private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar;
+        private readonly IStreamSubscriptionManifest<Guid, IStreamIdentity> subscriptionManifest;
+
         public string Name { get; private set; }
         public bool IsRewindable { get { return queueAdapter.IsRewindable; } }
 
-        public PersistentStreamProvider(string name, StreamPubSubOptions pubsubOptions, StreamLifecycleOptions lifeCycleOptions, IProviderRuntime runtime, SerializationManager serializationManager, ILogger<PersistentStreamProvider> logger)
+        public PersistentStreamProvider(
+            string name,
+            StreamLifecycleOptions lifeCycleOptions,
+            IStreamSubscriptionRegistrar<Guid, IStreamIdentity> subscriptionRegistrar,
+            IStreamSubscriptionManifest<Guid, IStreamIdentity> subscriptionManifest,
+            IProviderRuntime runtime,
+            SerializationManager serializationManager,
+            ILogger<PersistentStreamProvider> logger)
         {
             if (String.IsNullOrEmpty(name)) throw new ArgumentNullException(nameof(name));
             if (runtime == null) throw new ArgumentNullException(nameof(runtime));
-            this.pubsubOptions = pubsubOptions ?? throw new ArgumentNullException(nameof(pubsubOptions));
             this.Name = name;
+            this.subscriptionRegistrar = subscriptionRegistrar;
+            this.subscriptionManifest = subscriptionManifest;
             this.lifeCycleOptions = lifeCycleOptions ?? throw new ArgumentNullException(nameof(lifeCycleOptions));
             this.runtime = runtime.ServiceProvider.GetRequiredService<IStreamProviderRuntime>();
             this.runtimeClient = runtime.ServiceProvider.GetRequiredService<IRuntimeClient>();
@@ -63,13 +71,6 @@ namespace Orleans.Providers.Streams.Common
             if(!this.stateManager.PresetState(ProviderState.Initialized)) return;
             this.adapterFactory = this.runtime.ServiceProvider.GetRequiredServiceByName<IQueueAdapterFactory>(this.Name);
             this.queueAdapter = await adapterFactory.CreateAdapter();
-
-            if (this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedAndImplicit 
-                || this.pubsubOptions.PubSubType == StreamPubSubType.ExplicitGrainBasedOnly)
-            {
-                this.streamSubscriptionManager = this.runtime.ServiceProvider
-                    .GetService<IStreamSubscriptionManagerAdmin>().GetStreamSubscriptionManager(StreamSubscriptionManagerType.ExplicitSubscribeOnly);
-            }
             this.stateManager.CommitState();
         }
 
@@ -90,11 +91,6 @@ namespace Orleans.Providers.Streams.Common
                 }
             }
             stateManager.CommitState();
-        }
-
-        public IStreamSubscriptionManager GetStreamSubscriptionManager()
-        {
-            return this.streamSubscriptionManager;
         }
 
         private async Task Close(CancellationToken token)
@@ -131,7 +127,7 @@ namespace Orleans.Providers.Streams.Common
 
         private IInternalAsyncObservable<T> GetConsumerInterfaceImpl<T>(IAsyncStream<T> stream)
         {
-            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.runtime.PubSub(this.pubsubOptions.PubSubType), this.logger, IsRewindable);
+            return new StreamConsumer<T>((StreamImpl<T>)stream, Name, this.runtime, this.subscriptionRegistrar, this.logger, IsRewindable);
         }
 
         public Task<object> ExecuteCommand(int command, object arg)
@@ -167,9 +163,11 @@ namespace Orleans.Providers.Streams.Common
 
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
-            var pubsubOptions = services.GetRequiredService<IOptionsSnapshot<StreamPubSubOptions>>().Get(name);
             var initOptions = services.GetRequiredService<IOptionsSnapshot<StreamLifecycleOptions>>().Get(name);
-            return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, pubsubOptions, initOptions);
+            var subscriptionRegistrar = services.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name);
+            var subscriptionManifest = services.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name);
+
+            return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, initOptions, subscriptionRegistrar, subscriptionManifest);
         }
 
         public static ILifecycleParticipant<TLifecycle> ParticipateIn<TLifecycle>(IServiceProvider serviceProvider, string name)

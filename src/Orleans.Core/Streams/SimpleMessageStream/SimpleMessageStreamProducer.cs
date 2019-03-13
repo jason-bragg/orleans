@@ -23,8 +23,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
-        private SimpleMessageStreamProducerExtension    myExtension;
-        private IStreamProducerExtension                myGrainReference;
+        private readonly SimpleMessageStreamSubscriptionManager subscriptionManager;
         private IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions;
         private readonly bool                           fireAndForgetDelivery;
         private readonly bool                           optimizeForImmutableData;
@@ -63,18 +62,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             initLock = new AsyncLock();
             this.loggerFactory = loggerFactory;
             this.logger = loggerFactory.CreateLogger(this.GetType().FullName);
+            this.subscriptionManager = new SimpleMessageStreamSubscriptionManager(stream.StreamId, providerUtilities, subscriptionRegistrar, loggerFactory, fireAndForgetDelivery, optimizeForImmutableData);
             ConnectToRendezvous().Ignore();
-        }
-
-        private async Task BindExtensions()
-        {
-            var tup = await providerRuntime.BindExtension<SimpleMessageStreamProducerExtension, IStreamProducerExtension>(
-                () => new SimpleMessageStreamProducerExtension(providerRuntime, this.subscriptionRegistrar, this.loggerFactory, fireAndForgetDelivery, optimizeForImmutableData));
-
-            myExtension = tup.Item1;
-            myGrainReference = tup.Item2;
-
-            myExtension.AddStream(stream.StreamId);
         }
 
         private async Task ConnectToRendezvous()
@@ -87,9 +76,8 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             {
                 if (this.subscriptions == null) // need to re-check again.
                 {
-                    await BindExtensions();
-                    this.subscriptions = await this.subscriptionManifest.MonitorSubscriptions(stream.StreamId);
-                    myExtension.AddSubscribers(stream.StreamId, this.subscriptions.Value);
+                    this.subscriptions = await this.subscriptionManifest.GetSubscriptionChanges(stream.StreamId);
+                    this.subscriptionManager.UpdateSubscribers(this.subscriptions.Value);
                 }
             }
         }
@@ -112,9 +100,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 }
 
                 await ConnectToRendezvous();
+            } else
+            {
+                UpdateSubscriptions();
             }
 
-            await myExtension.DeliverItem(stream.StreamId, item);
+            await this.subscriptionManager.DeliverItem(item);
         }
 
         public Task OnNextBatchAsync(IEnumerable<T> batch, StreamSequenceToken token)
@@ -131,7 +122,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (this.subscriptions == null)
                 await ConnectToRendezvous();
 
-            await myExtension.CompleteStream(stream.StreamId);
+            await this.subscriptionManager.CompleteStream();
         }
 
         public async Task OnErrorAsync(Exception exc)
@@ -141,7 +132,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (this.subscriptions == null)
                 await ConnectToRendezvous();
 
-            await myExtension.ErrorInStream(stream.StreamId, exc);
+            await this.subscriptionManager.ErrorInStream(exc);
         }
 
         internal Action OnDisposeTestHook { get; set; }
@@ -149,8 +140,6 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         public Task Cleanup()
         {
             if(logger.IsEnabled(LogLevel.Debug)) logger.Debug("Cleanup() called");
-
-            myExtension.RemoveStream(stream.StreamId);
 
             if (isDisposed)
             {
@@ -176,6 +165,21 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             if (onDisposeTestHook != null)
                 onDisposeTestHook();
             return Task.CompletedTask;
+        }
+
+        private void UpdateSubscriptions()
+        {
+            if (!this.subscriptions.NextAsync.IsCompleted)
+                return;
+
+            // find most recent subscription list and only process that.
+            while (this.subscriptions.NextAsync.IsCompleted)
+            {
+                // should be non-blocking call, as we've already checked to see that the task is complete
+                this.subscriptions = this.subscriptions.NextAsync.GetResult();
+            }
+
+            this.subscriptionManager.UpdateSubscribers(this.subscriptions.Value);
         }
     }
 }

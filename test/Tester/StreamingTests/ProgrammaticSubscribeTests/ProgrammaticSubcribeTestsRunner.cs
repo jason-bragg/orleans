@@ -347,7 +347,7 @@ namespace Tester.StreamingTests
         {
             using (IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions = await GetSubManager(streamId.ProviderName)
                 .Manifest
-                .MonitorSubscriptions(streamId))
+                .GetSubscriptionChanges(streamId))
             {
                 return subscriptions.Value;
             }

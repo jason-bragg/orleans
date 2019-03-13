@@ -446,8 +446,12 @@ namespace Orleans.Streams
             if (!streamData.Subscriptions.NextAsync.IsCompleted)
                 return;
 
-            // update subscriptions
-            streamData.Subscriptions = await streamData.Subscriptions.NextAsync;
+            // find most recent subscription list and only process that.
+            while (streamData.Subscriptions.NextAsync.IsCompleted)
+            {
+                // should be non-blocking call, as we've already checked to see that the task is complete
+                streamData.Subscriptions = streamData.Subscriptions.NextAsync.GetResult();
+            }
 
             // remove dropped subscriptions
             foreach (StreamConsumerData consumer in streamData.AllConsumers())
@@ -458,10 +462,11 @@ namespace Orleans.Streams
                 }
             }
 
-            StartInactiveCursors(streamData, startToken); // if this is an existing stream, start any inactive cursors
+            // Start any inactive cursors for remaining subscriptions
+            StartInactiveCursors(streamData, startToken);
 
-            List<Task> pending = new List<Task>();
             // add new subscriptions
+            List<Task> pending = new List<Task>();
             foreach (StreamSubscription<Guid> subscription in streamData.Subscriptions.Value)
             {
                 if(!streamData.TryGetConsumer(subscription.SubscriptionId, out StreamConsumerData consumer))
@@ -729,7 +734,7 @@ namespace Orleans.Streams
         {
             try
             {
-                return await manifest.MonitorSubscriptions(streamId);
+                return await manifest.GetSubscriptionChanges(streamId);
             }
             catch (Exception e)
             {

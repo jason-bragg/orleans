@@ -6,20 +6,14 @@ using Orleans.Concurrency;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Microsoft.Extensions.Logging;
+using System.Linq;
 
 namespace Orleans.Providers.Streams.SimpleMessageStream
 {
-    /// <summary>
-    /// Multiplexes messages to multiple different producers in the same grain over one grain-extension interface.
-    /// 
-    /// On the silo, we have one extension per activation and this extension multiplexes all streams on this activation 
-    ///     (different stream ids and different stream providers).
-    /// On the client, we have one extension per stream (we bind an extension for every StreamProducer, therefore every stream has its own extension).
-    /// </summary>
-    [Serializable]
-    internal class SimpleMessageStreamProducerExtension : IStreamProducerExtension
+    internal class SimpleMessageStreamSubscriptionManager
     {
-        private readonly Dictionary<StreamId, StreamConsumerExtensionCollection> remoteConsumers;
+        private readonly StreamId streamId;
+        private readonly StreamConsumerExtensionCollection consumers;
         private readonly IStreamProviderRuntime     providerRuntime;
         private readonly IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar;
         private readonly bool                       fireAndForgetDelivery;
@@ -27,125 +21,68 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         private readonly ILogger                    logger;
         private readonly ILoggerFactory             loggerFactory;
 
-        internal SimpleMessageStreamProducerExtension(IStreamProviderRuntime providerRt, IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar, ILoggerFactory loggerFactory, bool fireAndForget, bool optimizeForImmutable)
+        internal SimpleMessageStreamSubscriptionManager(StreamId streamId, IStreamProviderRuntime providerRt, IStreamSubscriptionRegistrar<Guid, IStreamIdentity> registrar, ILoggerFactory loggerFactory, bool fireAndForget, bool optimizeForImmutable)
         {
+            this.streamId = streamId;
             providerRuntime = providerRt;
             this.registrar = registrar;
             fireAndForgetDelivery = fireAndForget;
             optimizeForImmutableData = optimizeForImmutable;
-            remoteConsumers = new Dictionary<StreamId, StreamConsumerExtensionCollection>();
-            logger = loggerFactory.CreateLogger<SimpleMessageStreamProducerExtension>();
+            consumers = new StreamConsumerExtensionCollection(registrar, loggerFactory);
+            logger = loggerFactory.CreateLogger<SimpleMessageStreamSubscriptionManager>();
             this.loggerFactory = loggerFactory;
         }
 
-        internal void AddStream(StreamId streamId)
+        internal void UpdateSubscribers(IList<StreamSubscription<Guid>> subscribers)
         {
-            StreamConsumerExtensionCollection obs;
-            // no need to lock on _remoteConsumers, since on the client we have one extension per stream (per StreamProducer)
-            // so this call is only made once, when StreamProducer is created.
-            if (remoteConsumers.TryGetValue(streamId, out obs)) return;
-
-            obs = new StreamConsumerExtensionCollection(this.registrar, this.loggerFactory);
-            remoteConsumers.Add(streamId, obs);
-        }
-
-        internal void RemoveStream(StreamId streamId)
-        {
-            remoteConsumers.Remove(streamId);
-        }
-
-        internal void AddSubscribers(StreamId streamId, IEnumerable<StreamSubscription<Guid>> newSubscribers)
-        {
+            IList<Guid> subscriptions = subscribers.Select(s => s.SubscriptionId).ToList();
             if (logger.IsEnabled(LogLevel.Debug))
-                logger.Debug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(newSubscribers), streamId);
+                logger.Debug("{0} AddSubscribers {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), Utils.EnumerableToString(subscriptions), streamId);
             
-            StreamConsumerExtensionCollection consumers;
-            if (remoteConsumers.TryGetValue(streamId, out consumers))
+            foreach (var subscriber in subscribers)
             {
-                foreach (var newSubscriber in newSubscribers)
+                var subscriptionId = GuidId.GetGuidId(subscriber.SubscriptionId);
+                if (!consumers.Contains(subscriptionId))
                 {
-                    consumers.AddRemoteSubscriber(GuidId.GetGuidId(newSubscriber.SubscriptionId), newSubscriber.Consumer.AsReference<IStreamConsumerExtension>());
+                    AddSubscriber(subscriptionId, subscriber.Consumer.AsReference<IStreamConsumerExtension>());
                 }
             }
-            else
+
+            foreach (GuidId subscriptionId in consumers.Subscriptions())
             {
-                // We got an item when we don't think we're the subscriber. This is a normal race condition.
-                // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
+                if (!subscriptions.Contains(subscriptionId.Guid))
+                {
+                    RemoveSubscriber(subscriptionId);
+                }
             }
         }
 
-        internal Task DeliverItem(StreamId streamId, object item)
+        internal Task DeliverItem(object item)
         {
-            StreamConsumerExtensionCollection consumers;
-            if (remoteConsumers.TryGetValue(streamId, out consumers))
-            {
-                // Note: This is the main hot code path, 
-                // and the caller immediately does await on the Task 
-                // returned from this method, so we can just direct return here 
-                // without incurring overhead of additional await.
-                return consumers.DeliverItem(streamId, item, fireAndForgetDelivery, optimizeForImmutableData);
-            }
-            else
-            {
-                // We got an item when we don't think we're the subscriber. This is a normal race condition.
-                // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
-            }
-            return Task.CompletedTask;
+            return consumers.DeliverItem(streamId, item, fireAndForgetDelivery, optimizeForImmutableData);
         }
 
-        internal Task CompleteStream(StreamId streamId)
+        internal Task CompleteStream()
         {
-            StreamConsumerExtensionCollection consumers;
-            if (remoteConsumers.TryGetValue(streamId, out consumers))
-            {
-                return consumers.CompleteStream(streamId, fireAndForgetDelivery);
-            }
-            else
-            {
-                // We got an item when we don't think we're the subscriber. This is a normal race condition.
-                // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
-            }
-            return Task.CompletedTask;
+            return consumers.CompleteStream(streamId, fireAndForgetDelivery);
         }
 
-        internal Task ErrorInStream(StreamId streamId, Exception exc)
+        internal Task ErrorInStream(Exception exc)
         {
-            StreamConsumerExtensionCollection consumers;
-            if (remoteConsumers.TryGetValue(streamId, out consumers))
-            {
-                return consumers.ErrorInStream(streamId, exc, fireAndForgetDelivery);
-            }
-            else
-            {
-                // We got an item when we don't think we're the subscriber. This is a normal race condition.
-                // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
-            }
-            return Task.CompletedTask;
+            return consumers.ErrorInStream(streamId, exc, fireAndForgetDelivery);
         }
 
-
-        // Called by rendezvous when new remote subsriber subscribes to this stream.
-        public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
+        private void AddSubscriber(GuidId subscriptionId, IStreamConsumerExtension streamConsumer)
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
                 logger.Debug("{0} AddSubscriber {1} for stream {2}", providerRuntime.ExecutingEntityIdentity(), streamConsumer, streamId);
             }
 
-            StreamConsumerExtensionCollection consumers;
-            if (remoteConsumers.TryGetValue(streamId, out consumers))
-            {
-                consumers.AddRemoteSubscriber(subscriptionId, streamConsumer);
-            }
-            else
-            {
-                // We got an item when we don't think we're the subscriber. This is a normal race condition.
-                // We can drop the item on the floor, or pass it to the rendezvous, or log a warning.
-            }
-            return Task.CompletedTask;
+            consumers.AddRemoteSubscriber(subscriptionId, streamConsumer);
         }
 
-        public Task RemoveSubscriber(GuidId subscriptionId, StreamId streamId)
+        private void RemoveSubscriber(GuidId subscriptionId)
         {
             if (logger.IsEnabled(LogLevel.Debug))
             {
@@ -153,11 +90,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                     subscriptionId);
             }
 
-            foreach (StreamConsumerExtensionCollection consumers in remoteConsumers.Values)
-            {
-                consumers.RemoveRemoteSubscriber(subscriptionId);
-            }
-            return Task.CompletedTask;
+            consumers.RemoveRemoteSubscriber(subscriptionId);
         }
 
         [Serializable]
@@ -275,6 +208,17 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 // If there's no subscriber, presumably we just drop the item on the floor
                 return fireAndForgetDelivery ? Task.CompletedTask : Task.WhenAll(tasks);
             }
+
+            internal bool Contains(GuidId subscriptionId)
+            {
+                return consumers.ContainsKey(subscriptionId);
+            }
+
+            internal IEnumerable<GuidId> Subscriptions()
+            {
+                return consumers.Keys;
+            }
+
 
             private async Task NotifyError(IStreamConsumerExtension remoteConsumer, GuidId subscriptionId, Exception exc, StreamId streamId, bool fireAndForgetDelivery)
             {

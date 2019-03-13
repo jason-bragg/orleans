@@ -52,10 +52,10 @@ namespace Orleans.Streams
             return streamRendezvous.ConsumerCount(streamId);
         }
 
-        public Task<List<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
+        public async Task<IList<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer = null)
         {
             var streamRendezvous = GetRendezvousGrain(streamId);
-            return streamRendezvous.GetAllSubscriptions(streamId, streamConsumer);
+            return await streamRendezvous.GetAllSubscriptions(streamId, streamConsumer);
         }
 
         private IPubSubRendezvousGrain GetRendezvousGrain(StreamId streamId)

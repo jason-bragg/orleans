@@ -10,17 +10,23 @@ namespace Orleans.Streams
     {
         public static ISimpleMessageStreamConfigurator UsePubSub(this ISimpleMessageStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.Create);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.Create);
+            return configurator;
         }
 
         public static ISimpleMessageStreamConfigurator UseExplicitOnlyPubSub(this ISimpleMessageStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.CreateUsingExplicitOnly);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.CreateUsingExplicitOnly);
+            return configurator;
         }
 
         public static ISimpleMessageStreamConfigurator UseImplicitSubscriptions(this ISimpleMessageStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.CreateUsingImplicitOnly);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.CreateUsingImplicitOnly);
+            return configurator;
         }
     }
 

@@ -81,8 +81,10 @@ namespace Orleans.Runtime.Providers
             IStreamQueueBalancer queueBalancer = CreateQueueBalancer(streamProviderName);
             var managerId = GrainId.NewSystemTargetGrainIdByTypeCode(Constants.PULLING_AGENTS_MANAGER_SYSTEM_TARGET_TYPE_CODE);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
-            var subscriptionRegistrar = this.ServiceProvider.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(streamProviderName);
-            var manifest = this.ServiceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(streamProviderName);
+            var subscriptionRegistrar = this.ServiceProvider.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(streamProviderName)
+                ?? this.ServiceProvider.GetService<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>();
+            var manifest = this.ServiceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(streamProviderName)
+                ?? this.ServiceProvider.GetService<IStreamSubscriptionManifest<Guid, IStreamIdentity>>();
             var manager = new PersistentStreamPullingManager(managerId, streamProviderName, this, subscriptionRegistrar, manifest, adapterFactory, queueBalancer, pullingAgentOptions, this.loggerFactory);
             this.RegisterSystemTarget(manager);
             // Init the manager only after it was registered locally.

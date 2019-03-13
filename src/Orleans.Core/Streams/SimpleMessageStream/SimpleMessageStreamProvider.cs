@@ -74,8 +74,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
-            var subscriptionRegistrar = services.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name);
-            var subscriptionManifest = services.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name);
+            var subscriptionRegistrar = services.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name)
+                ?? services.GetService<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>();
+            var subscriptionManifest = services.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name)
+                ?? services.GetService<IStreamSubscriptionManifest<Guid, IStreamIdentity>>();
             var options = services.GetService<IOptionsSnapshot<SimpleMessageStreamProviderOptions>>().Get(name);
             return ActivatorUtilities.CreateInstance<SimpleMessageStreamProvider>(services,
                 name,

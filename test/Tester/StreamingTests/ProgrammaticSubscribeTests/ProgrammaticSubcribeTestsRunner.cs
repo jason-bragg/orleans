@@ -301,8 +301,10 @@ namespace Tester.StreamingTests
         {
             public SubManager(string name, IServiceProvider serviceProvider)
             {
-                this.Registrar = serviceProvider.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name);
-                this.Manifest = serviceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name);
+                this.Registrar = serviceProvider.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name)
+                    ?? serviceProvider.GetService<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>();
+                this.Manifest = serviceProvider.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name)
+                    ?? serviceProvider.GetService<IStreamSubscriptionManifest<Guid, IStreamIdentity>>();
             }
             public IStreamSubscriptionRegistrar<Guid, IStreamIdentity> Registrar { get; }
             public IStreamSubscriptionManifest<Guid, IStreamIdentity> Manifest { get; }

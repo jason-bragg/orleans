@@ -10,15 +10,21 @@ namespace Orleans.Streams
     {
         public static ISiloPersistentStreamConfigurator UsePubSub(this ISiloPersistentStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.Create);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.Create);
+            return configurator;
         }
         public static ISiloPersistentStreamConfigurator UseExplicitOnlyPubSub(this ISiloPersistentStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.CreateUsingExplicitOnly);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.CreateUsingExplicitOnly);
+            return configurator;
         }
         public static ISiloPersistentStreamConfigurator UseImplicitSubscriptions(this ISiloPersistentStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.CreateUsingImplicitOnly);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.CreateUsingImplicitOnly);
+            return configurator;
         }
         public static ISiloPersistentStreamConfigurator ConfigurePullingAgent(this ISiloPersistentStreamConfigurator configurator, Action<OptionsBuilder<StreamPullingAgentOptions>> configureOptions = null)
         {

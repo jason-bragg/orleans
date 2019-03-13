@@ -17,17 +17,23 @@ namespace Orleans.Streams
 
         public static IClusterClientPersistentStreamConfigurator UsePubSub(this IClusterClientPersistentStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.Create);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.Create);
+            return configurator;
         }
 
         public static IClusterClientPersistentStreamConfigurator UseExplicitOnlyPubSub(this IClusterClientPersistentStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.CreateUsingExplicitOnly);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.CreateUsingExplicitOnly);
+            return configurator;
         }
 
         public static IClusterClientPersistentStreamConfigurator UseImplicitSubscriptions(this IClusterClientPersistentStreamConfigurator configurator)
         {
-            throw new NotImplementedException();
+            configurator.ConfigureComponent(PubSubSubscriptionRegistrar.CreateUsingImplicitOnly);
+            configurator.ConfigureComponent(PubSubSubscriptionManifest.CreateUsingImplicitOnly);
+            return configurator;
         }
     }
 

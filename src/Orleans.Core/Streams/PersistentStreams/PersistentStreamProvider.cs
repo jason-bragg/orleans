@@ -164,8 +164,10 @@ namespace Orleans.Providers.Streams.Common
         public static IStreamProvider Create(IServiceProvider services, string name)
         {
             var initOptions = services.GetRequiredService<IOptionsSnapshot<StreamLifecycleOptions>>().Get(name);
-            var subscriptionRegistrar = services.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name);
-            var subscriptionManifest = services.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name);
+            var subscriptionRegistrar = services.GetServiceByName<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>(name)
+                ?? services.GetService<IStreamSubscriptionRegistrar<Guid, IStreamIdentity>>();
+            var subscriptionManifest = services.GetServiceByName<IStreamSubscriptionManifest<Guid, IStreamIdentity>>(name)
+                ?? services.GetService<IStreamSubscriptionManifest<Guid, IStreamIdentity>>();
 
             return ActivatorUtilities.CreateInstance<PersistentStreamProvider>(services, name, initOptions, subscriptionRegistrar, subscriptionManifest);
         }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -11,7 +12,7 @@ namespace Orleans.Streams
         private readonly IStreamPubSub explicitPubSub;
         private readonly ImplicitStreamPubSub implicitPubSub;
 
-        public StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
+        private StreamPubSubImpl(IStreamPubSub explicitPubSub, ImplicitStreamPubSub implicitPubSub)
         {
             if (explicitPubSub == null)
             {
@@ -64,7 +65,7 @@ namespace Orleans.Streams
             return explicitPubSub.ConsumerCount(streamId, streamProvider, streamNamespace); 
         }
 
-        public async Task<List<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
+        public async Task<IList<StreamSubscription<Guid>>> GetAllSubscriptions(StreamId streamId, IStreamConsumerExtension streamConsumer)
         {
             if (streamConsumer != null)
             {
@@ -92,6 +93,13 @@ namespace Orleans.Streams
             return implicitPubSub.IsImplicitSubscriber(subscriptionId, streamId)
                 ? implicitPubSub.FaultSubscription(streamId, subscriptionId)
                 : explicitPubSub.FaultSubscription(streamId, subscriptionId);
+        }
+
+        internal static StreamPubSubImpl Create(IServiceProvider services)
+        {
+            var explicitPubSub = services.GetService<GrainBasedPubSubRuntime>();
+            var implicitPubSub = services.GetService<ImplicitStreamPubSub>();
+            return new StreamPubSubImpl(explicitPubSub, implicitPubSub);
         }
     }
 }

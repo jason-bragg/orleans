@@ -309,6 +309,12 @@ namespace Orleans.Hosting
             // persistent state facet support
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));
+
+            // legacy pubsub
+            // persistent state facet support
+            services.AddSingleton<GrainBasedPubSubRuntime>();
+            services.AddSingleton<ImplicitStreamPubSub>();
+            services.AddSingleton<StreamPubSubImpl>(StreamPubSubImpl.Create);
         }
     }
 }

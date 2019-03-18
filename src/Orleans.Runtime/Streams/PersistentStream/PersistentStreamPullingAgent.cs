@@ -422,7 +422,7 @@ namespace Orleans.Streams
             streamData.RefreshActivity(nowUtc);
             if (streamData.StreamRegistered)
             {
-                if (!streamData.Subscriptions.NextAsync.IsCompleted)
+                if (!streamData.SubscriptionChangeFeed.Next.IsCompleted)
                 {
                     // if this is an existing stream and there are no subscription changes, start any inactive cursors
                     StartInactiveCursors(streamData, startToken); 
@@ -443,20 +443,20 @@ namespace Orleans.Streams
 
         private async Task HandleSubscriptionChanges(StreamConsumerCollection streamData, StreamSequenceToken startToken, DateTime nowUtc)
         {
-            if (!streamData.Subscriptions.NextAsync.IsCompleted)
+            if (!streamData.SubscriptionChangeFeed.Next.IsCompleted)
                 return;
 
             // find most recent subscription list and only process that.
-            while (streamData.Subscriptions.NextAsync.IsCompleted)
+            while (streamData.SubscriptionChangeFeed.Next.IsCompleted)
             {
                 // should be non-blocking call, as we've already checked to see that the task is complete
-                streamData.Subscriptions = streamData.Subscriptions.NextAsync.GetResult();
+                streamData.SubscriptionChangeFeed = streamData.SubscriptionChangeFeed.Next.GetResult();
             }
 
             // remove dropped subscriptions
             foreach (StreamConsumerData consumer in streamData.AllConsumers())
             {
-                if (!streamData.Subscriptions.Value.Any(s => s.SubscriptionId.Equals(consumer.SubscriptionId)))
+                if (!streamData.SubscriptionChangeFeed.Value.Any(s => s.SubscriptionId.Equals(consumer.SubscriptionId)))
                 {
                     streamData.RemoveConsumer(consumer.SubscriptionId.Guid, this.logger);
                 }
@@ -467,7 +467,7 @@ namespace Orleans.Streams
 
             // add new subscriptions
             List<Task> pending = new List<Task>();
-            foreach (StreamSubscription<Guid> subscription in streamData.Subscriptions.Value)
+            foreach (StreamSubscription<Guid> subscription in streamData.SubscriptionChangeFeed.Value)
             {
                 if(!streamData.TryGetConsumer(subscription.SubscriptionId, out StreamConsumerData consumer))
                 {
@@ -729,7 +729,7 @@ namespace Orleans.Streams
             return false;
         }
 
-        private static async Task<IAsyncLinkedListNode<IList<StreamSubscription<Guid>>>> MonitorSubscriptions(IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest, StreamId streamId, string streamProviderName,
+        private static async Task<ChangeFeed<IList<StreamSubscription<Guid>>>> MonitorSubscriptions(IStreamSubscriptionManifest<Guid, IStreamIdentity> manifest, StreamId streamId, string streamProviderName,
             IStreamProducerExtension meAsStreamProducer, ILogger logger)
         {
             try
@@ -748,22 +748,22 @@ namespace Orleans.Streams
             try
             {
                 IStreamProducerExtension meAsStreamProducer = this.AsReference<IStreamProducerExtension>();
-                IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions = null;
+                ChangeFeed<IList<StreamSubscription<Guid>>> subscriptionChangeFeed = null;
                 await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 async i => {
-                                    subscriptions = 
+                                    subscriptionChangeFeed = 
                                     await MonitorSubscriptions(this.manifest, streamData.StreamId, streamProviderName, meAsStreamProducer, logger); },
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
                                 (exception, i) => !IsShutdown,
                                 Constants.INFINITE_TIMESPAN,
                                 DeliveryBackoffProvider);
 
-                streamData.Subscriptions = subscriptions;
+                streamData.SubscriptionChangeFeed = subscriptionChangeFeed;
+                IList<StreamSubscription<Guid>> subscriptions = subscriptionChangeFeed.Value;
+                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", subscriptions.Count, streamData.StreamId);
 
-                if (logger.IsEnabled(LogLevel.Debug)) logger.Debug(ErrorCode.PersistentStreamPullingAgent_16, "Got back {0} Subscribers for stream {1}.", subscriptions.Value.Count, streamData.StreamId);
-
-                var addSubscriptionTasks = new List<Task>(subscriptions.Value.Count);
-                foreach (StreamSubscription<Guid> subscription in subscriptions.Value)
+                var addSubscriptionTasks = new List<Task>(subscriptions.Count);
+                foreach (StreamSubscription<Guid> subscription in subscriptions)
                 {
                     IStreamConsumerExtension extension = subscription.Consumer.AsReference<IStreamConsumerExtension>();
                     addSubscriptionTasks.Add(AddSubscriber(streamData, subscription.SubscriptionId, streamData.StreamId, extension, streamStartToken, nowUtc));

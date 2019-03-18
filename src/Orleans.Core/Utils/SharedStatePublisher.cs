@@ -7,7 +7,7 @@ namespace Orleans.Runtime
     {
         private SharedState currentState;
 
-        protected IAsyncLinkedListNode<T> Current => this.currentState;
+        protected ChangeFeed<T> Current => this.currentState;
 
         public SharedStatePublisher(T initialState)
         {
@@ -18,22 +18,13 @@ namespace Orleans.Runtime
         {
             var newSateChange = new SharedState(state);
             SharedState last = Interlocked.Exchange(ref this.currentState, newSateChange);
-            last.NextCompletion.TrySetResult(newSateChange);
+            last.Completion.TrySetResult(newSateChange);
         }
 
-        private class SharedState : IAsyncLinkedListNode<T>
+        private class SharedState : ChangeFeed<T>
         {
-            public SharedState(T state)
-            {
-                this.Value = state;
-                this.NextCompletion = new TaskCompletionSource<IAsyncLinkedListNode<T>>();
-            }
-
-            public T Value { get; }
-            public Task<IAsyncLinkedListNode<T>> NextAsync => this.NextCompletion.Task;
-            public TaskCompletionSource<IAsyncLinkedListNode<T>> NextCompletion { get; }
-
-            public void Dispose() {}
+            public SharedState(T state) : base(state) { }
+            public TaskCompletionSource<ChangeFeed<T>> Completion => base.NextCompletion;
         }
     }
 }

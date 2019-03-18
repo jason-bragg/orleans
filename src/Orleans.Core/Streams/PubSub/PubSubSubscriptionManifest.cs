@@ -20,7 +20,7 @@ namespace Orleans.Streams
             this.pubsub = pubsub;
         }
 
-        public async Task<IAsyncLinkedListNode<IList<StreamSubscription<Guid>>>> GetSubscriptionChanges(IStreamIdentity streamId)
+        public async Task<ChangeFeed<IList<StreamSubscription<Guid>>>> GetSubscriptionChanges(IStreamIdentity streamId)
         {
             Tuple<ProducerExtension, IStreamProducerExtension> extension = await runtime
                 .BindExtension<ProducerExtension, IStreamProducerExtension>(() => new ProducerExtension(this.pubsub));
@@ -32,7 +32,7 @@ namespace Orleans.Streams
         {
             public StreamSubscriptionPublisher(IList<StreamSubscription<Guid>> initialState) : base(initialState) { }
 
-            public IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> Subscriptions => base.Current;
+            public ChangeFeed<IList<StreamSubscription<Guid>>> SubscriptionChangeFeed => base.Current;
         }
 
         private class ProducerExtension : IStreamProducerExtension
@@ -46,25 +46,25 @@ namespace Orleans.Streams
                 this.streamPublishers = new Dictionary<StreamId, StreamSubscriptionPublisher>();
             }
 
-            public async Task<IAsyncLinkedListNode<IList<StreamSubscription<Guid>>>> Register(StreamId streamId)
+            public async Task<ChangeFeed<IList<StreamSubscription<Guid>>>> Register(StreamId streamId)
             {
                 if(this.streamPublishers.TryGetValue(streamId, out StreamSubscriptionPublisher publisher))
                 {
-                    return publisher.Subscriptions;
+                    return publisher.SubscriptionChangeFeed;
                 }
                 ISet<PubSubSubscriptionState> pubsubStates = await this.pubsub.RegisterProducer(streamId, streamId.ProviderName, this);
                 IList<StreamSubscription<Guid>> subscriptions = pubsubStates
                     .Select(state => new StreamSubscription<Guid>(state.SubscriptionId.Guid, state.consumerReference))
                     .ToList();
                 this.streamPublishers[streamId] = publisher = new StreamSubscriptionPublisher(subscriptions);
-                return publisher.Subscriptions;
+                return publisher.SubscriptionChangeFeed;
             }
 
             public Task AddSubscriber(GuidId subscriptionId, StreamId streamId, IStreamConsumerExtension streamConsumer, IStreamFilterPredicateWrapper filter)
             {
                 if (this.streamPublishers.TryGetValue(streamId, out StreamSubscriptionPublisher publisher))
                 {
-                    List<StreamSubscription<Guid>> update = new List<StreamSubscription<Guid>>(publisher.Subscriptions.Value);
+                    List<StreamSubscription<Guid>> update = new List<StreamSubscription<Guid>>(publisher.SubscriptionChangeFeed.Value);
                     update.Add(new StreamSubscription<Guid>(subscriptionId.Guid, (GrainReference)streamConsumer));
                     publisher.Publish(update);
                 }
@@ -75,7 +75,7 @@ namespace Orleans.Streams
             {
                 if (this.streamPublishers.TryGetValue(streamId, out StreamSubscriptionPublisher publisher))
                 {
-                    List<StreamSubscription<Guid>> update = publisher.Subscriptions.Value
+                    List<StreamSubscription<Guid>> update = publisher.SubscriptionChangeFeed.Value
                         .Where(s => s.SubscriptionId != subscriptionId.Guid)
                         .ToList();
                     publisher.Publish(update);

@@ -6,6 +6,6 @@ namespace Orleans.Streams
 {
     public interface IStreamSubscriptionManifest<TSubscriptionId, TStreamId>
     {
-        Task<IAsyncLinkedListNode<IList<StreamSubscription<TSubscriptionId>>>> GetSubscriptionChanges(TStreamId streamId);
+        Task<ChangeFeed<IList<StreamSubscription<TSubscriptionId>>>> GetSubscriptionChanges(TStreamId streamId);
     }
 }

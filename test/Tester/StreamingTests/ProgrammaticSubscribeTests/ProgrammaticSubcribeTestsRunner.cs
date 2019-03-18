@@ -347,11 +347,11 @@ namespace Tester.StreamingTests
 
         public async Task<IEnumerable<StreamSubscription<Guid>>> GetSubscriptions(FullStreamIdentity streamId)
         {
-            using (IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions = await GetSubManager(streamId.ProviderName)
+            using (ChangeFeed<IList<StreamSubscription<Guid>>> subscriptionChangeFeed = await GetSubManager(streamId.ProviderName)
                 .Manifest
                 .GetSubscriptionChanges(streamId))
             {
-                return subscriptions.Value;
+                return subscriptionChangeFeed.Value;
             }
         }
 

@@ -24,7 +24,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         [NonSerialized]
         private readonly IStreamProviderRuntime         providerRuntime;
         private readonly SimpleMessageStreamSubscriptionManager subscriptionManager;
-        private IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> subscriptions;
+        private ChangeFeed<IList<StreamSubscription<Guid>>> subscriptionChangeFeed;
         private readonly bool                           fireAndForgetDelivery;
         private readonly bool                           optimizeForImmutableData;
         [NonSerialized]
@@ -74,10 +74,10 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
             // the caller should check _connectedToRendezvous before calling this method.
             using (await initLock.LockAsync())
             {
-                if (this.subscriptions == null) // need to re-check again.
+                if (this.subscriptionChangeFeed == null) // need to re-check again.
                 {
-                    this.subscriptions = await this.subscriptionManifest.GetSubscriptionChanges(stream.StreamId);
-                    this.subscriptionManager.UpdateSubscribers(this.subscriptions.Value);
+                    this.subscriptionChangeFeed = await this.subscriptionManifest.GetSubscriptionChanges(stream.StreamId);
+                    this.subscriptionManager.UpdateSubscribers(this.subscriptionChangeFeed.Value);
                 }
             }
         }
@@ -90,7 +90,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnNextAsync"));
 
-            if (this.subscriptions == null)
+            if (this.subscriptionChangeFeed == null)
             {
                 if (!this.optimizeForImmutableData)
                 {
@@ -119,7 +119,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnCompletedAsync"));
 
-            if (this.subscriptions == null)
+            if (this.subscriptionChangeFeed == null)
                 await ConnectToRendezvous();
 
             await this.subscriptionManager.CompleteStream();
@@ -129,7 +129,7 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
         {
             if (isDisposed) throw new ObjectDisposedException(string.Format("{0}-{1}", GetType(), "OnErrorAsync"));
 
-            if (this.subscriptions == null)
+            if (this.subscriptionChangeFeed == null)
                 await ConnectToRendezvous();
 
             await this.subscriptionManager.ErrorInStream(exc);
@@ -146,12 +146,12 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
                 return Task.CompletedTask;
             }
 
-            if (this.subscriptions != null)
+            if (this.subscriptionChangeFeed != null)
             {
                 try
                 {
-                    this.subscriptions.Dispose();
-                    this.subscriptions = null;
+                    this.subscriptionChangeFeed.Dispose();
+                    this.subscriptionChangeFeed = null;
                 }
                 catch (Exception exc)
                 {
@@ -169,17 +169,17 @@ namespace Orleans.Providers.Streams.SimpleMessageStream
 
         private void UpdateSubscriptions()
         {
-            if (!this.subscriptions.NextAsync.IsCompleted)
+            if (!this.subscriptionChangeFeed.Next.IsCompleted)
                 return;
 
             // find most recent subscription list and only process that.
-            while (this.subscriptions.NextAsync.IsCompleted)
+            while (this.subscriptionChangeFeed.Next.IsCompleted)
             {
                 // should be non-blocking call, as we've already checked to see that the task is complete
-                this.subscriptions = this.subscriptions.NextAsync.GetResult();
+                this.subscriptionChangeFeed = this.subscriptionChangeFeed.Next.GetResult();
             }
 
-            this.subscriptionManager.UpdateSubscribers(this.subscriptions.Value);
+            this.subscriptionManager.UpdateSubscribers(this.subscriptionChangeFeed.Value);
         }
     }
 }

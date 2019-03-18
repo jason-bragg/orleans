@@ -12,8 +12,8 @@ namespace Orleans.Streams
         private DateTime lastActivityTimeUtc;
 
         public StreamId StreamId { get; }
-        public IAsyncLinkedListNode<IList<StreamSubscription<Guid>>> Subscriptions { get; set; }
-        public bool StreamRegistered => this.Subscriptions != null;
+        public ChangeFeed<IList<StreamSubscription<Guid>>> SubscriptionChangeFeed { get; set; }
+        public bool StreamRegistered => this.SubscriptionChangeFeed != null;
 
         public StreamConsumerCollection(StreamId streamId, DateTime nowUtc)
         {
@@ -55,7 +55,7 @@ namespace Orleans.Streams
             {
                 consumer.SafeDisposeCursor(logger);
             }
-            this.Subscriptions?.Dispose();
+            this.SubscriptionChangeFeed?.Dispose();
             queueData.Clear();
         }
 

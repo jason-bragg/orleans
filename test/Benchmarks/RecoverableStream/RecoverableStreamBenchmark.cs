@@ -30,7 +30,7 @@ namespace Benchmarks.RecoverableStream
                 hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>("recoverable", b => b
                     .ConfigurePartitioning(1)
                     .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
-                hostBuilder.UseIRecoverableStreams();
+                hostBuilder.UseRecoverableStreams();
             }
         }
 

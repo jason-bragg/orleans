@@ -1,31 +1,25 @@
 
 using System;
 using System.Threading.Tasks;
+using Orleans.Core;
 
 namespace Orleans.Streams
 {
-    public class IRecoverableStreamState<TState>
+    public class RecoverableStreamState<TState>
     {
-        string ETag { get;}
-        TState State { get;  }
-        IStreamIdentity StreamId { get; }
-        StreamSequenceToken StartToken { get; }
-        StreamSequenceToken SequenceToken { get; }
-        bool Idle { get; }
+        public IStreamIdentity StreamId { get; set; }
+        public TState State { get; set; }
+        public StreamSequenceToken StartToken { get; set; }
+        public StreamSequenceToken LastProcessedToken { get; set; }
+        public bool Idle { get; set; }
     }
 
     public interface IRecoverableStreamProcessor<TEvent, TState>
     {
         Task<bool> ProcessEvent(TEvent evt, StreamSequenceToken token, TState state);
-        Task OnIdle(IRecoverableStreamState<TState> recoverableStreamState);
-        bool ShouldRetryRecovery(int attemtps, Exception lastException, out TimeSpan retryInterval);
+        Task OnIdle(TState state);
+        bool ShouldRetryRecovery(TState state, int attemtps, Exception lastException, out TimeSpan retryInterval);
 
-    }
-
-    public interface IRecoverableStreamStorage<TState>
-    {
-        Task<string> Store(IRecoverableStreamState<TState> recoverableStreamState);
-        Task<IRecoverableStreamState<TState>> Load();
     }
 
     public interface IRecoverableStream<TState>
@@ -35,6 +29,6 @@ namespace Orleans.Streams
 
         void Attach<TEvent>(
             IRecoverableStreamProcessor<TEvent, TState> streamingApp,
-            IRecoverableStreamStorage<TState> storage);
+            IStorage<RecoverableStreamState<TState>> storage);
     }
 }

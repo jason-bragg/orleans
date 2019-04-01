@@ -3,8 +3,11 @@ using System.Threading.Tasks;
 using BenchmarkGrainInterfaces.RecoverableStream;
 using Microsoft.Extensions.Logging;
 using Orleans;
-using Orleans.Core;
+using Orleans.CodeGeneration;
+using Orleans.Runtime;
 using Orleans.Streams;
+
+[assembly: GenerateSerializer(typeof(Orleans.Streams.RecoverableStreamState<BenchmarkGrains.RecoverableStreams.RecoverableStreamGrain.State>))]
 
 namespace BenchmarkGrains.RecoverableStreams
 {
@@ -15,16 +18,21 @@ namespace BenchmarkGrains.RecoverableStreams
         private readonly IRecoverableStream<State> recoverableStream;
         private readonly ILogger logger;
 
-        public class State {};
+        public class State
+        {
+            public int Count;
+        };
 
         public RecoverableStreamGrain(
             [RecoverableStream("recoverable")]
             IRecoverableStream<State> recoverableStream,
+            [PersistentState("state")]
+            IPersistentState<RecoverableStreamState<State>> streamState,
             ILogger<RecoverableStreamGrain> logger)
         {
             this.recoverableStream = recoverableStream;
             this.logger = logger;
-            recoverableStream.Attach(new MyProcessor(recoverableStream.StreamId, this.logger), new MyStorage(this.logger));
+            recoverableStream.Attach(new MyProcessor(recoverableStream.StreamId, this.logger), streamState);
         }
 
         public override Task OnActivateAsync()
@@ -55,44 +63,15 @@ namespace BenchmarkGrains.RecoverableStreams
             {
                 this.logger.LogInformation("Processing event {Event} for stream {Stream} at {Token}",
                     evt, this.streamId.Guid.ToString() + this.streamId.Namespace, token);
+                state.Count++;
+                this.logger.LogInformation("Event Count is {Count} for stream {Stream} at {Token}",
+                    state.Count, this.streamId.Guid.ToString() + this.streamId.Namespace, token);
                 return Task.FromResult(true);
             }
 
             public bool ShouldRetryRecovery(State state, int attemtps, Exception lastException, out TimeSpan retryInterval)
             {
                 throw new NotImplementedException();
-            }
-        }
-
-        private class MyStorage : IStorage<RecoverableStreamState<State>>
-        {
-            private readonly ILogger logger;
-
-            public MyStorage(ILogger logger)
-            {
-                this.logger = logger;
-            }
-
-            public RecoverableStreamState<State> State { get; set; } = new RecoverableStreamState<State> { State = new State() };
-
-            public string Etag => "blarg";
-
-            public Task ClearStateAsync()
-            {
-                this.State = new RecoverableStreamState<State> { State = new State() };
-                return Task.CompletedTask;
-            }
-
-            public Task ReadStateAsync()
-            {
-                return Task.CompletedTask;
-            }
-
-            public Task WriteStateAsync()
-            {
-                this.logger.LogInformation("Saving state for stream {Stream} at {Token}",
-                    this.State.StreamId.Guid.ToString() + this.State.StreamId.Namespace, this.State.LastProcessedToken ?? this.State.StartToken);
-                return Task.CompletedTask;
             }
         }
     }

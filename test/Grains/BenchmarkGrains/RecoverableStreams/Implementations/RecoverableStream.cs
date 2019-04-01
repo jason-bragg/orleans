@@ -16,7 +16,6 @@ namespace Orleans.Streams
 
         public void Attach<TEvent>(IRecoverableStreamProcessor<TEvent, TState> streamingApp, IRecoverableStreamStorage<TState> storage)
         {
-            throw new System.NotImplementedException();
         }
     }
 }

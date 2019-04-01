@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 
 namespace Orleans.Streams
@@ -7,7 +8,7 @@ namespace Orleans.Streams
         public IRecoverableStream<TState> Create<TState>(IGrainActivationContext context, IRecoverableStreamConfiguration config) where TState : new()
         {
             IStreamProvider provider = context.ActivationServices.GetServiceByName<IStreamProvider>(config.StreamProviderName);
-            return new RecoverableStream<TState>(provider);
+            return ActivatorUtilities.CreateInstance<RecoverableStream<TState>>(context.ActivationServices, provider);
         }
     }
 }

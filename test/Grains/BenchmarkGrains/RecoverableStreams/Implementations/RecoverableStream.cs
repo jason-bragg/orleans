@@ -5,11 +5,15 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.CodeGeneration;
 using Orleans.Core;
 using Orleans.Runtime;
 
+[assembly: GenerateSerializer(typeof(Orleans.Streams.RecoverableStreamState<>))]
+
 namespace Orleans.Streams
 {
+
     public class RecoverableStream<TState> : IRecoverableStream<TState>, ILifecycleParticipant<IGrainLifecycle>
     {
         private readonly IStreamProvider streamProvider;
@@ -35,7 +39,7 @@ namespace Orleans.Streams
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState, OnSetupState);
+            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState+1, OnSetupState);
         }
 
         private async Task OnSetupState(CancellationToken ct)
@@ -78,6 +82,7 @@ namespace Orleans.Streams
                 if(this.storage.State.StreamId == null)
                 {
                     this.storage.State.StreamId = streamId;
+                    this.storage.State.State = Activator.CreateInstance<TState>();
                 }
             }
 

@@ -27,10 +27,12 @@ namespace Benchmarks.RecoverableStream
         {
             public void Configure(ISiloHostBuilder hostBuilder)
             {
-                hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>("recoverable", b => b
-                    .ConfigurePartitioning(1)
-                    .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly));
-                hostBuilder.UseRecoverableStreams();
+                hostBuilder
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("recoverable", b => b
+                        .ConfigurePartitioning(1)
+                        .ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly))
+                    .UseRecoverableStreams();
             }
         }
 

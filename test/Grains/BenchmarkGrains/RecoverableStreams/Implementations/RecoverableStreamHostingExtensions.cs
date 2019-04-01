@@ -6,7 +6,7 @@ namespace Orleans.Hosting
 {
     public static class RecoverableStreamHostingExtensions
     {
-        public static void UseIRecoverableStreams(this ISiloHostBuilder builder)
+        public static void UseRecoverableStreams(this ISiloHostBuilder builder)
         {
             builder.ConfigureServices(services =>
             {

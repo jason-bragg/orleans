@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
@@ -8,6 +8,7 @@ using Benchmarks.Serialization;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
 using Benchmarks.GrainStorage;
+using Benchmarks.RecoverableStream;
 
 namespace Benchmarks
 {
@@ -160,6 +161,19 @@ namespace Benchmarks
                 {
                     var benchmark = new GrainStorageBenchmark();
                     benchmark.AzureBlobSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["RecoverableStream.Memory"] = () =>
+            {
+                RunBenchmark(
+                "Running recoverable stream benchmark against memory streams",
+                () =>
+                {
+                    var benchmark = new RecoverableStreamBenchmark();
+                    benchmark.MemorySetup();
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),

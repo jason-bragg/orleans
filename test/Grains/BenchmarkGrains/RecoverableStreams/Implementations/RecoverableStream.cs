@@ -13,18 +13,18 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-
     public class RecoverableStream<TState> : IRecoverableStream<TState>, ILifecycleParticipant<IGrainLifecycle>
     {
         private readonly IStreamProvider streamProvider;
         private readonly ILogger logger;
+        private readonly IGrainActivationContext context;
         private IStreamProcessor processor;
 
-
-        public RecoverableStream(IStreamProvider streamProvider, IStreamIdentity streamId, ILogger<RecoverableStream<TState>> logger)
+        public RecoverableStream(IStreamProvider streamProvider, IStreamIdentity streamId, IGrainActivationContext context, ILogger<RecoverableStream<TState>> logger)
         {
             this.streamProvider = streamProvider;
             this.StreamId = streamId;
+            this.context = context;
             this.logger = logger;
         }
 
@@ -81,8 +81,13 @@ namespace Orleans.Streams
                 await this.storage.ReadStateAsync();
                 if(this.storage.State.StreamId == null)
                 {
-                    this.storage.State.StreamId = streamId;
+                    this.storage.State.StreamId = this.streamId;
                     this.storage.State.State = Activator.CreateInstance<TState>();
+                }
+                if(this.storage.State.Idle)
+                {
+                    this.storage.State.StartToken = this.storage.State.LastProcessedToken = null;
+                    this.storage.State.Idle = false;
                 }
             }
 

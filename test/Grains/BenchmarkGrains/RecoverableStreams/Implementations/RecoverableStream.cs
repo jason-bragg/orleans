@@ -32,6 +32,15 @@ namespace Orleans.Streams
         Task OnNonReentrantTimer(object state);
     }
 
+    public enum AdvancedStorageReadResultCode
+    {
+        Success,
+
+        Throttled,
+
+        GeneralFailure,
+    }
+
     public enum AdvancedStorageWriteResultCode
     {
         /// <summary>
@@ -77,13 +86,12 @@ namespace Orleans.Streams
     }
 
     public interface IAdvancedStorage<TState>
-        where TState : new()
     {
         TState State { get; set; }
 
         string ETag { get; }
 
-        Task ReadStateAsync();
+        Task<AdvancedStorageReadResultCode> ReadStateAsync();
 
         Task<AdvancedStorageWriteResultCode> WriteStateAsync();
     }
@@ -111,16 +119,18 @@ namespace Orleans.Streams
 
         public string ETag => this.simpleStorage.Etag;
 
-        public Task ReadStateAsync()
+        public async Task<AdvancedStorageReadResultCode> ReadStateAsync()
         {
-            return this.simpleStorage.ReadStateAsync();
+            await this.simpleStorage.ReadStateAsync();
+
+            return AdvancedStorageReadResultCode.Success;
         }
 
-        public Task<AdvancedStorageWriteResultCode> WriteStateAsync()
+        public async Task<AdvancedStorageWriteResultCode> WriteStateAsync()
         {
-            this.simpleStorage.WriteStateAsync();
+            await this.simpleStorage.WriteStateAsync();
 
-            return Task.FromResult(AdvancedStorageWriteResultCode.Success);
+            return AdvancedStorageWriteResultCode.Success;
         } 
     }
 
@@ -129,6 +139,7 @@ namespace Orleans.Streams
         Task Subscribe(StreamSequenceToken token);
     }
 
+    // TODO: Hm maybe I should be having delegates/events that can be listened to.
     public interface IStreamMonitor
     {
         void NotifyActive(StreamSequenceToken token);
@@ -221,20 +232,6 @@ namespace Orleans.Streams
 
     }
 
-    public interface ICheckpointPolicy
-    {
-
-    }
-
-    public interface IStoragePolicy
-    {
-        bool ShouldBackoffOnWriteWithAmbiguousResult { get; }
-
-        bool ShouldReloadOnWriteWithAmbiguousResult { get; } // Need metrics to decide on this. Probably tech specific. TODO: Maybe this should be a threshold
-
-        TimeSpan GetBackoff(int attempts);
-    }
-
     public interface IAdvancedTimerManager
     {
         IDisposable RegisterReentrantTimer(string timerName, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
@@ -250,7 +247,7 @@ namespace Orleans.Streams
         private readonly IGrainActivationContext context;
         private readonly IGrainRuntime runtime;
         private IRecoverableStreamProcessor<TState, TEvent> processor;
-        private IAdvancedStorage<RecoverableStreamState<TState>> storage;
+        private IRecoverableStreamStorage<TState> storage;
         //private string streamingStateETag; // TODO: Not sure I need this.
         private RecoverableStreamState<TState> streamingState => this.storage.State;
 
@@ -304,12 +301,10 @@ namespace Orleans.Streams
                 return;
             }
 
-            await this.storage.ReadStateAsync();
-            this.streamingStateETag = this.storage.ETag;
-            this.streamingState = this.storage.State;
-            if (this.streamingState == null)
+            await this.storage.Load();
+            if (this.storage.State == null) // TODO: Will this actually come back null? What's the expectation from Orleans?
             {
-                this.streamingState = new RecoverableStreamState<TState>
+                this.storage.State = new RecoverableStreamState<TState>
                 {
                     StreamId = this.StreamId,
                     ApplicationState = new TState()
@@ -405,13 +400,104 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        private async Task<bool> Checkpoint()
+        private Task Recover()
         {
+            throw new NotImplementedException(nameof(Recover));
+        }
+    }
 
+    internal interface IRecoverableStreamStorage<TState>
+    {
+        RecoverableStreamState<TState> State { get; set; }
+
+        Task Load();
+
+        Task<bool> Save();
+
+        Task<bool> Checkpoint();
+    }
+
+    public interface IRecoverableStreamStoragePolicy
+    {
+        TimeSpan GetReadBackoff(AdvancedStorageReadResultCode resultCode, int attempts);
+
+        bool ShouldBackoffOnWriteWithAmbiguousResult { get; }
+
+        bool ShouldReloadOnWriteWithAmbiguousResult { get; } // Need metrics to decide on this. Probably tech specific. TODO: Maybe this should be a threshold
+
+        TimeSpan GetWriteBackoff(AdvancedStorageWriteResultCode resultCode, int attempts);
+    }
+
+    internal class RecoverableStreamStorage<TState> : IRecoverableStreamStorage<TState>
+    {
+        private IAdvancedStorage<RecoverableStreamState<TState>> storage;
+        private IRecoverableStreamStoragePolicy policy;
+
+        public RecoverableStreamStorage(IAdvancedStorage<RecoverableStreamState<TState>> storage, IRecoverableStreamStoragePolicy policy)
+        {
+            if (storage == null) { throw new ArgumentNullException(nameof(storage)); }
+            if (policy == null) { throw new ArgumentNullException(nameof(policy)); }
+
+            this.storage = storage;
+            this.policy = policy;
         }
 
+        public RecoverableStreamState<TState> State { get; set; }
+
+        public async Task Load()
+        {
+            int attempts = 0;
+
+            // This loop will exit when the state is loaded
+            // TODO: Should there be a max attempts here?
+            while (true)
+            {
+                AdvancedStorageReadResultCode readResult;
+
+                try
+                {
+                    ++attempts;
+                    readResult = await this.storage.ReadStateAsync();
+                }
+                catch (Exception exception)
+                {
+                    readResult = AdvancedStorageReadResultCode.GeneralFailure;
+
+                    // TODO: Log
+                    Console.WriteLine(exception);
+                }
+
+                bool shouldBackoff;
+
+                switch (readResult)
+                {
+                    case AdvancedStorageReadResultCode.Success:
+                        return;
+                    case AdvancedStorageReadResultCode.Throttled:
+                        shouldBackoff = true;
+                        break;
+                    case AdvancedStorageReadResultCode.GeneralFailure:
+                        shouldBackoff = false;
+                        break;
+                    default:
+                        throw new NotSupportedException(FormattableString.Invariant($"Unknown {nameof(AdvancedStorageReadResultCode)} '{readResult}' returned by storage"));
+                }
+
+                if (shouldBackoff)
+                {
+                    var backoff = this.policy.GetReadBackoff(readResult, attempts);
+
+                    if (backoff > TimeSpan.Zero)
+                    {
+                        await Task.Delay(backoff);
+                    }
+                }
+            }
+        }
+
+        // TODO: Not a fan of this code or Load even. It's hard to see the exit conditions. This will make logging difficult.
         // Return true if we FF'd. 
-        private async Task<bool> Save()
+        public async Task<bool> Save()
         {
             int attempts = 0;
 
@@ -438,7 +524,7 @@ namespace Orleans.Streams
                 }
 
                 // TODO: For safety we should limit the number of "optimized / skipped reloads we do"
-                bool shouldBackoff = false;
+                bool shouldBackoff;
                 bool shouldReload;
 
                 switch (writeResult)
@@ -446,10 +532,11 @@ namespace Orleans.Streams
                     case AdvancedStorageWriteResultCode.Success:
                         return false; // We didn't need to FF
                     case AdvancedStorageWriteResultCode.Ambiguous:
-                        shouldBackoff = this.storagePolicy.ShouldBackoffOnWriteWithAmbiguousResult;
-                        shouldReload = this.storagePolicy.ShouldReloadOnWriteWithAmbiguousResult;
+                        shouldBackoff = this.policy.ShouldBackoffOnWriteWithAmbiguousResult;
+                        shouldReload = this.policy.ShouldReloadOnWriteWithAmbiguousResult;
                         break;
                     case AdvancedStorageWriteResultCode.Conflict:
+                        shouldBackoff = false;
                         shouldReload = true;
                         break;
                     case AdvancedStorageWriteResultCode.Throttled:
@@ -468,7 +555,7 @@ namespace Orleans.Streams
 
                 if (shouldBackoff)
                 {
-                    var backoff = this.storagePolicy.GetBackoff(attempts);
+                    var backoff = this.policy.GetWriteBackoff(writeResult, attempts);
 
                     if (backoff > TimeSpan.Zero)
                     {
@@ -478,7 +565,8 @@ namespace Orleans.Streams
 
                 if (shouldReload)
                 {
-                    await this.storage.ReadStateAsync();
+                    // TODO: Maybe attempts should be carried in to here. Unfortunately right now "attempts" includes transient failures and conflicts and we probably only want to carry transient failures in.
+                    await this.Load();
 
                     var storedStreamingState = this.storage.State;
                     var storedStreamingStateETag = this.storage.ETag;
@@ -493,34 +581,29 @@ namespace Orleans.Streams
                         switch (comparison)
                         {
                             case EasyCompareToResult.Before:
-                            {
-                                // We're behind. Use what's currently in storage.
+                                {
+                                    // We're behind. Use what's currently in storage.
 
-                                // Fast forward
-                                await this.Subscribe(storedStreamingState.GetToken());
-
-                                // TODO: Notify of FF
-
-                                return true; // We needed to FF
-                            }
+                                    return true; // We need to FF
+                                }
                             case EasyCompareToResult.Equal:
-                            {
-                                // We're equal. We could take either state but we'll keep ours because maybe the GC implications are better.
-                                this.storage.State = currentStreamingState;
-                                
-                                return false; // We didn't need to FF.
-                            }
-                            case EasyCompareToResult.After:
-                            {
-                                // We're ahead. Overwrite storage.
-                                this.storage.State = currentStreamingState;
+                                {
+                                    // We're equal. We could take either state but we'll keep ours because maybe the GC implications are better.
+                                    this.storage.State = currentStreamingState;
 
-                                break;
-                            }
+                                    return false; // We didn't need to FF.
+                                }
+                            case EasyCompareToResult.After:
+                                {
+                                    // We're ahead. Overwrite storage.
+                                    this.storage.State = currentStreamingState;
+
+                                    break;
+                                }
                             default:
-                            {
-                                throw new NotSupportedException($"Unknown {nameof(EasyCompareToResult)} '{comparison}'");
-                            }
+                                {
+                                    throw new NotSupportedException($"Unknown {nameof(EasyCompareToResult)} '{comparison}'");
+                                }
                         }
                     }
                 }
@@ -529,9 +612,10 @@ namespace Orleans.Streams
             }
         }
 
-        private Task Recover()
+        public Task<bool> Checkpoint()
         {
-            throw new NotImplementedException(nameof(Recover));
+            // TODO: This can probably share code with Save. But we need to consider the checkpoint policy. If the checkpoint fails transiently, we should evaluate the retry policy and see how much we care. Of course if it's conflict we probably want to resolve it. If it's general failure we probably need to reload because we won't know if the storage impl bothers to return special codes or if we're in a fallback.
+            throw new NotImplementedException();
         }
     }
 }

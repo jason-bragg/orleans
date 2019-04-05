@@ -7,8 +7,8 @@ namespace Orleans.Streams
         IStreamIdentity StreamId { get; }
         TState State { get; }
 
-        void Attach(
-            IRecoverableStreamProcessor<TState, TEvent> processor,
-            IAdvancedStorage<RecoverableStreamState<TState>> storage);
+        void Attach(IRecoverableStreamProcessor<TState, TEvent> processor,
+            IAdvancedStorage<RecoverableStreamState<TState>> storage,
+            IRecoverableStreamStoragePolicy storagePolicy);
     }
 }

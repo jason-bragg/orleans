@@ -143,6 +143,7 @@ namespace Orleans.Streams
         private readonly ILogger logger;
         private readonly IGrainActivationContext context;
         private readonly IGrainRuntime runtime;
+
         private IRecoverableStreamProcessor<TState, TEvent> processor;
         private IRecoverableStreamStorage<TState> storage;
 
@@ -180,19 +181,28 @@ namespace Orleans.Streams
                 return this.storage.State.ApplicationState;
             }
         }
-
-        public void Attach(IRecoverableStreamProcessor<TState, TEvent> processor, IAdvancedStorage<RecoverableStreamState<TState>> storage)
+        
+        public void Attach(
+            IRecoverableStreamProcessor<TState, TEvent> processor,
+            IAdvancedStorage<RecoverableStreamState<TState>> storage,
+            IRecoverableStreamStoragePolicy storagePolicy)
         {
             if (processor == null) { throw new ArgumentNullException(nameof(processor)); }
             if (storage == null) { throw new ArgumentNullException(nameof(storage)); }
+            if (storagePolicy == null) { throw new ArgumentNullException(nameof(storagePolicy)); }
+
+            if (this.processor == null)
+            {
+                throw new InvalidOperationException("Stream already has Processor attached");
+            }
 
             this.processor = processor;
-            this.storage = new RecoverableStreamStorage<TState>(storage, null);
+            this.storage = new RecoverableStreamStorage<TState>(storage, storagePolicy);
         }
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState+1, OnSetupState, OnCleanupState);
+            lifecycle.Subscribe(this.GetType().FullName, GrainLifecycleStage.SetupState + 1, OnSetupState, OnCleanupState);
         }
 
         // TODO: What happens if I throw here? Do I get retried? Should I handle my own retries here? We might not be an implicit stream.
@@ -224,6 +234,9 @@ namespace Orleans.Streams
             }
 
             // TODO: Register timers
+
+            // TODO: Recovery?
+            await this.processor.OnSetup(this.storage.State.ApplicationState);
         }
 
         private Task OnCleanupState(CancellationToken cancellationToken)
@@ -288,12 +301,16 @@ namespace Orleans.Streams
                             return;
                         }
                     }
+
+                    await this.processor.OnActiveStream(this.storage.State.ApplicationState);
                 }
 
                 this.storage.State.SetCurrentToken(token);
 
                 // TODO: Handle Poison Events here. I'm actually thinking this could be a sub-processor!
-                var processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState); ;
+                var processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState);
+
+                // TODO: Checkpoint
 
                 if (processorRequestsSave)
                 {
@@ -307,6 +324,7 @@ namespace Orleans.Streams
 
                 await this.storage.Load();
 
+                // TODO: Should we have OnRecovery recovery?
                 await this.processor.OnRecovery(this.storage.State.ApplicationState);
 
                 await this.Subscribe(this.storage.State.GetToken());

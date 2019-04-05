@@ -33,7 +33,7 @@ namespace BenchmarkGrains.RecoverableStreams
         {
             this.recoverableStream = recoverableStream;
             this.logger = logger;
-            recoverableStream.Attach(new MyProcessor(recoverableStream.StreamId, this.logger), new AdvancedStorageSimpleStorageAdapter<RecoverableStreamState<State>>(streamState));
+            recoverableStream.Attach(new MyProcessor(recoverableStream.StreamId, this.logger), new AdvancedStorageSimpleStorageAdapter<RecoverableStreamState<State>>(streamState), TODO);
         }
 
         public override Task OnActivateAsync()

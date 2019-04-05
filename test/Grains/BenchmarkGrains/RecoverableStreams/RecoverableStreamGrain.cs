@@ -11,6 +11,7 @@ using Orleans.Streams;
 
 namespace BenchmarkGrains.RecoverableStreams
 {
+    // TODO: How is the stream namespace the extension?  Is that common practice with Implicit Stream Subscriptions now?
     [ImplicitStreamSubscription("test")]
     [ImplicitStreamSubscription("other")]
     public class RecoverableStreamGrain : Grain, IRecoverableStreamGrain
@@ -32,7 +33,7 @@ namespace BenchmarkGrains.RecoverableStreams
         {
             this.recoverableStream = recoverableStream;
             this.logger = logger;
-            recoverableStream.Attach(new MyProcessor(recoverableStream.StreamId, this.logger), streamState);
+            recoverableStream.Attach(new MyProcessor(recoverableStream.StreamId, this.logger), new AdvancedStorageSimpleStorageAdapter<RecoverableStreamState<State>>(streamState));
         }
 
         public override Task OnActivateAsync()
@@ -54,24 +55,24 @@ namespace BenchmarkGrains.RecoverableStreams
 
             }
 
-            public Task OnIdle(State state)
+            public Task OnActive(State state)
             {
-                throw new NotImplementedException();
+                return Task.CompletedTask;
             }
 
-            public Task<bool> ProcessEvent(int evt, StreamSequenceToken token, State state)
+            public Task<ProcessEventResultCode> OnEvent(int evt, StreamSequenceToken token, State state)
             {
                 this.logger.LogInformation("Processing event {Event} for stream {Stream} at {Token}",
                     evt, this.streamId.Guid.ToString() + this.streamId.Namespace, token);
                 state.Count++;
                 this.logger.LogInformation("Event Count is {Count} for stream {Stream} at {Token}",
                     state.Count, this.streamId.Guid.ToString() + this.streamId.Namespace, token);
-                return Task.FromResult(true);
+                return Task.FromResult(ProcessEventResultCode.Continue);
             }
 
-            public bool ShouldRetryRecovery(State state, int attemtps, Exception lastException, out TimeSpan retryInterval)
+            public Task OnIdle(State state)
             {
-                throw new NotImplementedException();
+                return Task.CompletedTask;
             }
         }
     }

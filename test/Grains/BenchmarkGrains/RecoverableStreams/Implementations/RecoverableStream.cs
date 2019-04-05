@@ -251,9 +251,9 @@ namespace Orleans.Streams
             }
             catch (Exception exception)
             {
-                // TODO: Warn
+                // TODO: Warn. 
                 Console.WriteLine(exception);
-                throw;
+                throw; // TODO: Not sure what else we can do here. We're not doing explicit pub sub so it feels like this shouldn't be transient and should never throw.
             }
         }
 
@@ -271,24 +271,26 @@ namespace Orleans.Streams
 
                 this.streamingState.IsIdle = false;
 
-                // TODO: Save and handle storage conflict
+                var saveFastForwarded = await this.Save();
+
+                if (saveFastForwarded)
+                {
+                    // We fast-forwarded so it's possible that the current event is now considered a duplicate
+                    if (this.streamingState.IsDuplicateEvent(token))
+                    {
+                        return;
+                    }
+                }
             }
 
             this.streamingState.SetCurrentToken(token);
 
-            bool processorRequestsSave;
-            try
-            {
-                processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState);;
-            }
-            catch (Exception exception)
-            {
-                // TODO: Enter recovery
-            }
+            // TODO: Handle Poison Events here. I'm actually thinking this could be a sub-processor!
+            var processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState);;
             
             if (processorRequestsSave)
             {
-                // TODO: Save and handle storage conflict
+                await this.storage.Save();
             }
         }
 
@@ -300,6 +302,22 @@ namespace Orleans.Streams
         private Task Recover()
         {
             throw new NotImplementedException(nameof(Recover));
+        }
+
+        // TODO: Maybe this should be pushed down to the storage interface, but it's kinda nice how that has limited dependencies right now
+        // Did we FF?
+        private async Task<bool> Save()
+        {
+            var storageRequestsFastForward = await this.storage.Save();
+
+            await this.processor.OnFastForward(this.storage.State.ApplicationState);
+
+            if (storageRequestsFastForward)
+            {
+                await this.Subscribe(this.storage.State.GetToken());
+            }
+
+            return storageRequestsFastForward;
         }
     }
 }

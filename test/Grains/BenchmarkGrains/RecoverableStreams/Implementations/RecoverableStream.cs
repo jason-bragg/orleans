@@ -145,17 +145,19 @@ namespace Orleans.Streams
         private readonly IGrainRuntime runtime;
         private IRecoverableStreamProcessor<TState, TEvent> processor;
         private IRecoverableStreamStorage<TState> storage;
-        //private string streamingStateETag; // TODO: Not sure I need this.
-        private RecoverableStreamState<TState> streamingState => this.storage.State;
-
-        private IStoragePolicy storagePolicy;
 
         public RecoverableStream(IStreamProvider streamProvider, IStreamIdentity streamId, IGrainActivationContext context, ILogger<RecoverableStream<TState, TEvent>> logger, IGrainRuntime runtime)
         {
-            if (!streamProvider.IsRewindable)
-            {
-                throw new ArgumentException("String Provider must be Rewindable", nameof(streamProvider));
-            }
+            if (streamProvider == null) { throw new ArgumentNullException(nameof(streamProvider)); }
+            if (!streamProvider.IsRewindable) { throw new ArgumentException("Stream Provider must be Rewindable", nameof(streamProvider)); }
+
+            if (streamId == null) { throw new ArgumentNullException(nameof(streamId)); }
+
+            if (context == null) { throw new ArgumentNullException(nameof(context)); }
+
+            if (logger == null) { throw new ArgumentNullException(nameof(logger)); }
+
+            if (runtime == null) { throw new ArgumentNullException(nameof(runtime)); }
 
             this.streamProvider = streamProvider;
             this.StreamId = streamId;
@@ -170,19 +172,22 @@ namespace Orleans.Streams
         {
             get
             {
-                if (this.streamingState == null)
+                if (this.storage.State == null)
                 {
                     return default;
                 }
 
-                return this.streamingState.ApplicationState;
+                return this.storage.State.ApplicationState;
             }
         }
 
         public void Attach(IRecoverableStreamProcessor<TState, TEvent> processor, IAdvancedStorage<RecoverableStreamState<TState>> storage)
         {
+            if (processor == null) { throw new ArgumentNullException(nameof(processor)); }
+            if (storage == null) { throw new ArgumentNullException(nameof(storage)); }
+
             this.processor = processor;
-            this.storage = storage;
+            this.storage = new RecoverableStreamStorage<TState>(storage, null);
         }
 
         public void Participate(IGrainLifecycle lifecycle)
@@ -208,10 +213,10 @@ namespace Orleans.Streams
                 };
             }
 
-            if (!this.streamingState.IsIdle)
+            if (!this.storage.State.IsIdle)
             {
                 // TODO: Get current token
-                await this.Subscribe(this.streamingState.CurrentToken ?? this.streamingState.StartToken);
+                await this.Subscribe(this.storage.State.GetToken());
             }
             else
             {
@@ -259,49 +264,56 @@ namespace Orleans.Streams
 
         private async Task OnNext(TEvent @event, StreamSequenceToken token)
         {
-            if (this.streamingState.IsDuplicateEvent(token))
+            try
             {
-                return;
-            }
-
-            if (this.streamingState.StartToken == null || this.streamingState.IsIdle)
-            {
-                this.streamingState.ResetTokens();
-                this.streamingState.SetStartToken(token);
-
-                this.streamingState.IsIdle = false;
-
-                var saveFastForwarded = await this.Save();
-
-                if (saveFastForwarded)
+                if (this.storage.State.IsDuplicateEvent(token))
                 {
-                    // We fast-forwarded so it's possible that the current event is now considered a duplicate
-                    if (this.streamingState.IsDuplicateEvent(token))
+                    return;
+                }
+
+                if (this.storage.State.StartToken == null || this.storage.State.IsIdle)
+                {
+                    this.storage.State.ResetTokens();
+                    this.storage.State.SetStartToken(token);
+
+                    this.storage.State.IsIdle = false;
+
+                    var saveFastForwarded = await this.Save();
+
+                    if (saveFastForwarded)
                     {
-                        return;
+                        // We fast-forwarded so it's possible that the current event is now considered a duplicate
+                        if (this.storage.State.IsDuplicateEvent(token))
+                        {
+                            return;
+                        }
                     }
                 }
+
+                this.storage.State.SetCurrentToken(token);
+
+                // TODO: Handle Poison Events here. I'm actually thinking this could be a sub-processor!
+                var processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState); ;
+
+                if (processorRequestsSave)
+                {
+                    await this.storage.Save();
+                }
             }
-
-            this.streamingState.SetCurrentToken(token);
-
-            // TODO: Handle Poison Events here. I'm actually thinking this could be a sub-processor!
-            var processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState);;
-            
-            if (processorRequestsSave)
+            catch (Exception exception)
             {
-                await this.storage.Save();
+                // TODO: Log
+                Console.WriteLine(exception);
+
+                await this.storage.Load();
+
+                await this.processor.OnRecovery(this.storage.State.ApplicationState);
+
+                await this.Subscribe(this.storage.State.GetToken());
+
+                // TODO: Hm. If there are other batches queued for delivery outside the grain, will those get delivered first? Are the streaming extensions smarter than that?
+                // TODO: Do we actually need to throw here? We requested a rewind, shouldn't that be sufficient?
             }
-        }
-
-        private Task OnError(Exception exception)
-        {
-            return Task.CompletedTask;
-        }
-
-        private Task Recover()
-        {
-            throw new NotImplementedException(nameof(Recover));
         }
 
         // TODO: Maybe this should be pushed down to the storage interface, but it's kinda nice how that has limited dependencies right now
@@ -318,6 +330,11 @@ namespace Orleans.Streams
             }
 
             return storageRequestsFastForward;
+        }
+
+        private Task OnError(Exception exception)
+        {
+            return Task.CompletedTask;
         }
     }
 }

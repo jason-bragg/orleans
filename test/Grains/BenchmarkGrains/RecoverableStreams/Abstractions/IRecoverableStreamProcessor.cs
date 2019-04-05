@@ -15,5 +15,8 @@ namespace Orleans.Streams
 
         // FYI, just fast forwarded. Here's the new state.
         Task OnFastForward(TState state);
+
+        // FYI, just recovered. Here's the new state we're starting with.
+        Task OnRecovery(TState state);
     }
 }

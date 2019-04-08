@@ -10,6 +10,6 @@ namespace Orleans.Streams
 
         Task<bool> Save();
 
-        Task<bool> Checkpoint();
+        Task<(bool persisted, bool fastForwardRequested)> CheckpointIfOverdue();
     }
 }

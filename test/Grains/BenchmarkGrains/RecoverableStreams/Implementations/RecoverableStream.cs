@@ -128,15 +128,16 @@ namespace Orleans.Streams
 
     }
 
+    public delegate Task AdvancedTimerCallback(IDisposable timer, object state);
+
     public interface IAdvancedTimerManager
     {
-        IDisposable RegisterReentrantTimer(string timerName, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
+        IDisposable RegisterReentrantTimer(AdvancedTimerCallback callback, object state, TimeSpan dueTime, TimeSpan period);
 
-        IDisposable RegisterNonReentrantTimer(string timerName, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
+        IDisposable RegisterNonReentrantTimer(AdvancedTimerCallback callback, object state, TimeSpan dueTime, TimeSpan period);
     }
 
     // TODO: Mega TODOs
-    //   - Checkpoints
     //   - Recovery backoff
     //   - Idle detection via timers and lifecycle control
     //   - Graceful limping (cut until we need it but then it'll probably be a "context" that we tack on to OnNext())
@@ -147,6 +148,7 @@ namespace Orleans.Streams
         private readonly ILogger logger;
         private readonly IGrainActivationContext context;
         private readonly IGrainRuntime runtime;
+        private readonly IAdvancedTimerManager timerManager; // TODO: Instantiate me using all kinds of crazy Orleans stuff
 
         private IRecoverableStreamProcessor<TState, TEvent> processor;
         private IRecoverableStreamStorage<TState> storage;
@@ -185,7 +187,8 @@ namespace Orleans.Streams
                 return this.storage.State.ApplicationState;
             }
         }
-        
+
+        // TODO: Handle if events or timer ticks start coming in before we're attached. Or maybe we should make that not be possible?
         public void Attach(
             IRecoverableStreamProcessor<TState, TEvent> processor,
             IAdvancedStorage<RecoverableStreamState<TState>> storage,
@@ -210,6 +213,7 @@ namespace Orleans.Streams
         }
 
         // TODO: What happens if I throw here? Do I get retried? Should I handle my own retries here? We might not be an implicit stream.
+        // TODO: Handle what to do if we're not attached. Throw? Put ourselves into a no-op state?
         private async Task OnSetupState(CancellationToken cancellationToken)
         {
             if (cancellationToken.IsCancellationRequested)
@@ -237,7 +241,8 @@ namespace Orleans.Streams
                 await this.Subscribe(null);
             }
 
-            // TODO: Register timers
+            // TODO: Apply jitter to timer registration
+            this.timerManager.RegisterReentrantTimer(this.OnCheckpointTimer, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
 
             // TODO: Recovery?
             await this.processor.OnSetup(this.storage.State.ApplicationState, this.storage.State.GetToken());
@@ -277,6 +282,11 @@ namespace Orleans.Streams
                 Console.WriteLine(exception);
                 throw; // TODO: Not sure what else we can do here. We're not doing explicit pub sub but we can't guarantee we're on the same silo so this could still fail.
             }
+        }
+
+        private Task OnCheckpointTimer(IDisposable timer, object state)
+        {
+            return this.CheckpointIfOverdue();
         }
 
         private async Task OnNext(TEvent @event, StreamSequenceToken token)
@@ -338,20 +348,43 @@ namespace Orleans.Streams
             }
         }
 
+        private Task<bool> CheckpointIfOverdue()
+        {
+            return this.Persist(isCheckpoint: true);
+        }
+
+        private Task<bool> Save()
+        {
+            return this.Persist(isCheckpoint: false);
+        }
+
         // TODO: Maybe this should be pushed down to the storage interface, but it's kinda nice how that has limited dependencies right now
         // Did we FF?
-        private async Task<bool> Save()
+        private async Task<bool> Persist(bool isCheckpoint)
         {
-            var storageRequestsFastForward = await this.storage.Save();
-
-            await this.processor.OnFastForward(this.storage.State.ApplicationState, this.storage.State.GetToken()); // TODO: Should token be passed in? Save is sometimes call before current token is set
-
-            if (storageRequestsFastForward)
+            bool persisted, fastForwardRequested;
+            if (isCheckpoint)
+            {
+                (persisted, fastForwardRequested) = await this.storage.CheckpointIfOverdue();
+            }
+            else
+            {
+                persisted = true;
+                fastForwardRequested = await this.storage.Save();
+            }
+            
+            if (fastForwardRequested)
             {
                 await this.Subscribe(this.storage.State.GetToken());
             }
 
-            return storageRequestsFastForward;
+            if (persisted)
+            {
+                await this.processor.OnPersisted(this.storage.State.ApplicationState, this.storage.State.GetToken(),
+                    fastForwardRequested); // TODO: Should token be passed in? Save is sometimes call before current token is set
+            }
+
+            return fastForwardRequested;
         }
 
         private Task OnError(Exception exception)

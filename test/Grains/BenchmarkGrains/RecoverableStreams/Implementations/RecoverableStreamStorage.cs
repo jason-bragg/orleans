@@ -9,6 +9,11 @@ namespace Orleans.Streams
         private readonly IAdvancedStorage<RecoverableStreamState<TState>> storage;
         private readonly IRecoverableStreamStoragePolicy policy;
 
+        private StreamSequenceToken lastKnownPersistedToken;
+
+        private DateTime? nextCheckpointTime;
+        private int checkpointAttemptCount;
+
         public RecoverableStreamStorage(IAdvancedStorage<RecoverableStreamState<TState>> storage, IRecoverableStreamStoragePolicy policy)
         {
             if (storage == null) { throw new ArgumentNullException(nameof(storage)); }
@@ -53,15 +58,29 @@ namespace Orleans.Streams
                 switch (readResult)
                 {
                     case AdvancedStorageReadResultCode.Success:
+                    {
+                        if (this.nextCheckpointTime == null)
+                        {
+                            this.nextCheckpointTime = DateTime.UtcNow + this.policy.GetNextCheckpoint(0);
+                        }
+
                         return;
+                    }
                     case AdvancedStorageReadResultCode.Throttled:
+                    {
                         shouldBackoff = true;
                         break;
+                    }
                     case AdvancedStorageReadResultCode.GeneralFailure:
+                    {
                         shouldBackoff = false;
                         break;
+                    }
                     default:
-                        throw new NotSupportedException(FormattableString.Invariant($"Unknown {nameof(AdvancedStorageReadResultCode)} '{readResult}' returned by storage"));
+                    {
+                        throw new NotSupportedException(FormattableString.Invariant(
+                            $"Unknown {nameof(AdvancedStorageReadResultCode)} '{readResult}' returned by storage"));
+                    }
                 }
 
                 if (shouldBackoff)
@@ -111,6 +130,7 @@ namespace Orleans.Streams
                 switch (writeResult)
                 {
                     case AdvancedStorageWriteResultCode.Success:
+                        this.nextCheckpointTime = DateTime.Now + this.policy.GetNextCheckpoint(0);
                         return false; // We didn't need to FF
                     case AdvancedStorageWriteResultCode.Ambiguous:
                         shouldBackoff = this.policy.ShouldBackoffOnWriteWithAmbiguousResult;
@@ -165,12 +185,16 @@ namespace Orleans.Streams
                             {
                                 // We're behind. Use what's currently in storage.
 
+                                this.nextCheckpointTime = DateTime.Now + this.policy.GetNextCheckpoint(0);
+
                                 return true; // We need to FF
                             }
                             case EasyCompareToResult.Equal:
                             {
                                 // We're equal. We could take either state but we'll keep ours because maybe the GC implications are better.
                                 this.storage.State = currentStreamingState;
+
+                                this.nextCheckpointTime = DateTime.Now + this.policy.GetNextCheckpoint(0);
 
                                 return false; // We didn't need to FF.
                             }
@@ -193,9 +217,20 @@ namespace Orleans.Streams
             }
         }
 
-        public Task<bool> Checkpoint()
+        public Task<(bool persisted, bool fastForwardRequested)> CheckpointIfOverdue()
         {
-            // TODO: This can probably share code with Save. But we need to consider the checkpoint policy. If the checkpoint fails transiently, we should evaluate the retry policy and see how much we care. Of course if it's conflict we probably want to resolve it. If it's general failure we probably need to reload because we won't know if the storage impl bothers to return special codes or if we're in a fallback.
+            if (this.nextCheckpointTime == null)
+            {
+                // TODO: Warn?
+                return Task.FromResult((false, false));
+            }
+
+            if (DateTime.UtcNow < this.nextCheckpointTime)
+            {
+                return Task.FromResult((false, false));
+            }
+
+            // TODO: This can probably share code with Save. But we need to consider the checkpoint policy. If the checkpoint fails transiently, we should evaluate the retry policy and see how much we care (how many times do we care to retry?). Of course if it's conflict we probably want to resolve it. If it's general failure we probably need to reload because we won't know if the storage impl bothers to return special codes or if we're in a fallback.
             throw new NotImplementedException();
         }
     }

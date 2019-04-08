@@ -35,11 +35,11 @@ namespace Orleans.Streams
             }
         }
 
-        public override Task OnSave(TState state, StreamSequenceToken token)
+        public override Task OnPersisted(TState state, StreamSequenceToken token, bool fastForward)
         {
             // TODO: Clear pairs before token
 
-            return this.InnerProcessor.OnSave(state, token);
+            return this.InnerProcessor.OnPersisted(state, token, fastForward);
         }
 
         public override Task OnFastForward(TState state, StreamSequenceToken token)

@@ -15,7 +15,7 @@ namespace Orleans.Streams
 
         public virtual Task OnCleanup(TState state, StreamSequenceToken token) => Task.CompletedTask;
 
-        public virtual Task OnSave(TState state, StreamSequenceToken token) => Task.CompletedTask;
+        public virtual Task OnPersisted(TState state, StreamSequenceToken token, bool fastForward) => Task.CompletedTask;
 
         public virtual Task OnFastForward(TState state, StreamSequenceToken token) => Task.CompletedTask;
 

@@ -21,7 +21,7 @@ namespace Orleans.Streams
         Task OnCleanup(TState state, StreamSequenceToken token);
 
         // FYI, just saved
-        Task OnSave(TState state, StreamSequenceToken token);
+        Task OnPersisted(TState state, StreamSequenceToken token, bool fastForward);
 
         // FYI, just fast forwarded. Here's the new state.
         Task OnFastForward(TState state, StreamSequenceToken token);

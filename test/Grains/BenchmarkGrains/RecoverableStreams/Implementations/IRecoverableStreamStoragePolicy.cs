@@ -4,6 +4,10 @@ namespace Orleans.Streams
 {
     public interface IRecoverableStreamStoragePolicy
     {
+        TimeSpan GetNextCheckpoint(int checkpointAttemptCount);
+
+        int GetCheckpointSubAttemptCount(int checkpointAttemptCount); // TODO: Improve naming
+
         TimeSpan GetReadBackoff(AdvancedStorageReadResultCode resultCode, int attempts);
 
         bool ShouldBackoffOnWriteWithAmbiguousResult { get; }

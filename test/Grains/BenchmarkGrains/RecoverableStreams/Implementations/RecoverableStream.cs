@@ -1,22 +1,21 @@
 
 using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime;
+using Orleans.Streams;
 
-[assembly: GenerateSerializer(typeof(Orleans.Streams.RecoverableStreamState<>))]
+[assembly: GenerateSerializer(typeof(RecoverableStreamState<>))]
 
 namespace Orleans.Streams
 {
     public enum TimerType
     {
         ActivityTracker,
-        Recovery,
+        Recovery
     }
 
     public class TimerState
@@ -99,7 +98,7 @@ namespace Orleans.Streams
     public class BasicRecoveryBackoffPolicy : StreamMonitorBase, IRecoveryBackoffPolicy
     {
         private StreamSequenceToken recoverySequenceToken;
-        private int recoveryCount = 0;
+        private int recoveryCount;
         
         public override void NotifyRecovery(StreamSequenceToken token)
         {
@@ -140,7 +139,6 @@ namespace Orleans.Streams
     //   - Checkpoints
     //   - Recovery backoff
     //   - Idle detection via timers and lifecycle control
-    //   - Poison events
     //   - Graceful limping (cut until we need it but then it'll probably be a "context" that we tack on to OnNext())
     // TODO: Potential conflict between grain timeout and timer frequencies. Possible to warn or even delay?
     public class RecoverableStream<TState, TEvent> : IRecoverableStream<TState, TEvent>, ILifecycleParticipant<IGrainLifecycle>, INonReentrantTimerCallbackGrainExtension where TState : new()
@@ -242,7 +240,7 @@ namespace Orleans.Streams
             // TODO: Register timers
 
             // TODO: Recovery?
-            await this.processor.OnSetup(this.storage.State.ApplicationState);
+            await this.processor.OnSetup(this.storage.State.ApplicationState, this.storage.State.GetToken());
         }
 
         private Task OnCleanupState(CancellationToken cancellationToken)
@@ -277,7 +275,7 @@ namespace Orleans.Streams
             {
                 // TODO: Warn. 
                 Console.WriteLine(exception);
-                throw; // TODO: Not sure what else we can do here. We're not doing explicit pub sub so it feels like this shouldn't be transient and should never throw.
+                throw; // TODO: Not sure what else we can do here. We're not doing explicit pub sub but we can't guarantee we're on the same silo so this could still fail.
             }
         }
 
@@ -308,13 +306,13 @@ namespace Orleans.Streams
                         }
                     }
 
-                    await this.processor.OnActiveStream(this.storage.State.ApplicationState);
+                    await this.processor.OnActiveStream(this.storage.State.ApplicationState, token);
                 }
 
                 this.storage.State.SetCurrentToken(token);
 
                 // TODO: Handle Poison Events here. I'm actually thinking this could be a sub-processor!
-                var processorRequestsSave = await this.processor.OnEvent(@event, token, this.storage.State.ApplicationState);
+                var processorRequestsSave = await this.processor.OnEvent(this.storage.State.ApplicationState, token, @event);
 
                 // TODO: Checkpoint
 
@@ -331,7 +329,7 @@ namespace Orleans.Streams
                 await this.storage.Load();
 
                 // TODO: Should we have OnRecovery recovery?
-                await this.processor.OnRecovery(this.storage.State.ApplicationState);
+                await this.processor.OnRecovery(this.storage.State.ApplicationState, token);
 
                 await this.Subscribe(this.storage.State.GetToken());
 
@@ -346,7 +344,7 @@ namespace Orleans.Streams
         {
             var storageRequestsFastForward = await this.storage.Save();
 
-            await this.processor.OnFastForward(this.storage.State.ApplicationState);
+            await this.processor.OnFastForward(this.storage.State.ApplicationState, this.storage.State.GetToken()); // TODO: Should token be passed in? Save is sometimes call before current token is set
 
             if (storageRequestsFastForward)
             {
@@ -365,23 +363,10 @@ namespace Orleans.Streams
                 return Task.CompletedTask;
             }
 
+            // TODO: Save if requested
             // TODO: Error handling?
-            return this.processor.OnError(new OrleansErrorArgs(exception));
+            // TODO: Null handling?
+            return this.processor.OnError(this.storage.State.ApplicationState, this.storage.State.GetToken(), exception, new StreamingFailureErrorArgs());
         }
-    }
-
-    public class OrleansErrorArgs
-    {
-        public OrleansErrorArgs(Exception exception)
-        {
-            this.Exception = exception;
-        }
-
-        public Exception Exception { get; }
-    }
-
-    public class PoisonRecoverableStreamProcessor<TState, TEvent> : IRecoverableStreamProcessor<TState, TEvent>
-    {
-
     }
 }

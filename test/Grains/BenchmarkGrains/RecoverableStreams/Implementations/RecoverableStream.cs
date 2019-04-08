@@ -136,6 +136,12 @@ namespace Orleans.Streams
         IDisposable RegisterNonReentrantTimer(string timerName, Func<object, Task> asyncCallback, object state, TimeSpan dueTime, TimeSpan period);
     }
 
+    // TODO: Mega TODOs
+    //   - Checkpoints
+    //   - Recovery backoff
+    //   - Idle detection via timers and lifecycle control
+    //   - Poison events
+    //   - Graceful limping (cut until we need it but then it'll probably be a "context" that we tack on to OnNext())
     // TODO: Potential conflict between grain timeout and timer frequencies. Possible to warn or even delay?
     public class RecoverableStream<TState, TEvent> : IRecoverableStream<TState, TEvent>, ILifecycleParticipant<IGrainLifecycle>, INonReentrantTimerCallbackGrainExtension where TState : new()
     {
@@ -352,7 +358,30 @@ namespace Orleans.Streams
 
         private Task OnError(Exception exception)
         {
-            return Task.CompletedTask;
+            // TODO: Log
+
+            if (this.processor == null)
+            {
+                return Task.CompletedTask;
+            }
+
+            // TODO: Error handling?
+            return this.processor.OnError(new OrleansErrorArgs(exception));
         }
+    }
+
+    public class OrleansErrorArgs
+    {
+        public OrleansErrorArgs(Exception exception)
+        {
+            this.Exception = exception;
+        }
+
+        public Exception Exception { get; }
+    }
+
+    public class PoisonRecoverableStreamProcessor<TState, TEvent> : IRecoverableStreamProcessor<TState, TEvent>
+    {
+
     }
 }

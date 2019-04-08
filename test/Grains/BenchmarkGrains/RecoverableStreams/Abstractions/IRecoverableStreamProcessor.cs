@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 
 namespace Orleans.Streams
@@ -23,5 +24,8 @@ namespace Orleans.Streams
 
         // FYI, just recovered. Here's the new state we're starting with.
         Task OnRecovery(TState state);
+
+        // Orleans OnError, OnPoisonEvent, etc.
+        Task OnError(object errorArgs);
     }
 }

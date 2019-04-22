@@ -20,6 +20,7 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
         private readonly ILoggerFactory loggerFactory;
+        private readonly IQueueDataAdapter<EventData, IBatchContainer> queueDataAdapter;
 
         /// <summary>
         /// Orleans logging
@@ -44,6 +45,7 @@ namespace Orleans.ServiceBus.Providers
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
         private EventHubClient client;
         private ITelemetryProducer telemetryProducer;
+
         /// <summary>
         /// Gets the serialization manager.
         /// </summary>
@@ -102,6 +104,7 @@ namespace Orleans.ServiceBus.Providers
 
         public EventHubAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
             StreamCacheEvictionOptions cacheEvictionOptions, StreamStatisticOptions statisticOptions,
+            IQueueDataAdapter<EventData, IBatchContainer> queueDataAdapter,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = name;
@@ -109,6 +112,7 @@ namespace Orleans.ServiceBus.Providers
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.ehOptions = ehOptions ?? throw new ArgumentNullException(nameof(ehOptions));
             this.cacheOptions = cacheOptions?? throw new ArgumentNullException(nameof(cacheOptions));
+            this.queueDataAdapter = queueDataAdapter ?? throw new ArgumentNullException(nameof(queueDataAdapter));
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
@@ -208,12 +212,6 @@ namespace Orleans.ServiceBus.Providers
         public virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
-            if (token != null)
-            {
-                throw new NotImplementedException("EventHub stream provider currently does not support non-null StreamSequenceToken.");
-            }
-            EventData eventData = EventHubBatchContainer.ToEventData(this.SerializationManager, streamGuid, streamNamespace, events, requestContext);
-
             return this.client.SendAsync(eventData, streamGuid.ToString());
         }
 
@@ -302,7 +300,8 @@ namespace Orleans.ServiceBus.Providers
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions);
+            var queueDataAdapter = services.GetServiceByName<IQueueDataAdapter<EventData, IBatchContainer>>(name);
+            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, queueDataAdapter);
             factory.Init();
             return factory;
         }

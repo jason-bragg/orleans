@@ -1,9 +1,8 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -22,15 +21,14 @@ namespace Orleans.Providers.Streams.Common
     ///   in part, why, unlike the SimpleQueueCache, this cache does not implement IQueueCache.  It is intended
     ///   to be used in queue specific implementations of IQueueCache.
     /// </summary>
-    /// <typeparam name="TQueueMessage">Queue specific data</typeparam>
     /// <typeparam name="TCachedMessage">Tightly packed cached structure.  Should only contain value types.</typeparam>
-    public class PooledQueueCache<TQueueMessage, TCachedMessage>: IPurgeObservable<TCachedMessage>
+    public class PooledQueueCache<TCachedMessage>: IPurgeObservable<TCachedMessage>
         where TCachedMessage : struct
     {
         // linked list of message bocks.  First is newest.
         private readonly LinkedList<CachedMessageBlock<TCachedMessage>> messageBlocks;
-        private readonly CachedMessagePool<TQueueMessage, TCachedMessage> pool;
-        private readonly ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter;
+        private readonly CachedMessagePool<TCachedMessage> pool;
+        private readonly ICacheDataAdapter<TCachedMessage> cacheDataAdapter;
         private readonly ICacheDataComparer<TCachedMessage> comparer;
         private readonly ILogger logger;
         private readonly ICacheMonitor cacheMonitor;
@@ -76,7 +74,7 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="logger"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval">cache monitor write interval.  Only triggered for active caches.</param>
-        public PooledQueueCache(ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, ILogger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
+        public PooledQueueCache(ICacheDataAdapter<TCachedMessage> cacheDataAdapter, ICacheDataComparer<TCachedMessage> comparer, ILogger logger, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
             if (cacheDataAdapter == null)
             {
@@ -94,7 +92,7 @@ namespace Orleans.Providers.Streams.Common
             this.comparer = comparer;
             this.logger = logger;
             this.itemCount = 0;
-            pool = new CachedMessagePool<TQueueMessage, TCachedMessage>(cacheDataAdapter);
+            pool = new CachedMessagePool<TCachedMessage>(cacheDataAdapter);
             messageBlocks = new LinkedList<CachedMessageBlock<TCachedMessage>>();
             this.cacheMonitor = cacheMonitor;
 
@@ -306,34 +304,25 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="messages"></param>
         /// <param name="dequeueTime"></param>
         /// <returns></returns>
-        public List<StreamPosition> Add(List<TQueueMessage> messages, DateTime dequeueTime)
+        public void Add(List<TCachedMessage> messages, DateTime dequeueTime)
         {
-            var streamPosisions = new List<StreamPosition>();
             foreach (var message in messages)
             {
-                streamPosisions.Add(this.Add(message, dequeueTime));
+                this.Add(message);
             }
             this.cacheMonitor?.TrackMessagesAdded(messages.Count);
             periodicMonitoring?.TryAction(dequeueTime);
-            return streamPosisions;
         }
 
-        private StreamPosition Add(TQueueMessage message, DateTime dequeueTimeUtc)
+        private void Add(TCachedMessage message)
         {
-            if (message == null)
-            {
-                throw new ArgumentNullException("message");
-            }
-
-            StreamPosition streamPosition;
             // allocate message from pool
-            CachedMessageBlock<TCachedMessage> block = pool.AllocateMessage(message, dequeueTimeUtc, out streamPosition);
+            CachedMessageBlock<TCachedMessage> block = pool.AllocateMessage(message);
 
             // If new block, add message block to linked list
             if (block != messageBlocks.FirstOrDefault())
                 messageBlocks.AddFirst(block.Node);
             itemCount++;
-            return streamPosition;
         }
 
         /// <summary>

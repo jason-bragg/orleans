@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using Orleans.Streams;
 
@@ -37,6 +37,5 @@ namespace Orleans.Providers.Streams.Common
         /// Position in the stream
         /// </summary>
         public StreamSequenceToken SequenceToken { get; }
-
     }
 }

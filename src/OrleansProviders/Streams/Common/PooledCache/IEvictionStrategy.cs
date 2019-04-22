@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -33,8 +33,8 @@ namespace Orleans.Providers.Streams.Common
 
     public static class EvictionStrategyCommonUtils
     {
-        public static void WireUpEvictionStrategy<TQueueMessage, TCachedMessage>(PooledQueueCache<TQueueMessage, TCachedMessage> cache,
-            ICacheDataAdapter<TQueueMessage, TCachedMessage> cacheDataAdapter, IEvictionStrategy<TCachedMessage> evictionStrategy)
+        public static void WireUpEvictionStrategy<TCachedMessage>(PooledQueueCache<TCachedMessage> cache,
+            ICacheDataAdapter<TCachedMessage> cacheDataAdapter, IEvictionStrategy<TCachedMessage> evictionStrategy)
             where TCachedMessage : struct
         {
             evictionStrategy.PurgeObservable = cache;

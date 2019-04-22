@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using Orleans.Streams;
 
@@ -10,20 +10,10 @@ namespace Orleans.Providers.Streams.Common
     ///   this interface allows adapter developers to build custom data transforms appropriate for 
     ///   the various types of queue data.
     /// </summary>
-    /// <typeparam name="TQueueMessage"></typeparam>
     /// <typeparam name="TCachedMessage"></typeparam>
-    public interface ICacheDataAdapter<in TQueueMessage, TCachedMessage>
+    public interface ICacheDataAdapter<TCachedMessage>
         where TCachedMessage : struct
     {
-        /// <summary>
-        /// Converts a TQueueMessage message from the queue to a TCachedMessage cachable structures.
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <param name="queueMessage"></param>
-        /// <param name="dequeueTimeUtc"></param>
-        /// <returns></returns>
-        StreamPosition QueueMessageToCachedMessage(ref TCachedMessage cachedMessage, TQueueMessage queueMessage, DateTime dequeueTimeUtc);
-
         /// <summary>
         /// Converts a cached message to a batch container for delivery
         /// </summary>
@@ -37,13 +27,6 @@ namespace Orleans.Providers.Streams.Common
         /// <param name="cachedMessage"></param>
         /// <returns></returns>
         StreamSequenceToken GetSequenceToken(ref TCachedMessage cachedMessage);
-
-        /// <summary>
-        /// Gets the stream position from a queue message
-        /// </summary>
-        /// <param name="queueMessage"></param>
-        /// <returns></returns>
-        StreamPosition GetStreamPosition(TQueueMessage queueMessage);
 
         /// <summary>
         /// Should be set to OnBlockAllocated method of the cache's EvicationStrategy

@@ -16,6 +16,6 @@ namespace Orleans.Streams
         /// <summary>
         /// Creates a batch container from a cloud queue message
         /// </summary>
-        TMessageBatch FromQueueMessage(TQueueMessage cloudMsg, long sequenceId);
+        TMessageBatch FromQueueMessage(TQueueMessage queueMessage, long sequenceId);
     }
 }

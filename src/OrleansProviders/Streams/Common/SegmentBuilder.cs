@@ -1,7 +1,7 @@
-﻿
+
 using System;
 
-namespace Orleans.ServiceBus.Providers
+namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Utility class for encoding data into an ArraySegment.

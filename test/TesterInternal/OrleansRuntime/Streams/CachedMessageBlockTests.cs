@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using Orleans.Providers.Streams.Common;
@@ -65,8 +65,6 @@ namespace UnitTests.OrleansRuntime.Streams
 
         private class TestCacheDataAdapter : ICacheDataAdapter<TestQueueMessage, TestCachedMessage>
         {
-            public Action<FixedSizeBuffer> OnBlockAllocated { set; private get; }
-
             public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
             {
                 StreamPosition streamPosition = GetStreamPosition(queueMessage);

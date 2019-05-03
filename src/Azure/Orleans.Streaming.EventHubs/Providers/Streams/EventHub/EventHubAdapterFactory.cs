@@ -20,7 +20,7 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
         private readonly ILoggerFactory loggerFactory;
-        private readonly IQueueDataAdapter<EventData, IBatchContainer> queueDataAdapter;
+        private readonly IEventHubDataAdapter dataAdapter;
 
         /// <summary>
         /// Orleans logging
@@ -104,7 +104,7 @@ namespace Orleans.ServiceBus.Providers
 
         public EventHubAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions, EventHubStreamCachePressureOptions cacheOptions, 
             StreamCacheEvictionOptions cacheEvictionOptions, StreamStatisticOptions statisticOptions,
-            IQueueDataAdapter<EventData, IBatchContainer> queueDataAdapter,
+            IEventHubDataAdapter dataAdapter,
             IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
         {
             this.Name = name;
@@ -112,7 +112,7 @@ namespace Orleans.ServiceBus.Providers
             this.statisticOptions = statisticOptions ?? throw new ArgumentNullException(nameof(statisticOptions));
             this.ehOptions = ehOptions ?? throw new ArgumentNullException(nameof(ehOptions));
             this.cacheOptions = cacheOptions?? throw new ArgumentNullException(nameof(cacheOptions));
-            this.queueDataAdapter = queueDataAdapter ?? throw new ArgumentNullException(nameof(queueDataAdapter));
+            this.dataAdapter = dataAdapter ?? throw new ArgumentNullException(nameof(dataAdapter));
             this.receiverOptions = receiverOptions?? throw new ArgumentNullException(nameof(receiverOptions));
             this.serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
             this.SerializationManager = serializationManager ?? throw new ArgumentNullException(nameof(serializationManager));
@@ -212,6 +212,7 @@ namespace Orleans.ServiceBus.Providers
         public virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
+            EventData eventData = this.dataAdapter.ToQueueMessage(streamGuid, streamNamespace, events, token, requestContext);
             return this.client.SendAsync(eventData, streamGuid.ToString());
         }
 

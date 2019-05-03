@@ -1,35 +1,31 @@
 
-using System;
-
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>
     /// Pool of tightly packed cached messages that are kept in large blocks to reduce GC pressure.
     /// </summary>
-    /// <typeparam name="TCachedMessage">Tightly packed structure.  Struct should contain only value types.</typeparam>
-    internal class CachedMessagePool<TCachedMessage>
-        where TCachedMessage : struct
+    internal class CachedMessagePool
     {
-        private readonly IObjectPool<CachedMessageBlock<TCachedMessage>> messagePool;
-        private CachedMessageBlock<TCachedMessage> currentMessageBlock;
+        private readonly IObjectPool<CachedMessageBlock> messagePool;
+        private CachedMessageBlock currentMessageBlock;
 
         /// <summary>
         /// Allocates a pool of cached message blocks.
         /// </summary>
         /// <param name="cacheDataAdapter"></param>
-        public CachedMessagePool(ICacheDataAdapter<TCachedMessage> cacheDataAdapter)
+        public CachedMessagePool(ICacheDataAdapter cacheDataAdapter)
         {
-            messagePool = new ObjectPool<CachedMessageBlock<TCachedMessage>>(
-                () => new CachedMessageBlock<TCachedMessage>());
+            messagePool = new ObjectPool<CachedMessageBlock>(
+                () => new CachedMessageBlock());
         }
 
         /// <summary>
         /// Allocates a message in a block and returns the block the message is in.
         /// </summary>
         /// <returns></returns>
-        public CachedMessageBlock<TCachedMessage> AllocateMessage(TCachedMessage message)
+        public CachedMessageBlock AllocateMessage(CachedMessage message)
         {
-            CachedMessageBlock<TCachedMessage> returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
+            CachedMessageBlock returnBlock = currentMessageBlock ?? (currentMessageBlock = messagePool.Allocate());
             returnBlock.Add(message);
 
             // blocks at capacity are eligable for purge, so we don't want to be holding on to them.

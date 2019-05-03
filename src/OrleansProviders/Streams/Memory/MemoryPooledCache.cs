@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -41,10 +41,9 @@ namespace Orleans.Providers
 
             public int Compare(MemoryMessageData cachedMessage, StreamSequenceToken token)
             {
-                var realToken = (EventSequenceToken)token;
-                return cachedMessage.SequenceNumber != realToken.SequenceNumber
-                    ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
-                    : 0 - realToken.EventIndex;
+                return cachedMessage.SequenceNumber != token.SequenceNumber
+                    ? (int)(cachedMessage.SequenceNumber - token.SequenceNumber)
+                    : 0 - token.EventIndex;
             }
 
             public bool Equals(MemoryMessageData cachedMessage, IStreamIdentity streamIdentity)
@@ -82,8 +81,6 @@ namespace Orleans.Providers
             private readonly IObjectPool<FixedSizeBuffer> bufferPool;
             private readonly TSerializer serializer;
             private FixedSizeBuffer currentBuffer;
-
-            public Action<FixedSizeBuffer> OnBlockAllocated { private get; set; }
 
             public CacheDataAdapter(IObjectPool<FixedSizeBuffer> bufferPool, TSerializer serializer)
             {

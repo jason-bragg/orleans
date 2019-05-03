@@ -1,4 +1,4 @@
-﻿
+
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -70,10 +70,9 @@ namespace UnitTests.OrleansRuntime.Streams
 
             public int Compare(TestCachedMessage cachedMessage, StreamSequenceToken token)
             {
-                var realToken = (EventSequenceTokenV2)token;
-                return cachedMessage.SequenceNumber != realToken.SequenceNumber
-                    ? (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber)
-                    : 0 - realToken.EventIndex;
+                return cachedMessage.SequenceNumber != token.SequenceNumber
+                    ? (int)(cachedMessage.SequenceNumber - token.SequenceNumber)
+                    : 0 - token.EventIndex;
             }
 
             public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
@@ -110,8 +109,6 @@ namespace UnitTests.OrleansRuntime.Streams
         {
             private readonly Orleans.Providers.Streams.Common.IObjectPool<FixedSizeBuffer> bufferPool;
             private FixedSizeBuffer currentBuffer;
-
-            public Action<FixedSizeBuffer> OnBlockAllocated { private get; set; }
 
             public TestCacheDataAdapter(Orleans.Providers.Streams.Common.IObjectPool<FixedSizeBuffer> bufferPool)
             {

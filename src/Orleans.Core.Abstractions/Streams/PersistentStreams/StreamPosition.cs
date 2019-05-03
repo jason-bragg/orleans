@@ -1,8 +1,7 @@
 
 using System;
-using Orleans.Streams;
 
-namespace Orleans.Providers.Streams.Common
+namespace Orleans.Streams
 {
     /// <summary>
     /// Stream position uniquely identifies the position of an event in a stream.

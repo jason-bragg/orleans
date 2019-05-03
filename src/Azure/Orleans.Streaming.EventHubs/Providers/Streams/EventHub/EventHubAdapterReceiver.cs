@@ -73,7 +73,6 @@ namespace Orleans.ServiceBus.Providers
             IQueueAdapterReceiverMonitor monitor,
             LoadSheddingOptions loadSheddingOptions,
             ITelemetryProducer telemetryProducer,
-            IQueueDataAdapter<EventData, IBatchContainer> queueDataAdapter,
             Func<EventHubPartitionSettings, string, ILogger, ITelemetryProducer, IEventHubReceiver> eventHubReceiverFactory = null)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));

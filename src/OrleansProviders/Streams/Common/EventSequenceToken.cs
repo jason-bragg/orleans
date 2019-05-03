@@ -11,16 +11,6 @@ namespace Orleans.Providers.Streams.Common
     public class EventSequenceToken : StreamSequenceToken
     {
         /// <summary>
-        /// Number of event batches in stream prior to this event batch
-        /// </summary>
-        public long SequenceNumber { get; set; }
-        
-        /// <summary>
-        /// Number of events in batch prior to this event
-        /// </summary>
-        public int EventIndex { get; set; }
-
-        /// <summary>
         /// Sequence token constructor
         /// </summary>
         /// <param name="seqNumber"></param>

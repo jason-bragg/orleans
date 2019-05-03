@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using Orleans.Streams;
 
@@ -10,16 +10,6 @@ namespace Orleans.Providers.Streams.Common
     [Serializable]
     public class EventSequenceTokenV2 : StreamSequenceToken
     {
-        /// <summary>
-        /// Number of event batches in stream prior to this event batch
-        /// </summary>
-        public long SequenceNumber { get;  }
-
-        /// <summary>
-        /// Number of events in batch prior to this event
-        /// </summary>
-        public int EventIndex { get;  }
-
         /// <summary>
         /// Sequence token constructor
         /// </summary>

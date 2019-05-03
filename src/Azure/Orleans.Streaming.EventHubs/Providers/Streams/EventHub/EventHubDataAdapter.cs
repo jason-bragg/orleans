@@ -1,168 +1,18 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
-using System.Linq;
 using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
-using System.Collections.Concurrent;
-using Orleans.Runtime;
 
 namespace Orleans.ServiceBus.Providers
 {
     /// <summary>
-    /// This is a tightly packed cached structure containing an event hub message.
-    /// It should only contain value types.
-    /// </summary>
-    public struct CachedEventHubMessage
-    {
-        /// <summary>
-        /// Guid of streamId this event is part of
-        /// </summary>
-        public Guid StreamGuid;
-        /// <summary>
-        /// EventHub sequence number.  Position of event in partition
-        /// </summary>
-        public long SequenceNumber;
-        /// <summary>
-        /// Time event was written to EventHub
-        /// </summary>
-        public DateTime EnqueueTimeUtc;
-        /// <summary>
-        /// Time event was read from EventHub into this cache
-        /// </summary>
-        public DateTime DequeueTimeUtc;
-        /// <summary>
-        /// Segment containing the serialized event data
-        /// </summary>
-        public ArraySegment<byte> Segment;
-    }
-
-    /// <summary>
-    /// Replication of EventHub EventData class, reconstructed from cached data CachedEventHubMessage
-    /// </summary>
-    [Serializable]
-    public class EventHubMessage
-    {
-        /// <summary>
-        /// Constructor
-        /// </summary>
-        /// <param name="streamIdentity">Stream Identity</param>
-        /// <param name="partitionKey">EventHub partition key for message</param>
-        /// <param name="offset">Offset into the EventHub partition where this message was from</param>
-        /// <param name="sequenceNumber">Offset into the EventHub partition where this message was from</param>
-        /// <param name="enqueueTimeUtc">Time in UTC when this message was injected by EventHub</param>
-        /// <param name="dequeueTimeUtc">Time in UTC when this message was read from EventHub into the current service</param>
-        /// <param name="properties">User properties from EventData object</param>
-        /// <param name="payload">Binary data from EventData object</param>
-        public EventHubMessage(IStreamIdentity streamIdentity, string partitionKey, string offset, long sequenceNumber,
-            DateTime enqueueTimeUtc, DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
-        {
-            StreamIdentity = streamIdentity;
-            PartitionKey = partitionKey;
-            Offset = offset;
-            SequenceNumber = sequenceNumber;
-            EnqueueTimeUtc = enqueueTimeUtc;
-            DequeueTimeUtc = dequeueTimeUtc;
-            Properties = properties;
-            Payload = payload;
-        }
-
-        /// <summary>
-        /// Duplicate of EventHub's EventData class.
-        /// </summary>
-        /// <param name="cachedMessage"></param>
-        /// <param name="serializationManager"></param>
-        public EventHubMessage(CachedEventHubMessage cachedMessage, SerializationManager serializationManager)
-        {
-            int readOffset = 0;
-            StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset));
-            Offset = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            PartitionKey = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            SequenceNumber = cachedMessage.SequenceNumber;
-            EnqueueTimeUtc = cachedMessage.EnqueueTimeUtc;
-            DequeueTimeUtc = cachedMessage.DequeueTimeUtc;
-            Properties = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).DeserializeProperties(serializationManager);
-            Payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset).ToArray();
-        }
-
-        /// <summary>
-        /// Stream identifier
-        /// </summary>
-        public IStreamIdentity StreamIdentity { get; }
-        /// <summary>
-        /// EventHub partition key
-        /// </summary>
-        public string PartitionKey { get; }
-        /// <summary>
-        /// Offset into EventHub partition
-        /// </summary>
-        public string Offset { get; }
-        /// <summary>
-        /// Sequence number in EventHub partition
-        /// </summary>
-        public long SequenceNumber { get; }
-        /// <summary>
-        /// Time event was written to EventHub
-        /// </summary>
-        public DateTime EnqueueTimeUtc { get; }
-        /// <summary>
-        /// Time event was read from EventHub and added to cache
-        /// </summary>
-        public DateTime DequeueTimeUtc { get; }
-        /// <summary>
-        /// User EventData properties
-        /// </summary>
-        public IDictionary<string, object> Properties { get; }
-        /// <summary>
-        /// Binary event data
-        /// </summary>
-        public byte[] Payload { get; }
-    }
-
-    /// <summary>
-    /// Default eventhub data comparer.  Implements comparisons against CachedEventHubMessage
-    /// </summary>
-    public class EventHubDataComparer : ICacheDataComparer<CachedEventHubMessage>
-    {
-        /// <summary>
-        /// Singleton instance, since type is stateless using this will reduce allocations.
-        /// </summary>
-        public static readonly ICacheDataComparer<CachedEventHubMessage> Instance = new EventHubDataComparer();
-
-        /// <summary>
-        /// Compare a cached message with a sequence token to determine if it message is before or after the token
-        /// </summary>
-        public int Compare(CachedEventHubMessage cachedMessage, StreamSequenceToken streamToken)
-        {
-            var realToken = (EventSequenceToken)streamToken;
-            return (int)(cachedMessage.SequenceNumber - realToken.SequenceNumber);
-        }
-
-        /// <summary>
-        /// Checks to see if the cached message is part of the provided stream
-        /// </summary>
-        public bool Equals(CachedEventHubMessage cachedMessage, IStreamIdentity streamIdentity)
-        {
-            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-            if (result != 0) return false;
-
-            int readOffset = 0;
-            string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
-            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
-        }
-    }
-
-    /// <summary>
     /// Default event hub data adapter.  Users may subclass to override event data to stream mapping.
     /// </summary>
-    public class EventHubDataAdapter : ICacheDataAdapter<CachedEventHubMessage>
+    public class EventHubDataAdapter : IEventHubDataAdapter
     {
         private readonly SerializationManager serializationManager;
-
-        /// <inheritdoc />
-        public Action<FixedSizeBuffer> OnBlockAllocated { set; private get; }
 
         /// <summary>
         /// Cache data adapter that adapts EventHub's EventData to CachedEventHubMessage used in cache
@@ -173,24 +23,12 @@ namespace Orleans.ServiceBus.Providers
             this.serializationManager = serializationManager;
         }
 
-        /// <inheritdoc />
-        public DateTime? GetMessageEnqueueTimeUtc(ref CachedEventHubMessage message)
-        {
-            return message.EnqueueTimeUtc;
-        }
-
-        /// <inheritdoc />
-        public DateTime? GetMessageDequeueTimeUtc(ref CachedEventHubMessage message)
-        {
-            return message.DequeueTimeUtc;
-        }
-
         /// <summary>
         /// Converts a cached message to a batch container for delivery
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <returns></returns>
-        public IBatchContainer GetBatchContainer(ref CachedEventHubMessage cachedMessage)
+        public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
             var evenHubMessage = new EventHubMessage(cachedMessage, this.serializationManager);
             return GetBatchContainer(evenHubMessage);
@@ -211,9 +49,77 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <returns></returns>
-        public virtual StreamSequenceToken GetSequenceToken(ref CachedEventHubMessage cachedMessage)
+        public virtual StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
         {
             return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
+        }
+
+        public EventData ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        {
+            if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
+            return EventHubBatchContainer.ToEventData(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
+        }
+
+        public CachedMessage FromQueueMessage(StreamPosition position, EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
+        {
+            return new CachedMessage()
+            {
+                StreamGuid = position.StreamIdentity.Guid,
+                SequenceNumber = queueMessage.SystemProperties.SequenceNumber,
+                EnqueueTimeUtc = queueMessage.SystemProperties.EnqueuedTimeUtc,
+                Segment = EncodeMessageIntoSegment(position, queueMessage, getSegment)
+            };
+        }
+
+        // Placed object message payload into a segment.
+        protected virtual ArraySegment<byte> EncodeMessageIntoSegment(StreamPosition position, EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
+        {
+            byte[] propertiesBytes = queueMessage.SerializeProperties(this.serializationManager);
+            byte[] payload = queueMessage.Body.Array;
+            // get size of namespace, offset, partitionkey, properties, and payload
+            int size = SegmentBuilder.CalculateAppendSize(position.StreamIdentity.Namespace) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.Offset) +
+            SegmentBuilder.CalculateAppendSize(queueMessage.SystemProperties.PartitionKey) +
+            SegmentBuilder.CalculateAppendSize(propertiesBytes) +
+            SegmentBuilder.CalculateAppendSize(payload);
+
+            // get segment
+            ArraySegment<byte> segment = new ArraySegment<byte>(new byte[size]);
+
+            // encode namespace, offset, partitionkey, properties and payload into segment
+            int writeOffset = 0;
+            SegmentBuilder.Append(segment, ref writeOffset, position.StreamIdentity.Namespace);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.Offset);
+            SegmentBuilder.Append(segment, ref writeOffset, queueMessage.SystemProperties.PartitionKey);
+            SegmentBuilder.Append(segment, ref writeOffset, propertiesBytes);
+            SegmentBuilder.Append(segment, ref writeOffset, payload);
+
+            return segment;
+        }
+
+        public StreamPosition GetStreamPosition(EventData queueMessage)
+        {
+            Guid streamGuid =
+            Guid.Parse(queueMessage.SystemProperties.PartitionKey);
+            string streamNamespace = queueMessage.GetStreamNamespaceProperty();
+            IStreamIdentity stremIdentity = new StreamIdentity(streamGuid, streamNamespace);
+            StreamSequenceToken token =
+                new EventHubSequenceTokenV2(queueMessage.SystemProperties.Offset, queueMessage.SystemProperties.SequenceNumber, 0);
+            return new StreamPosition(stremIdentity, token);
+        }
+
+        /// <summary>
+        /// Checks to see if the cached message is part of the provided stream
+        /// </summary>
+        public bool Equals(ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
+        {
+            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+            if (result != 0) return false;
+
+            // TODO: intern namespaces to prevent the need to encode them into segment decode on each check.
+            int readOffset = 0;
+            string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+            return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
         }
     }
 }

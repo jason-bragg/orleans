@@ -28,7 +28,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <returns></returns>
-        public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
+        public virtual IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
         {
             var evenHubMessage = new EventHubMessage(cachedMessage, this.serializationManager);
             return GetBatchContainer(evenHubMessage);
@@ -54,13 +54,13 @@ namespace Orleans.ServiceBus.Providers
             return new EventHubSequenceTokenV2("", cachedMessage.SequenceNumber, 0);
         }
 
-        public EventData ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
+        public virtual EventData ToQueueMessage<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
         {
             if (token != null) throw new ArgumentException("EventHub streams currently does not support non-null StreamSequenceToken.", nameof(token));
             return EventHubBatchContainer.ToEventData(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
         }
 
-        public CachedMessage FromQueueMessage(StreamPosition position, EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
+        public virtual CachedMessage FromQueueMessage(StreamPosition position, EventData queueMessage, Func<int, ArraySegment<byte>> getSegment)
         {
             return new CachedMessage()
             {
@@ -97,7 +97,7 @@ namespace Orleans.ServiceBus.Providers
             return segment;
         }
 
-        public StreamPosition GetStreamPosition(EventData queueMessage)
+        public virtual StreamPosition GetStreamPosition(EventData queueMessage)
         {
             Guid streamGuid =
             Guid.Parse(queueMessage.SystemProperties.PartitionKey);
@@ -111,7 +111,7 @@ namespace Orleans.ServiceBus.Providers
         /// <summary>
         /// Checks to see if the cached message is part of the provided stream
         /// </summary>
-        public bool Equals(ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
+        public virtual bool Equals(ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
         {
             int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
             if (result != 0) return false;

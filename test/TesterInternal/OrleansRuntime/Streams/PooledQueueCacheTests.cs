@@ -9,7 +9,6 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Xunit;
-using Orleans.Runtime;
 
 namespace UnitTests.OrleansRuntime.Streams
 {
@@ -29,16 +28,6 @@ namespace UnitTests.OrleansRuntime.Streams
             public long SequenceNumber;
             public readonly byte[] Data = FixedMessage;
             public DateTime EnqueueTimeUtc = DateTime.UtcNow;
-        }
-
-        private struct TestCachedMessage
-        {
-            public Guid StreamGuid;
-            public string StreamNamespace;
-            public long SequenceNumber;
-            public ArraySegment<byte> Payload;
-            public DateTime EnqueueTimeUtc;
-            public DateTime DequeueTimeUtc;
         }
 
         private class TestBatchContainer : IBatchContainer
@@ -64,126 +53,103 @@ namespace UnitTests.OrleansRuntime.Streams
             }
         }
 
-        private class TestCacheDataComparer : ICacheDataComparer<TestCachedMessage>
+
+        private class TestCacheDataAdapter : ICacheDataAdapter
         {
-            public static readonly ICacheDataComparer<TestCachedMessage> Instance = new TestCacheDataComparer();
-
-            public int Compare(TestCachedMessage cachedMessage, StreamSequenceToken token)
+            public bool Equals(ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
             {
-                return cachedMessage.SequenceNumber != token.SequenceNumber
-                    ? (int)(cachedMessage.SequenceNumber - token.SequenceNumber)
-                    : 0 - token.EventIndex;
+                int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
+                if (result != 0) return false;
+
+                // TODO: intern namespaces to prevent the need to encode them into segment decode on each check.
+                int readOffset = 0;
+                string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+                return string.Compare(decodedStreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
             }
 
-            public bool Equals(TestCachedMessage cachedMessage, IStreamIdentity streamIdentity)
+            public IBatchContainer GetBatchContainer(ref CachedMessage cachedMessage)
             {
-                int results = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-                return results == 0 && string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal)==0;
-            }
-        }
+                //Deserialize payload
+                int readOffset = 0;
+                string decodedStreamNamespace = SegmentBuilder.ReadNextString(cachedMessage.Segment, ref readOffset);
+                ArraySegment<byte> payload = SegmentBuilder.ReadNextBytes(cachedMessage.Segment, ref readOffset);
 
-        private class EvictionStrategy : ChronologicalEvictionStrategy<TestCachedMessage>
-        {
-            public EvictionStrategy(ILogger logger, TimePurgePredicate purgePredicate, ICacheMonitor cacheMonitor, TimeSpan? monitorWriteInterval)
-                : base(logger, purgePredicate, cacheMonitor, monitorWriteInterval)
-            {
-            }
-
-            protected override object GetBlockId(TestCachedMessage? cachedMessage)
-            {
-                return cachedMessage?.Payload.Array;
-            }
-
-            protected override DateTime GetDequeueTimeUtc(ref TestCachedMessage cachedMessage)
-            {
-                return cachedMessage.DequeueTimeUtc;
-            }
-
-            protected override DateTime GetEnqueueTimeUtc(ref TestCachedMessage cachedMessage)
-            {
-                return cachedMessage.EnqueueTimeUtc;
-            }
-        }
-
-        private class TestCacheDataAdapter : ICacheDataAdapter<TestQueueMessage, TestCachedMessage>
-        {
-            private readonly Orleans.Providers.Streams.Common.IObjectPool<FixedSizeBuffer> bufferPool;
-            private FixedSizeBuffer currentBuffer;
-
-            public TestCacheDataAdapter(Orleans.Providers.Streams.Common.IObjectPool<FixedSizeBuffer> bufferPool)
-            {
-                if (bufferPool == null)
-                {
-                    throw new ArgumentNullException(nameof(bufferPool));
-                }
-                this.bufferPool = bufferPool;
-            }
-
-            public DateTime? GetMessageEnqueueTimeUtc(ref TestCachedMessage message)
-            {
-                return message.EnqueueTimeUtc;
-            }
-
-            public DateTime? GetMessageDequeueTimeUtc(ref TestCachedMessage message)
-            {
-                return message.DequeueTimeUtc;
-            }
-
-            public StreamPosition QueueMessageToCachedMessage(ref TestCachedMessage cachedMessage, TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
-            {
-                StreamPosition streamPosition = GetStreamPosition(queueMessage);
-                cachedMessage.StreamGuid = streamPosition.StreamIdentity.Guid;
-                cachedMessage.StreamNamespace = streamPosition.StreamIdentity.Namespace;
-                cachedMessage.SequenceNumber = queueMessage.SequenceNumber;
-                cachedMessage.Payload = SerializeMessageIntoPooledSegment(queueMessage);
-                cachedMessage.EnqueueTimeUtc = queueMessage.EnqueueTimeUtc;
-                cachedMessage.DequeueTimeUtc = dequeueTimeUtc;
-                return streamPosition;
-            }
-
-            // Placed object message payload into a segment from a buffer pool.  When this get's too big, older blocks will be purged
-            private ArraySegment<byte> SerializeMessageIntoPooledSegment(TestQueueMessage queueMessage)
-            {
-                // get segment from current block
-                ArraySegment<byte> segment;
-                if (currentBuffer == null || !currentBuffer.TryGetSegment(queueMessage.Data.Length, out segment))
-                {
-                    // no block or block full, get new block and try again
-                    currentBuffer = bufferPool.Allocate();
-                    this.OnBlockAllocated.Invoke(currentBuffer);
-                    // if this fails with clean block, then requested size is too big
-                    if (!currentBuffer.TryGetSegment(queueMessage.Data.Length, out segment))
-                    {
-                        string errmsg = String.Format(CultureInfo.InvariantCulture,
-                            "Message size is to big. MessageSize: {0}", queueMessage.Data.Length);
-                        throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
-                    }
-                }
-                Buffer.BlockCopy(queueMessage.Data, 0, segment.Array, segment.Offset, queueMessage.Data.Length);
-                return segment;
-            }
-
-            public IBatchContainer GetBatchContainer(ref TestCachedMessage cachedMessage)
-            {
                 return new TestBatchContainer
                 {
                     StreamGuid =  cachedMessage.StreamGuid,
-                    StreamNamespace = cachedMessage.StreamNamespace,
+                    StreamNamespace = decodedStreamNamespace,
                     SequenceToken = GetSequenceToken(ref cachedMessage),
-                    Data = cachedMessage.Payload.ToArray()
+                    Data = payload.ToArray()
                 };
             }
 
-            public StreamSequenceToken GetSequenceToken(ref TestCachedMessage cachedMessage)
+            public StreamSequenceToken GetSequenceToken(ref CachedMessage cachedMessage)
             {
                 return new EventSequenceTokenV2(cachedMessage.SequenceNumber);
             }
 
-            public StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
+        }
+
+        private class CachedMessageConverter
+        {
+            private readonly IObjectPool<FixedSizeBuffer> bufferPool;
+            private readonly IEvictionStrategy evictionStrategy;
+            private FixedSizeBuffer currentBuffer;
+
+
+            public CachedMessageConverter(IObjectPool<FixedSizeBuffer> bufferPool, IEvictionStrategy evictionStrategy)
+            {
+                this.bufferPool = bufferPool;
+                this.evictionStrategy = evictionStrategy;
+            }
+
+            public CachedMessage ToCachedMessage(TestQueueMessage queueMessage, DateTime dequeueTimeUtc)
+            {
+                StreamPosition streamPosition = GetStreamPosition(queueMessage);
+                return new CachedMessage
+                {
+                    StreamGuid = streamPosition.StreamIdentity.Guid,
+                    SequenceNumber = queueMessage.SequenceNumber,
+                    Segment = SerializeMessageIntoPooledSegment(streamPosition, queueMessage),
+                    EnqueueTimeUtc = queueMessage.EnqueueTimeUtc,
+                    DequeueTimeUtc = dequeueTimeUtc
+                };
+            }
+
+            private StreamPosition GetStreamPosition(TestQueueMessage queueMessage)
             {
                 IStreamIdentity streamIdentity = new StreamIdentity(queueMessage.StreamGuid, queueMessage.StreamNamespace);
                 StreamSequenceToken sequenceToken = new EventSequenceTokenV2(queueMessage.SequenceNumber);
                 return new StreamPosition(streamIdentity, sequenceToken);
+            }
+
+            private ArraySegment<byte> SerializeMessageIntoPooledSegment(StreamPosition streamPosition, TestQueueMessage queueMessage)
+            {
+                // serialize payload
+                int size = SegmentBuilder.CalculateAppendSize(queueMessage.StreamNamespace) +
+                    SegmentBuilder.CalculateAppendSize(queueMessage.Data);
+
+                // get segment from current block
+                ArraySegment<byte> segment;
+                if (currentBuffer == null || !currentBuffer.TryGetSegment(size, out segment))
+                {
+                    // no block or block full, get new block and try again
+                    currentBuffer = bufferPool.Allocate();
+                    //call EvictionStrategy's OnBlockAllocated method
+                    this.evictionStrategy.OnBlockAllocated(currentBuffer);
+                    // if this fails with clean block, then requested size is too big
+                    if (!currentBuffer.TryGetSegment(size, out segment))
+                    {
+                        string errmsg = String.Format(CultureInfo.InvariantCulture,
+                            "Message size is too big. MessageSize: {0}", size);
+                        throw new ArgumentOutOfRangeException(nameof(queueMessage), errmsg);
+                    }
+                }
+                // encode namespace, offset, partitionkey, properties and payload into segment
+                int writeOffset = 0;
+                SegmentBuilder.Append(segment, ref writeOffset, queueMessage.StreamNamespace);
+                SegmentBuilder.Append(segment, ref writeOffset, queueMessage.Data);
+                return segment;
             }
         }
 
@@ -197,13 +163,13 @@ namespace UnitTests.OrleansRuntime.Streams
         public void GoldenPathTest()
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
-            var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NullLogger.Instance, null, null);
-            var evictionStrategy = new EvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
-            dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
 
-            RunGoldenPath(cache, 111);
+            RunGoldenPath(cache, converter, 111);
         }
 
         /// <summary>
@@ -214,18 +180,18 @@ namespace UnitTests.OrleansRuntime.Streams
         public void CacheDrainTest()
         {
             var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(PooledBufferSize));
-            var dataAdapter = new TestCacheDataAdapter(bufferPool);
-            var cache = new PooledQueueCache<TestQueueMessage, TestCachedMessage>(dataAdapter, TestCacheDataComparer.Instance, NullLogger.Instance, null, null);
-            var evictionStrategy = new EvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
+            var dataAdapter = new TestCacheDataAdapter();
+            var cache = new PooledQueueCache(dataAdapter, NullLogger.Instance, null, null);
+            var evictionStrategy = new ChronologicalEvictionStrategy(NullLogger.Instance, new TimePurgePredicate(TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(10)), null, null);
             evictionStrategy.PurgeObservable = cache;
-            dataAdapter.OnBlockAllocated = evictionStrategy.OnBlockAllocated;
+            var converter = new CachedMessageConverter(bufferPool, evictionStrategy);
 
             int startSequenceNuber = 222;
-            startSequenceNuber = RunGoldenPath(cache, startSequenceNuber);
-            RunGoldenPath(cache, startSequenceNuber);
+            startSequenceNuber = RunGoldenPath(cache, converter, startSequenceNuber);
+            RunGoldenPath(cache, converter, startSequenceNuber);
         }
 
-        private int RunGoldenPath(PooledQueueCache<TestQueueMessage, TestCachedMessage> cache, int startOfCache)
+        private int RunGoldenPath(PooledQueueCache cache, CachedMessageConverter converter, int startOfCache)
         {
             int sequenceNumber = startOfCache;
             IBatchContainer batch;
@@ -243,7 +209,11 @@ namespace UnitTests.OrleansRuntime.Streams
                     SequenceNumber = sequenceNumber + i
                 })
                 .ToList();
-            cache.Add(messages, DateTime.UtcNow);
+            DateTime utcNow = DateTime.UtcNow;
+            List<CachedMessage> cachedMessages = messages
+                .Select(m => converter.ToCachedMessage(m, utcNow))
+                .ToList();
+            cache.Add(cachedMessages, utcNow);
             sequenceNumber += MessagesPerBuffer * PooledBufferCount;
 
             // get cursor for stream1, walk all the events in the stream using the cursor
@@ -285,7 +255,11 @@ namespace UnitTests.OrleansRuntime.Streams
                     SequenceNumber = sequenceNumber + i
                 })
                 .ToList();
-                cache.Add(moreMessages, DateTime.UtcNow);
+                utcNow = DateTime.UtcNow;
+                List<CachedMessage> moreCachedMessages = moreMessages
+                    .Select(m => converter.ToCachedMessage(m, utcNow))
+                    .ToList();
+                cache.Add(moreCachedMessages, utcNow);
                 sequenceNumber += MessagesPerBuffer;
 
                 // walk all the events in the stream using the cursor

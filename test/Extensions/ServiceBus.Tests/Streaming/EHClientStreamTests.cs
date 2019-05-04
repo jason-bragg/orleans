@@ -19,6 +19,7 @@ using Xunit.Abstractions;
 using Orleans.Streams;
 using Orleans.ServiceBus.Providers;
 using Tester;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ServiceBus.Tests.StreamingTests
 {
@@ -69,9 +70,9 @@ namespace ServiceBus.Tests.StreamingTests
                                 options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
                                 options.PersistInterval = TimeSpan.FromSeconds(10);
                             }));
-                    });
-                hostBuilder
-                    .AddMemoryGrainStorage("PubSubStore");
+                    })
+                    .AddMemoryGrainStorage("PubSubStore")
+                    .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
             }
         }
 
@@ -86,7 +87,8 @@ namespace ServiceBus.Tests.StreamingTests
                             options.ConnectionString = TestDefaultConfiguration.EventHubConnectionString;
                             options.ConsumerGroup = EHConsumerGroup;
                             options.Path = EHPath;
-                        })));
+                        })))
+                    .ConfigureServices(services => services.TryAddSingleton<IEventHubDataAdapter, EventHubDataAdapter>());
             }
         }
 

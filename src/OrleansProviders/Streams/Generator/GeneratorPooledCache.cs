@@ -1,7 +1,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
@@ -69,10 +68,10 @@ namespace Orleans.Providers.Streams.Generator
 
         private CachedMessage QueueMessageToCachedMessage(GeneratedBatchContainer queueMessage, DateTime dequeueTimeUtc)
         {
-            StreamPosition setreamPosition = GetStreamPosition(queueMessage);
+            StreamPosition streamPosition = GetStreamPosition(queueMessage);
             return new CachedMessage()
             {
-                StreamGuid = setreamPosition.StreamIdentity.Guid,
+                StreamGuid = streamPosition.StreamIdentity.Guid,
                 SequenceNumber = queueMessage.RealToken.SequenceNumber,
                 EnqueueTimeUtc = queueMessage.EnqueueTimeUtc,
                 DequeueTimeUtc = dequeueTimeUtc,

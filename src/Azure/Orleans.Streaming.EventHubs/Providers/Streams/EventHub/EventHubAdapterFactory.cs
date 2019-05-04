@@ -20,7 +20,11 @@ namespace Orleans.ServiceBus.Providers
     public class EventHubAdapterFactory : IQueueAdapterFactory, IQueueAdapter, IQueueAdapterCache
     {
         private readonly ILoggerFactory loggerFactory;
-        private readonly IEventHubDataAdapter dataAdapter;
+
+        /// <summary>
+        /// Data adapter
+        /// </summary>
+        protected readonly IEventHubDataAdapter dataAdapter;
 
         /// <summary>
         /// Orleans logging
@@ -259,7 +263,7 @@ namespace Orleans.ServiceBus.Providers
         {
             var eventHubPath = this.ehOptions.Path;
             var sharedDimensions = new EventHubMonitorAggregationDimensions(eventHubPath);
-            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.SerializationManager, sharedDimensions);
+            return new EventHubQueueCacheFactory(eventHubCacheOptions, cacheEvictionOptions, statisticOptions, this.dataAdapter, this.SerializationManager, sharedDimensions);
         }
 
         private EventHubAdapterReceiver MakeReceiver(QueueId queueId)
@@ -301,8 +305,10 @@ namespace Orleans.ServiceBus.Providers
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            var queueDataAdapter = services.GetServiceByName<IQueueDataAdapter<EventData, IBatchContainer>>(name);
-            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, queueDataAdapter);
+            var dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+                ?? services.GetRequiredService<IEventHubDataAdapter>()
+                ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
+            var factory = ActivatorUtilities.CreateInstance<EventHubAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;
         }

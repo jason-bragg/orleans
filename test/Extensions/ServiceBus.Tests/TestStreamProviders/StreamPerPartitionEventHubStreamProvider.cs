@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Text;
 using Microsoft.Azure.EventHubs;
 using Microsoft.Extensions.DependencyInjection;
@@ -20,25 +20,34 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
     public class StreamPerPartitionEventHubStreamAdapterFactory : EventHubAdapterFactory
     {
         private StreamCacheEvictionOptions evictionOptions;
-        public StreamPerPartitionEventHubStreamAdapterFactory(string name, EventHubOptions ehOptions, EventHubReceiverOptions receiverOptions,
-            EventHubStreamCachePressureOptions cacheOptions, StreamCacheEvictionOptions evictionOptions, StreamStatisticOptions statisticOptions, 
-            IServiceProvider serviceProvider, SerializationManager serializationManager, ITelemetryProducer telemetryProducer, ILoggerFactory loggerFactory)
-            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
+        public StreamPerPartitionEventHubStreamAdapterFactory(
+            string name,
+            EventHubOptions ehOptions,
+            EventHubReceiverOptions receiverOptions,
+            EventHubStreamCachePressureOptions cacheOptions,
+            StreamCacheEvictionOptions evictionOptions,
+            StreamStatisticOptions statisticOptions,
+            IEventHubDataAdapter dataAdapter,
+            IServiceProvider serviceProvider,
+            SerializationManager serializationManager,
+            ITelemetryProducer telemetryProducer,
+            ILoggerFactory loggerFactory)
+            : base(name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter, serviceProvider, serializationManager, telemetryProducer, loggerFactory)
         {
             this.evictionOptions = evictionOptions;
         }
 
         protected override IEventHubQueueCacheFactory CreateCacheFactory(EventHubStreamCachePressureOptions options)
         {
-            return new CustomCacheFactory(this.Name, evictionOptions, SerializationManager);
+            return new CustomCacheFactory(this.Name, evictionOptions, base.dataAdapter, SerializationManager);
         }
 
         private class CachedDataAdapter : EventHubDataAdapter
         {
             private readonly Guid partitionStreamGuid;
 
-            public CachedDataAdapter(string partitionKey, IObjectPool<FixedSizeBuffer> bufferPool, SerializationManager serializationManager)
-                : base(serializationManager, bufferPool)
+            public CachedDataAdapter(string partitionKey, SerializationManager serializationManager)
+                : base(serializationManager)
             {
                 partitionStreamGuid = GetPartitionGuid(partitionKey);
             }
@@ -64,13 +73,15 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
         {
             private readonly string name;
             private readonly StreamCacheEvictionOptions options;
+            private readonly IEventHubDataAdapter dataAdapter;
             private readonly SerializationManager serializationManager;
             private readonly TimePurgePredicate timePurgePredicate;
 
-            public CustomCacheFactory(string name, StreamCacheEvictionOptions options, SerializationManager serializationManager)
+            public CustomCacheFactory(string name, StreamCacheEvictionOptions options, IEventHubDataAdapter dataAdapter, SerializationManager serializationManager)
             {
                 this.name = name;
                 this.options = options;
+                this.dataAdapter = dataAdapter;
                 this.serializationManager = serializationManager;
                 timePurgePredicate = new TimePurgePredicate(options.DataMinTimeInCache, options.DataMaxAgeInCache);
             }
@@ -78,10 +89,9 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             public IEventHubQueueCache CreateCache(string partition, IStreamQueueCheckpointer<string> checkpointer, ILoggerFactory loggerFactory, ITelemetryProducer telemetryProducer)
             {
                 var bufferPool = new ObjectPool<FixedSizeBuffer>(() => new FixedSizeBuffer(1 << 20), null, null);
-                var dataAdapter = new CachedDataAdapter(partition, bufferPool, this.serializationManager);
                 var cacheLogger = loggerFactory.CreateLogger($"{typeof(EventHubQueueCache).FullName}.{this.name}.{partition}");
-                return new EventHubQueueCache(checkpointer, dataAdapter, EventHubDataComparer.Instance, cacheLogger,
-                    new EventHubCacheEvictionStrategy(cacheLogger, this.timePurgePredicate, null, null), null, null);
+                var evictionStrategy = new ChronologicalEvictionStrategy(cacheLogger, this.timePurgePredicate, null, null);
+                return new EventHubQueueCache(EventHubAdapterReceiver.MaxMessagesPerRead, bufferPool, this.dataAdapter, evictionStrategy, checkpointer, cacheLogger, null, null);
             }
         }
 
@@ -92,7 +102,10 @@ namespace ServiceBus.Tests.TestStreamProviders.EventHub
             var cacheOptions = services.GetOptionsByName<EventHubStreamCachePressureOptions>(name);
             var statisticOptions = services.GetOptionsByName<StreamStatisticOptions>(name);
             var evictionOptions = services.GetOptionsByName<StreamCacheEvictionOptions>(name);
-            var factory = ActivatorUtilities.CreateInstance<StreamPerPartitionEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions);
+            var dataAdapter = services.GetServiceByName<IEventHubDataAdapter>(name)
+                ?? services.GetRequiredService<IEventHubDataAdapter>()
+                ?? ActivatorUtilities.CreateInstance<EventHubDataAdapter>(services);
+            var factory = ActivatorUtilities.CreateInstance<StreamPerPartitionEventHubStreamAdapterFactory>(services, name, ehOptions, receiverOptions, cacheOptions, evictionOptions, statisticOptions, dataAdapter);
             factory.Init();
             return factory;
         }

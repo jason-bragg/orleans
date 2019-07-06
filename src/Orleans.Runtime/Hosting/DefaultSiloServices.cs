@@ -186,10 +186,12 @@ namespace Orleans.Hosting
             services.Replace(new ServiceDescriptor(typeof(StatelessWorkerPlacement), sp => new StatelessWorkerPlacement(), ServiceLifetime.Singleton));
             services.AddPlacementDirector<ActivationCountBasedPlacement, ActivationCountPlacementDirector>();
             services.AddPlacementDirector<HashBasedPlacement, HashBasedPlacementDirector>();
+            services.AddPlacementDirector<SiloPlacement, SiloPlacementDirector>();
 
             // Activation selectors
             services.AddSingletonKeyedService<Type, IActivationSelector, RandomPlacementDirector>(typeof(RandomPlacement));
             services.AddSingletonKeyedService<Type, IActivationSelector, StatelessWorkerDirector>(typeof(StatelessWorkerPlacement));
+            services.AddSingletonKeyedService<Type, IActivationSelector, SiloPlacementDirector>(typeof(SiloPlacement));
 
             // Versioning
             services.TryAddSingleton<VersionSelectorManager>();

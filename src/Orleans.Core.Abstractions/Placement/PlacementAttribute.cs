@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Orleans.Runtime;
 
 namespace Orleans.Placement
@@ -67,6 +67,30 @@ namespace Orleans.Placement
         public ActivationCountBasedPlacementAttribute() :
             base(ActivationCountBasedPlacement.Singleton)
         {
+        }
+    }
+
+    /// <summary>
+    /// Marks a grain class as using the <c>SiloPlacement</c> policy.
+    /// </summary>
+    /// <remarks>
+    /// This indicates the grain should always be placed on the target silo.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Class, AllowMultiple = false)]
+    public sealed class SiloPlacementAttribute : PlacementAttribute
+    {
+        public SiloPlacementAttribute() :
+            base(SiloPlacement.Singleton)
+        {
+        }
+    }
+
+    public static class PlacementGrainFactoryExtensions
+    {
+        public static TGrainInterface GetGrain<TGrainInterface>(this IGrainFactory grainFactory, SiloAddress silo, string primaryKey = null, string grainClassNamePrefix = null)
+            where TGrainInterface : IGrainWithStringKey
+        {
+            return grainFactory.GetGrain<TGrainInterface>($"{silo.GetConsistentHashCode()}.{primaryKey}", grainClassNamePrefix);
         }
     }
 }

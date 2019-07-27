@@ -11,6 +11,7 @@ using Benchmarks.GrainStorage;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Toolchains.CsProj;
+using Benchmarks.Streams;
 
 namespace Benchmarks
 {
@@ -193,6 +194,32 @@ namespace Benchmarks
                 {
                     var benchmark = new GrainStorageBenchmark();
                     benchmark.AzureBlobSetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Streams.Write.Memory"] = () =>
+            {
+                RunBenchmark(
+                "Running Stream write to memory benchmark",
+                () =>
+                {
+                    var benchmark = new StreamsBenchmark(2, 100);
+                    benchmark.MemorySetup();
+                    return benchmark;
+                },
+                benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
+                benchmark => benchmark.Teardown());
+            },
+            ["Streams.Write.EventHub"] = () =>
+            {
+                RunBenchmark(
+                "Running Stream write to EventHub benchmark",
+                () =>
+                {
+                    var benchmark = new StreamsBenchmark(2, 900);
+                    benchmark.EventHubSetup();
                     return benchmark;
                 },
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),

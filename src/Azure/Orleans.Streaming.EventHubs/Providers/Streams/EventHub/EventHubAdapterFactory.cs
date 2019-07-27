@@ -11,6 +11,8 @@ using Orleans.Serialization;
 using Orleans.Streams;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using System.Linq;
+using System.Diagnostics;
 
 namespace Orleans.ServiceBus.Providers
 {
@@ -42,7 +44,7 @@ namespace Orleans.ServiceBus.Providers
         private IEventHubQueueMapper streamQueueMapper;
         private string[] partitionIds;
         private ConcurrentDictionary<QueueId, EventHubAdapterReceiver> receivers;
-        private EventHubClient client;
+        private EventHubClient[] clients;
         private ITelemetryProducer telemetryProducer;
         /// <summary>
         /// Gets the serialization manager.
@@ -195,6 +197,7 @@ namespace Orleans.ServiceBus.Providers
             return this.StreamFailureHandlerFactory(this.streamQueueMapper.QueueToPartition(queueId));
         }
 
+        private long maxDelay = 1000;
         /// <summary>
         /// Writes a set of events to the queue as a single batch associated with the provided streamId.
         /// </summary>
@@ -205,7 +208,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="token"></param>
         /// <param name="requestContext"></param>
         /// <returns></returns>
-        public virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
+        public async virtual Task QueueMessageBatchAsync<T>(Guid streamGuid, string streamNamespace, IEnumerable<T> events, StreamSequenceToken token,
             Dictionary<string, object> requestContext)
         {
             if (token != null)
@@ -213,8 +216,15 @@ namespace Orleans.ServiceBus.Providers
                 throw new NotImplementedException("EventHub stream provider currently does not support non-null StreamSequenceToken.");
             }
             EventData eventData = EventHubBatchContainer.ToEventData(this.SerializationManager, streamGuid, streamNamespace, events, requestContext);
-
-            return this.client.SendAsync(eventData, streamGuid.ToString());
+            Stopwatch sw = Stopwatch.StartNew();
+            await this.clients[streamGuid.GetHashCode() % this.clients.Length].SendAsync(eventData, streamGuid.ToString()).ConfigureAwait(false);
+            sw.Stop();
+            if(sw.ElapsedMilliseconds > maxDelay)
+            {
+                maxDelay = sw.ElapsedMilliseconds;
+                Console.WriteLine($"Too Long: {sw.ElapsedMilliseconds}");
+            }
+//            await this.clients[streamGuid.GetHashCode() % this.clients.Length].SendAsync(eventData, streamGuid.ToString());
         }
 
         /// <summary>
@@ -243,11 +253,13 @@ namespace Orleans.ServiceBus.Providers
 
         protected virtual void InitEventHubClient()
         {
+            const int ClientCount = 4;
             var connectionStringBuilder = new EventHubsConnectionStringBuilder(this.ehOptions.ConnectionString)
             {
+
                 EntityPath = this.ehOptions.Path
             };
-            this.client = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
+            this.clients = Enumerable.Range(0, ClientCount).Select(_=>EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString())).ToArray();
         }
 
         /// <summary>
@@ -291,7 +303,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         protected virtual async Task<string[]> GetPartitionIdsAsync()
         {
-            EventHubRuntimeInformation runtimeInfo = await client.GetRuntimeInformationAsync();
+            EventHubRuntimeInformation runtimeInfo = await clients[0].GetRuntimeInformationAsync();
             return runtimeInfo.PartitionIds;
         }
 

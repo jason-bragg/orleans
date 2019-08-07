@@ -40,6 +40,7 @@ using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
 using Orleans.Networking.Shared;
+using Orleans.Utils;
 
 namespace Orleans.Hosting
 {
@@ -356,6 +357,9 @@ namespace Orleans.Hosting
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
             services.AddSingleton<SocketSchedulers>();
             services.AddSingleton<SharedMemoryPool>();
+
+            // backgrounder utility
+            services.AddTransient<IBackgrounder>(Backgrounder.Create);
         }
     }
 }

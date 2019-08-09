@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
-using Orleans.Utils;
+using Orleans.Utilities;
 
 namespace Orleans.Runtime.Utilities
 {
@@ -18,8 +18,8 @@ namespace Orleans.Runtime.Utilities
         private readonly IGrainActivationContext _context;
         private readonly ITimerManager _timerManager;
         private readonly ILogger<Backgrounder> _logger;
-        private readonly List<BackgroundWork> _pending;
         private readonly CancellationTokenSource _deactivating;
+        private readonly List<BackgroundWork> _pending;
 
         public Backgrounder(IOptions<BackgrounderOptions> options, IGrainActivationContext context, ITimerManager timerManager, ILogger<Backgrounder> logger)
         {
@@ -27,8 +27,8 @@ namespace Orleans.Runtime.Utilities
             _context = context;
             _timerManager = timerManager;
             _logger = logger;
-            _pending = new List<BackgroundWork>();
             _deactivating = new CancellationTokenSource();
+            _pending = new List<BackgroundWork>();
         }
 
         public Task<T> Run<T>(Func<CancellationToken, Task<T>> fetch)
@@ -40,7 +40,7 @@ namespace Orleans.Runtime.Utilities
 
         public void Participate(IGrainLifecycle lifecycle)
         {
-            // Signal we're deactivating at first chance ('last' during shutdown).
+            // Signal we're deactivating at first chance ('last' stage during shutdown).
             lifecycle.Subscribe(nameof(Backgrounder), GrainLifecycleStage.Last, NoOp, SignalDeactivating);
             // Wait for pending work prior to on deactivate logic, for cleaner grain developer experience.
             lifecycle.Subscribe(nameof(Backgrounder), GrainLifecycleStage.Activate + 1, NoOp, AwaitPending);
@@ -48,6 +48,7 @@ namespace Orleans.Runtime.Utilities
 
         private async Task AwaitPending(CancellationToken ct)
         {
+            if (!_deactivating.IsCancellationRequested) _deactivating.Cancel(false);
             if (ct.IsCancellationRequested) return;
             if (_pending.Count == 0) return;
             if (_logger.IsEnabled(LogLevel.Debug))
@@ -55,34 +56,27 @@ namespace Orleans.Runtime.Utilities
                 _logger.Debug("Background work found while deactivating.  GrainType: {GrainType}, GrainId: {GrainId}, Count: {Count}",
                     _context.GrainType, _context.GrainIdentity, _pending.Count);
             }
-            try
-            {
-                Task pendingWork = Task.WhenAll(_pending.Select(p => p.Pending));
-                pendingWork.Ignore();
-                var timeoutCancellationTokenSource = new CancellationTokenSource();
-                var completedTask = await Task.WhenAny(pendingWork, _timerManager.Delay(_options.BackgroundDeactivationTimeout));
+            Task pendingWork = Task.WhenAll(_pending.Select(p => p.Pending));
+            pendingWork.Ignore();
+            var timeoutCancellationTokenSource = new CancellationTokenSource();
+            var completedTask = await Task.WhenAny(pendingWork, _timerManager.Delay(_options.BackgroundDeactivationTimeout));
 
-                // If pending completed before the timeout, await the completed result and log any errors
-                if (pendingWork == completedTask)
-                {
-                    timeoutCancellationTokenSource.Cancel();
-                    await pendingWork;
-                    return;
-                }
-                _logger.LogWarning("Background work did not complete within deactivation timeout. GrainType: {GrainType}, GrainId: {GrainId}, BackgroundDeactivationTimeout: {BackgroundDeactivationTimeout}",
-                    _context.GrainType, _context.GrainIdentity, _options.BackgroundDeactivationTimeout);
-            }
-            catch (Exception ex)
+            // If pending completed before the timeout, await the completed result to throw any errors
+            if (pendingWork == completedTask)
             {
-                _logger.LogWarning(ex, "Background work failed during grain deactivation. GrainType: {GrainType}, GrainId: {GrainId}}", _context.GrainType, _context.GrainIdentity);
+                timeoutCancellationTokenSource.Cancel();
+                await pendingWork;
+                return;
             }
+            _logger.LogWarning("Background work did not complete within deactivation timeout. GrainType: {GrainType}, GrainId: {GrainId}, BackgroundDeactivationTimeout: {BackgroundDeactivationTimeout}",
+                _context.GrainType, _context.GrainIdentity, _options.BackgroundDeactivationTimeout);
         }
 
         private Task NoOp(CancellationToken ct) => Task.CompletedTask;
 
         private Task SignalDeactivating(CancellationToken ct)
         {
-            _deactivating.Cancel(false);
+            if (!_deactivating.IsCancellationRequested) _deactivating.Cancel(false);
             return Task.CompletedTask;
         }
 

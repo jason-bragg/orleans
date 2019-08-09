@@ -40,7 +40,7 @@ using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
 using Orleans.Networking.Shared;
-using Orleans.Utils;
+using Orleans.Utilities;
 
 namespace Orleans.Hosting
 {

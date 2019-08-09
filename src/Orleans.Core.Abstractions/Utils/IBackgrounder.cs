@@ -2,7 +2,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace Orleans.Utils
+namespace Orleans.Utilities
 {
     public interface IBackgrounder
     {

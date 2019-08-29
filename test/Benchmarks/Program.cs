@@ -11,6 +11,7 @@ using Benchmarks.GrainStorage;
 using BenchmarkDotNet.Configs;
 using BenchmarkDotNet.Jobs;
 using BenchmarkDotNet.Toolchains.CsProj;
+using Benchmarks.ObjectPool;
 
 namespace Benchmarks
 {
@@ -198,11 +199,17 @@ namespace Benchmarks
                 benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
                 benchmark => benchmark.Teardown());
             },
+            ["ObjectPool"] = () =>
+            {
+                BenchmarkRunner.Run<ObjectPoolBenchmarks>();
+            },
         };
 
         // requires benchmark name or 'All' word as first parameter
         static void Main(string[] args)
         {
+            if (args.FirstOrDefault() == "Benchmarks") args = args.Skip(1).ToArray();
+
             if (args.Length > 0 && args[0].Equals("all", StringComparison.InvariantCultureIgnoreCase))
             {
                 Console.WriteLine("Running full benchmarks suite");
@@ -212,6 +219,7 @@ namespace Benchmarks
 
             if (args.Length == 0 || !_benchmarks.ContainsKey(args[0]))
             {
+                Console.WriteLine($"Invalid args: {string.Join("|", args)}" );
                 Console.WriteLine("Please, select benchmark, list of available:");
                 _benchmarks
                     .Select(pair => pair.Key)

@@ -20,6 +20,8 @@ namespace Benchmarks.ObjectPool
         public ReadOnlySequence<byte> Data { get; }
 
         public override string ToString() => this.marker.ToString();
+
+        internal bool IsValid => marker != null;
     }
 
     public interface IObjectPoolMonitor2 : IObjectPoolMonitor
@@ -90,35 +92,27 @@ namespace Benchmarks.ObjectPool
         {
             byte[] resource;
 
-            Chunk activeChunk = this.workingChunk;
+            (Chunk active, object marker) chunk = this.GetWorkingChunk();
 
             //if couldn't pop a resource from the pool
-            if (!activeChunk.free.TryPop(out resource))
+            if (!chunk.active.free.TryPop(out resource))
             {
                 // check to see if gc has fired, which signals that resources may be free so we should cycle chunk.
                 if(!gcSignal.IsAlive)
                 {
-                    lock(this.guard)
-                    {
-                        if (!gcSignal.IsAlive)
-                        {
-                            Interlocked.Increment(ref this.gcCount);
-                            CycleChunk();
-                            this.gcSignal = new WeakReference(new object());
-                        }
-                    }
+                    SafeCycleChunk();
                 }
-                activeChunk = this.workingChunk;
+                chunk = this.GetWorkingChunk();
                 // if nothing was freed, or we failed to pop a resource again, allocate new one
-                if (!activeChunk.free.TryPop(out resource))
+                if (!chunk.active.free.TryPop(out resource))
                 {
                     // create a new resource using factoryFunc from outside of the pool
                     resource = new byte[this.blocksize];
                     Interlocked.Increment(ref this.totalObjects);
                 }
             }
-            var block = new DataBlock(activeChunk.Marker, resource);
-            activeChunk.used.Push(resource);
+            var block = new DataBlock(chunk.marker, resource);
+            chunk.active.used.Push(resource);
             this.monitor?.TrackObjectAllocated();
             lock(this.guard)
             {
@@ -127,9 +121,39 @@ namespace Benchmarks.ObjectPool
             return block;
         }
 
+        private (Chunk, object) GetWorkingChunk()
+        {
+            Chunk activeChunk = this.workingChunk;
+            object marker = activeChunk.Marker;
+
+            // race condition, we got old chunk
+            // Note, in testing, this never happens, but in theory it could so we account for it.
+            while (marker is null)
+            {
+                SafeCycleChunk();
+                activeChunk = this.workingChunk;
+                marker = activeChunk.Marker;
+            }
+            return (activeChunk, marker);
+        }
+
+        private void SafeCycleChunk()
+        {
+            lock (this.guard)
+            {
+                if (!gcSignal.IsAlive)
+                {
+                    this.gcCount++;
+                    CycleChunk();
+                    this.gcSignal = new WeakReference(new object());
+                }
+            }
+        }
+
         private void CycleChunk()
         {
             Chunk freeChunk;
+            // find a free chunck, or allocate new chunk
             if (TryFindFreeChhunk(out freeChunk))
             {
                 Interlocked.Increment(ref this.reusedChunks);
@@ -141,55 +165,62 @@ namespace Benchmarks.ObjectPool
             {
                 freeChunk = new Chunk();
             }
-            this.workingChunk.prev = this.tail;
-            if(this.tail != null)
-            {
-                this.tail.next = this.workingChunk;
-            }
-            this.tail = this.workingChunk;
-            if(this.head == null)
-            {
-                head = this.workingChunk;
-            }
-            this.workingChunk.Marker = null;
-            this.workingChunk = freeChunk;
+
+            // link working chunk to tail, so most recently used chunk is last checked
+            LinkAtTail(this.workingChunk);
+
+            // swap free chunk with working chunk
+            Swap(ref this.workingChunk, ref freeChunk);
+
+            // clear marker in old working chunk, so only structures hold marker
+            //   when they are all cleaned up, gc will free marker, signaling these resources are available.
+            freeChunk.Marker = null;
         }
 
         private void Unlink(Chunk chunk)
         {
+            // chunk is neither head nor tail, simple unlink
             if (chunk.next != null && chunk.prev != null)
             {
                 chunk.prev.next = chunk.next;
                 chunk.next.prev = chunk.prev;
-                chunk.next = null;
-                chunk.prev = null;
-                return;
-            }
-            if (chunk == this.head)
+            } else
             {
-                this.head = chunk.next;
-                if(chunk.next != null)
+                // if chunk is head, set head to next and unlink from next
+                if (chunk == this.head)
                 {
-                    chunk.next.prev = null;
-                    chunk.next = null;
+                    this.head = chunk.next;
+                    if (chunk.next != null)
+                    {
+                        chunk.next.prev = null;
+                    }
+                }
+                // if chunk is tail, set tail to prev, and unlink prev
+                if (chunk == this.tail)
+                {
+                    this.tail = chunk.prev;
+                    if (chunk.prev != null)
+                    {
+                        chunk.prev.next = null;
+                    }
                 }
             }
-            if (chunk == this.tail)
-            {
-                this.tail = chunk.prev;
-                if (chunk.prev != null)
-                {
-                    chunk.prev.next = null;
-                    chunk.prev = null;
-                }
-            }
+            chunk.next = null;
+            chunk.prev = null;
         }
 
-        private static void Swap<TItem>(ref TItem obj1, ref TItem obj2)
+        private void LinkAtTail(Chunk chunk)
         {
-            TItem stash = obj1;
-            obj1 = obj2;
-            obj2 = stash;
+            chunk.prev = this.tail;
+            if (this.tail != null)
+            {
+                this.tail.next = this.workingChunk;
+            } else
+            {
+                // if tail is unset, head will also be unset, so this chunk becomes head also
+                this.head = this.workingChunk;
+            }
+            this.tail = chunk;
         }
 
         private bool TryFindFreeChhunk(out Chunk freeChunk)
@@ -232,6 +263,14 @@ namespace Benchmarks.ObjectPool
                 }
                 chunk = chunk.next;
             }
+        }
+
+        // simple ref swap
+        private static void Swap<TItem>(ref TItem obj1, ref TItem obj2)
+        {
+            TItem stash = obj1;
+            obj1 = obj2;
+            obj2 = stash;
         }
     }
 }

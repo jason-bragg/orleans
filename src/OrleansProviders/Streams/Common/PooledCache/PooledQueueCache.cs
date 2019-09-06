@@ -26,7 +26,6 @@ namespace Orleans.Providers.Streams.Common
         // linked list of message bocks.  First is newest.
         private readonly LinkedList<CachedMessageBlock> messageBlocks;
         private readonly CachedMessagePool pool;
-        private readonly ICacheDataAdapter cacheDataAdapter;
         private readonly ICacheMonitor cacheMonitor;
         private readonly PeriodicAction periodicMonitoring;
 
@@ -52,12 +51,10 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Pooled queue cache is a cache of message that obtains resource from a pool
         /// </summary>
-        /// <param name="cacheDataAdapter"></param>
         /// <param name="cacheMonitor"></param>
         /// <param name="cacheMonitorWriteInterval">cache monitor write interval.  Only triggered for active caches.</param>
-        public PooledQueueCache(ICacheDataAdapter cacheDataAdapter, ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
+        public PooledQueueCache(ICacheMonitor cacheMonitor, TimeSpan? cacheMonitorWriteInterval)
         {
-            this.cacheDataAdapter = cacheDataAdapter ?? throw new ArgumentNullException(nameof(cacheDataAdapter));
             this.ItemCount = 0;
             this.pool = new CachedMessagePool();
             this.messageBlocks = new LinkedList<CachedMessageBlock>();

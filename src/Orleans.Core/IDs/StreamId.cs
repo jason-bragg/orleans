@@ -30,13 +30,15 @@ namespace Orleans.Streams
 
         public string ProviderName => this.key.ProviderName;
 
-        public ArraySegment<byte> Token { get; }
+        [NonSerialized]
+        private byte[] token;
+        public byte[] Token => this.token ?? (this.token = new StreamIdentityToken(key.Guid, key.Namespace).Token);
 
         // TODO: need to integrate with Orleans serializer to really use Interner.
         private StreamId(StreamIdInternerKey key)
         {
             this.key = key;
-            this.Token = new StreamIdentityToken(key.Guid, key.Namespace).Token;
+            
         }
 
         internal static StreamId GetStreamId(Guid guid, string providerName, string streamNamespace)

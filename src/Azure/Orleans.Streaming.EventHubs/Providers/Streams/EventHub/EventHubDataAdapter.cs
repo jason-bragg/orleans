@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using Microsoft.Azure.EventHubs;
 using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
@@ -51,7 +50,7 @@ namespace Orleans.ServiceBus.Providers
             return EventHubBatchContainer.ToEventData(this.serializationManager, streamGuid, streamNamespace, events, requestContext);
         }
 
-        public virtual CachedMessage FromQueueMessage(StreamPosition streamPosition, EventData queueMessage, in DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
+        public virtual CachedMessage Pack(StreamPosition streamPosition, EventData queueMessage, in DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment)
         {
             var cachedMessage =  new CachedMessage()
             {
@@ -64,9 +63,9 @@ namespace Orleans.ServiceBus.Providers
                 queueMessage,
                 getSegment,
                 out cachedMessage.Segment,
-                out cachedMessage.SequenceToken,
-                out cachedMessage.StreamId,
-                out cachedMessage.Payload);
+                out cachedMessage.SequenceTokenWindow,
+                out cachedMessage.StreamIdWindow,
+                out cachedMessage.PayloadWindow);
 
             return cachedMessage;
         }
@@ -75,9 +74,9 @@ namespace Orleans.ServiceBus.Providers
         {
             Guid streamGuid = Guid.Parse(queueMessage.SystemProperties.PartitionKey);
             string streamNamespace = queueMessage.GetStreamNamespaceProperty();
-            var stremIdentity = new StreamIdentityToken(streamGuid, streamNamespace);
-            ArraySegment<byte> token = queueMessage.GetSequenceToken();
-            return new StreamPosition(stremIdentity.Token, token);
+            var stremIdentityToken = new ArraySegment<byte>(StreamIdentityToken.Create(streamGuid, streamNamespace));
+            ArraySegment<byte> sequenceToken = queueMessage.GetSequenceToken();
+            return new StreamPosition(stremIdentityToken, sequenceToken);
         }
 
         /// <summary>

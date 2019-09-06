@@ -6,7 +6,6 @@ using Orleans.Runtime;
 
 namespace Orleans.Streams
 {
-    [Serializable]
     internal class StreamConsumerCollection
     {
         private readonly Dictionary<GuidId, StreamConsumerData> queueData; // map of consumers for one stream: from Guid ConsumerId to StreamConsumerData

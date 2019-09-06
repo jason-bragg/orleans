@@ -7,7 +7,10 @@ namespace Orleans.ServiceBus.Providers
 {
     public interface IEventHubDataAdapter : IQueueDataAdapter<EventData>, ICacheDataAdapter
     {
-        CachedMessage FromQueueMessage(StreamPosition position, EventData queueMessage, in DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment);
+        /// <summary>
+        /// Pack EventData into cached message
+        /// </summary>
+        CachedMessage Pack(StreamPosition streamPosition, EventData queueMessage, in DateTime dequeueTime, Func<int, ArraySegment<byte>> getSegment);
 
         StreamPosition GetStreamPosition(string partition, EventData queueMessage);
 

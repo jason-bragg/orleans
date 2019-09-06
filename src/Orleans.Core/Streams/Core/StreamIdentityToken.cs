@@ -6,6 +6,13 @@ namespace Orleans.Streams
     {
         public StreamIdentityToken(in Guid streamGuid, string streamNamespace)
         {
+            this.Token = StreamIdentityToken.Create(streamGuid, streamNamespace);
+        }
+
+        public byte[] Token { get; }
+
+        public static byte[]  Create(in Guid streamGuid, string streamNamespace)
+        {
             byte[] guidBytes = streamGuid.ToByteArray();
             char[] streamNamespaceChars = streamNamespace?.ToCharArray();
             int size = guidBytes.Length + // of guid
@@ -18,9 +25,7 @@ namespace Orleans.Streams
             {
                 Buffer.BlockCopy(streamNamespaceChars, 0, token, guidBytes.Length, streamNamespaceChars.Length * sizeof(char));
             }
-            this.Token = new ArraySegment<byte>(token);
+            return token;
         }
-
-        public ArraySegment<byte> Token { get; }
     }
 }

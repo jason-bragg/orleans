@@ -62,7 +62,7 @@ namespace Orleans.ServiceBus.Providers
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, cacheMonitor, cacheMonitorWriteInterval);
+            this.cache = new PooledQueueCache(cacheMonitor, cacheMonitorWriteInterval);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
@@ -72,37 +72,25 @@ namespace Orleans.ServiceBus.Providers
         }
 
         /// <inheritdoc />
-        public void SignalPurge()
-        {
-            this.evictionStrategy.PerformPurge(DateTime.UtcNow);
-        }
+        public void SignalPurge() => this.evictionStrategy.PerformPurge(DateTime.UtcNow);
 
         /// <summary>
         /// Add cache pressure monitor to the cache's back pressure algorithm
         /// </summary>
-        /// <param name="monitor"></param>
         public void AddCachePressureMonitor(ICachePressureMonitor monitor)
         {
             monitor.CacheMonitor = this.cacheMonitor;
             this.cachePressureMonitor.AddCachePressureMonitor(monitor);
         }
 
-        /// <summary>
-        /// Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.
-        /// </summary>
-        /// <filterpriority>2</filterpriority>
-        public void Dispose()
-        {
-            this.evictionStrategy.OnPurged = null;
-        }
+        public void Dispose() => this.evictionStrategy.OnPurged = null;
 
         /// <summary>
         /// The limit of the maximum number of items that can be added
         /// </summary>
-        public int GetMaxAddCount()
-        {
-            return cachePressureMonitor.IsUnderPressure(DateTime.UtcNow) ? 0 : defaultMaxAddCount;
-        }
+        public int GetMaxAddCount() => this.cachePressureMonitor.IsUnderPressure(DateTime.UtcNow)
+            ? 0
+            : this.defaultMaxAddCount;
 
         /// <summary>
         /// Add a list of EventHub EventData to the cache.
@@ -117,10 +105,10 @@ namespace Orleans.ServiceBus.Providers
             foreach (EventData message in messages)
             {
                 StreamPosition position = this.dataAdapter.GetStreamPosition(this.Partition, message);
-                cachedMessages.Add(this.dataAdapter.FromQueueMessage(position, message, dequeueTimeUtc, this.GetSegment));
+                cachedMessages.Add(this.dataAdapter.Pack(position, message, dequeueTimeUtc, this.GetSegment));
                 positions.Add(position);
             }
-            cache.Add(cachedMessages, dequeueTimeUtc);
+            this.cache.Add(cachedMessages, dequeueTimeUtc);
             return positions;
         }
 
@@ -131,9 +119,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
         public object GetCursor(in ArraySegment<byte> streamIdentity, in ArraySegment<byte> sequenceToken)
-        {
-            return cache.GetCursor(streamIdentity, sequenceToken);
-        }
+            => cache.GetCursor(streamIdentity, sequenceToken);
 
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
@@ -143,13 +129,15 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            if (!this.cache.TryGetNextMessage(cursorObj, out message))
+            message = null;
+            if (!this.cache.TryGetNextMessage(cursorObj, out CachedMessage cachedItem))
                 return false;
             double cachePressureContribution;
             cachePressureMonitor.RecordCachePressureContribution(
-                TryCalculateCachePressureContribution(message.SequenceToken, out cachePressureContribution)
+                TryCalculateCachePressureContribution(cachedItem, out cachePressureContribution)
                     ? cachePressureContribution
                     : 0.0);
+            message = this.dataAdapter.GetBatchContainer(cachedItem);
             return true;
         }
 
@@ -175,21 +163,21 @@ namespace Orleans.ServiceBus.Providers
         ///   0 indicating  no danger,
         ///   1 indicating removal is imminent.
         /// </summary>
-        private bool TryCalculateCachePressureContribution(StreamSequenceToken token, out double cachePressureContribution)
+        private bool TryCalculateCachePressureContribution(in CachedMessage cachedItem, out double cachePressureContribution)
         {
             cachePressureContribution = 0;
             // if cache is empty or has few items, don't calculate pressure
             if (this.cache.IsEmpty ||
                 !this.cache.Newest.HasValue ||
                 !this.cache.Oldest.HasValue ||
+                // TODO : this is hacky.. find better way - jbragg
                 this.cache.Newest.Value.DequeueTimeUtc.Ticks - this.cache.Oldest.Value.DequeueTimeUtc.Ticks < TimeSpan.FromSeconds(30).Ticks) // not enough items in cache.
             {
                 return false;
             }
 
-            IEventHubPartitionLocation location = (IEventHubPartitionLocation)token;
-            double cacheSize = cache.Newest.Value.EnqueueTimeUtc.Ticks - cache.Oldest.Value.EnqueueTimeUtc.Ticks;
-            long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
+            double cacheSize = Math.Max(1, this.cache.Newest.Value.EnqueueTimeUtc.Ticks - this.cache.Oldest.Value.EnqueueTimeUtc.Ticks);
+            long distanceFromNewestMessage = this.cache.Newest.Value.EnqueueTimeUtc.Ticks - cachedItem.EnqueueTimeUtc.Ticks;
             // pressure is the ratio of the distance from the front of the cache to the
             cachePressureContribution = distanceFromNewestMessage / cacheSize;
 

@@ -62,7 +62,7 @@ namespace Orleans.ServiceBus.Providers
             this.bufferPool = bufferPool;
             this.dataAdapter = dataAdapter;
             this.checkpointer = checkpointer;
-            this.cache = new PooledQueueCache(dataAdapter, logger, cacheMonitor, cacheMonitorWriteInterval);
+            this.cache = new PooledQueueCache(dataAdapter, cacheMonitor, cacheMonitorWriteInterval);
             this.cacheMonitor = cacheMonitor;
             this.evictionStrategy = evictionStrategy;
             this.evictionStrategy.OnPurged = this.OnPurge;
@@ -110,7 +110,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="messages"></param>
         /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        public List<StreamPosition> Add(List<EventData> messages, DateTime dequeueTimeUtc)
+        public List<StreamPosition> Add(List<EventData> messages, in DateTime dequeueTimeUtc)
         {
             List<StreamPosition> positions = new List<StreamPosition>();
             List<CachedMessage> cachedMessages = new List<CachedMessage>();
@@ -130,7 +130,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        public object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
+        public object GetCursor(in ArraySegment<byte> streamIdentity, in ArraySegment<byte> sequenceToken)
         {
             return cache.GetCursor(streamIdentity, sequenceToken);
         }
@@ -143,7 +143,7 @@ namespace Orleans.ServiceBus.Providers
         /// <returns></returns>
         public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
         {
-            if (!cache.TryGetNextMessage(cursorObj, out message))
+            if (!this.cache.TryGetNextMessage(cursorObj, out message))
                 return false;
             double cachePressureContribution;
             cachePressureMonitor.RecordCachePressureContribution(
@@ -179,16 +179,16 @@ namespace Orleans.ServiceBus.Providers
         {
             cachePressureContribution = 0;
             // if cache is empty or has few items, don't calculate pressure
-            if (cache.IsEmpty ||
-                !cache.Newest.HasValue ||
-                !cache.Oldest.HasValue ||
-                cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber < 10 * defaultMaxAddCount) // not enough items in cache.
+            if (this.cache.IsEmpty ||
+                !this.cache.Newest.HasValue ||
+                !this.cache.Oldest.HasValue ||
+                this.cache.Newest.Value.DequeueTimeUtc.Ticks - this.cache.Oldest.Value.DequeueTimeUtc.Ticks < TimeSpan.FromSeconds(30).Ticks) // not enough items in cache.
             {
                 return false;
             }
 
             IEventHubPartitionLocation location = (IEventHubPartitionLocation)token;
-            double cacheSize = cache.Newest.Value.SequenceNumber - cache.Oldest.Value.SequenceNumber;
+            double cacheSize = cache.Newest.Value.EnqueueTimeUtc.Ticks - cache.Oldest.Value.EnqueueTimeUtc.Ticks;
             long distanceFromNewestMessage = cache.Newest.Value.SequenceNumber - location.SequenceNumber;
             // pressure is the ratio of the distance from the front of the cache to the
             cachePressureContribution = distanceFromNewestMessage / cacheSize;

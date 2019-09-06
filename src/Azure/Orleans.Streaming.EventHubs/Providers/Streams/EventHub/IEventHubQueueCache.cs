@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Azure.EventHubs;
-using Orleans.Providers.Streams.Common;
 using Orleans.Streams;
 using System.Collections.Generic;
 
@@ -17,7 +16,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="message"></param>
         /// <param name="dequeueTimeUtc"></param>
         /// <returns></returns>
-        List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc);
+        List<StreamPosition> Add(List<EventData> message, in DateTime dequeueTimeUtc);
 
         /// <summary>
         /// Get a cursor into the cache to read events from a stream.
@@ -25,7 +24,7 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
         /// <returns></returns>
-        object GetCursor(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken);
+        object GetCursor(in ArraySegment<byte> streamIdentity, in ArraySegment<byte> sequenceToken);
         /// <summary>
         /// Try to get the next message in the cache for the provided cursor.
         /// </summary>

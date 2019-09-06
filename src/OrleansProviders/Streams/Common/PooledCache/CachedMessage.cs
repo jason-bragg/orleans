@@ -1,6 +1,5 @@
 
 using System;
-using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -11,21 +10,17 @@ namespace Orleans.Providers.Streams.Common
     public struct CachedMessage
     {
         /// <summary>
-        /// Guid of streamId this event is part of
+        /// location of sequence token in segment
         /// </summary>
-        public Guid StreamGuid;
+        public (int Offset, int Count) SequenceTokenWindow;
         /// <summary>
-        /// Interned Namespace string of streamId this event is part of
+        /// location of streamId in segment
         /// </summary>
-        public string StreamNamespace;
+        public (int Offset, int Count) StreamIdWindow;
         /// <summary>
-        /// Sequence number.  Position of event in queue
+        /// location of payload in segment
         /// </summary>
-        public long SequenceNumber;
-        /// <summary>
-        /// Event index.  Index in batch
-        /// </summary>
-        public int EventIndex;
+        public (int Offset, int Count) PayloadWindow;
         /// <summary>
         /// Time event was written to EventHub
         /// </summary>
@@ -42,19 +37,16 @@ namespace Orleans.Providers.Streams.Common
 
     public static class CachedMessageExtensions
     {
-        public static int Compare(this ref CachedMessage cachedMessage, StreamSequenceToken token)
-        {
-            return cachedMessage.SequenceNumber != token.SequenceNumber
-                ? (int)(cachedMessage.SequenceNumber - token.SequenceNumber)
-                : cachedMessage.EventIndex - token.EventIndex;
-        }
+        public static ReadOnlySpan<byte> SequenceToken(this ref CachedMessage cachedMessage)
+            => cachedMessage.Segment.AsSpan(cachedMessage.SequenceTokenWindow.Offset, cachedMessage.SequenceTokenWindow.Count);
 
-        public static bool CompareStreamId(this ref CachedMessage cachedMessage, IStreamIdentity streamIdentity)
-        {
-            int result = cachedMessage.StreamGuid.CompareTo(streamIdentity.Guid);
-            if (result != 0) return false;
+        public static ReadOnlySpan<byte> StreamId(this ref CachedMessage cachedMessage)
+            => cachedMessage.Segment.AsSpan(cachedMessage.StreamIdWindow.Offset, cachedMessage.StreamIdWindow.Count);
 
-            return string.Compare(cachedMessage.StreamNamespace, streamIdentity.Namespace, StringComparison.Ordinal) == 0;
-        }
+        public static int Compare(this ref CachedMessage cachedMessage, in ArraySegment<byte> sequenceToken)
+            => cachedMessage.SequenceToken().SequenceCompareTo(sequenceToken);
+
+        public static bool CompareStreamId(this ref CachedMessage cachedMessage, in ArraySegment<byte> streamIdentity)
+            => cachedMessage.StreamId().SequenceEqual(streamIdentity);
     }
 }

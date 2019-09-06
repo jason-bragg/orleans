@@ -1,5 +1,6 @@
 
 using System;
+using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
 {
@@ -8,6 +9,7 @@ namespace Orleans.Providers.Streams.Common
     /// </summary>
     public static class SegmentBuilder
     {
+        private const int GuidByteArraySize = 16;
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
         /// </summary>
@@ -23,7 +25,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Calculates how much space will be needed to append the provided bytes into the segment.
         /// </summary>
-        public static int CalculateAppendSize(ArraySegment<byte> segment)
+        public static int CalculateAppendSize(in ArraySegment<byte> segment)
         {
             return (segment.Count == 0)
                 ? sizeof(int)
@@ -71,7 +73,7 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Appends an array of bytes to the end of the segment
         /// </summary>
-        public static void Append(ArraySegment<byte> segment, ref int writerOffset, ArraySegment<byte> append)
+        public static void Append(ArraySegment<byte> segment, ref int writerOffset, in ArraySegment<byte> append)
         {
             if (segment.Array == null)
             {

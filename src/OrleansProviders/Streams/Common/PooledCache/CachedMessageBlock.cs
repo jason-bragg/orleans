@@ -1,6 +1,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans.Streams;
 
 namespace Orleans.Providers.Streams.Common
@@ -96,15 +97,15 @@ namespace Orleans.Providers.Streams.Common
         /// Add a message from the queue to the block.
         /// Converts the queue message to a cached message and stores it at the end of the block.
         /// </summary>
-        public void Add(CachedMessage message)
+        public void Add(in CachedMessage message)
         {
-            if (!HasCapacity)
+            if (!this.HasCapacity)
             {
                 throw new InvalidOperationException("Block is full");
             }
 
-            int index = writeIndex++;
-            cachedMessages[index] = message;
+            int index = this.writeIndex++;
+            this.cachedMessages[index] = message;
         }
 
         /// <summary>
@@ -128,35 +129,33 @@ namespace Orleans.Providers.Streams.Common
         /// Gets the sequence token of the cached message a the provided index
         /// </summary>
         /// <param name="index"></param>
-        /// <param name="dataAdapter"></param>
         /// <returns></returns>
-        public StreamSequenceToken GetSequenceToken(int index, ICacheDataAdapter dataAdapter)
+        public ArraySegment<byte> GetSequenceToken(int index)
         {
             if (index >= writeIndex || index < readIndex)
             {
                 throw new ArgumentOutOfRangeException(nameof(index));
             }
-            return dataAdapter.GetSequenceToken(ref cachedMessages[index]);
+            ref var msg = ref this.cachedMessages[index];
+            return new ArraySegment<byte>(new ArraySegment<byte>(msg.Segment.Array, msg.SequenceToken.Offset, msg.SequenceToken.Count).ToArray());
         }
 
         /// <summary>
         /// Gets the sequence token of the newest message in this block
         /// </summary>
-        /// <param name="dataAdapter"></param>
         /// <returns></returns>
-        public StreamSequenceToken GetNewestSequenceToken(ICacheDataAdapter dataAdapter)
+        public ArraySegment<byte> GetNewestSequenceToken()
         {
-            return GetSequenceToken(NewestMessageIndex, dataAdapter);
+            return GetSequenceToken(NewestMessageIndex);
         }
 
         /// <summary>
         /// Gets the sequence token of the oldest message in this block
         /// </summary>
-        /// <param name="dataAdapter"></param>
         /// <returns></returns>
-        public StreamSequenceToken GetOldestSequenceToken(ICacheDataAdapter dataAdapter)
+        public ArraySegment<byte> GetOldestSequenceToken()
         {
-            return GetSequenceToken(OldestMessageIndex, dataAdapter);
+            return GetSequenceToken(OldestMessageIndex);
         }
         
         /// <summary>
@@ -164,7 +163,7 @@ namespace Orleans.Providers.Streams.Common
         /// </summary>
         /// <param name="token"></param>
         /// <returns></returns>
-        public int GetIndexOfFirstMessageLessThanOrEqualTo(StreamSequenceToken token)
+        public int GetIndexOfFirstMessageLessThanOrEqualTo(in ArraySegment<byte> token)
         {
             for (int i = writeIndex - 1; i >= readIndex; i--)
             {
@@ -179,15 +178,15 @@ namespace Orleans.Providers.Streams.Common
         /// <summary>
         /// Tries to find the first message in the block that is part of the provided stream.
         /// </summary>
-        public bool TryFindFirstMessage(IStreamIdentity streamIdentity, ICacheDataAdapter dataAdapter, out int index)
+        public bool TryFindFirstMessage(ArraySegment<byte> streamIdentity, out int index)
         {
-            return TryFindNextMessage(readIndex, streamIdentity, dataAdapter, out index);
+            return TryFindNextMessage(readIndex, streamIdentity, out index);
         }
 
         /// <summary>
         /// Tries to get the next message from the provided stream, starting at the start index.
         /// </summary>
-        public bool TryFindNextMessage(int start, IStreamIdentity streamIdentity, ICacheDataAdapter dataAdapter, out int index)
+        public bool TryFindNextMessage(int start, ArraySegment<byte> streamIdentity, out int index)
         {
             if (start < readIndex)
             {

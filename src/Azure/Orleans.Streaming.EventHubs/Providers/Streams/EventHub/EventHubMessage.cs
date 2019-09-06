@@ -25,16 +25,16 @@ namespace Orleans.ServiceBus.Providers
         /// <param name="properties">User properties from EventData object</param>
         /// <param name="payload">Binary data from EventData object</param>
         public EventHubMessage(IStreamIdentity streamIdentity, string partitionKey, string offset, long sequenceNumber,
-            DateTime enqueueTimeUtc, DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
+            DateTime enqueueTimeUtc, in DateTime dequeueTimeUtc, IDictionary<string, object> properties, byte[] payload)
         {
-            StreamIdentity = streamIdentity;
-            PartitionKey = partitionKey;
-            Offset = offset;
-            SequenceNumber = sequenceNumber;
-            EnqueueTimeUtc = enqueueTimeUtc;
-            DequeueTimeUtc = dequeueTimeUtc;
-            Properties = properties;
-            Payload = payload;
+            this.StreamIdentity = streamIdentity;
+            this.PartitionKey = partitionKey;
+            this.Offset = offset;
+            this.SequenceNumber = sequenceNumber;
+            this.EnqueueTimeUtc = enqueueTimeUtc;
+            this.DequeueTimeUtc = dequeueTimeUtc;
+            this.Properties = properties;
+            this.Payload = payload;
         }
 
         /// <summary>
@@ -42,7 +42,7 @@ namespace Orleans.ServiceBus.Providers
         /// </summary>
         /// <param name="cachedMessage"></param>
         /// <param name="serializationManager"></param>
-        public EventHubMessage(CachedMessage cachedMessage, SerializationManager serializationManager)
+        public EventHubMessage(in CachedMessage cachedMessage, SerializationManager serializationManager)
         {
             int readOffset = 0;
             StreamIdentity = new StreamIdentity(cachedMessage.StreamGuid, cachedMessage.StreamNamespace);

@@ -14,7 +14,7 @@ namespace Orleans.Streams
         /// </summary>
         /// <param name="streamIdentity"></param>
         /// <param name="sequenceToken"></param>
-        public StreamPosition(IStreamIdentity streamIdentity, StreamSequenceToken sequenceToken)
+        public StreamPosition(in ArraySegment<byte> streamIdentity, in ArraySegment<byte> sequenceToken)
         {
             if (streamIdentity == null)
             {
@@ -24,17 +24,17 @@ namespace Orleans.Streams
             {
                 throw new ArgumentNullException("sequenceToken");
             }
-            StreamIdentity = streamIdentity;
-            SequenceToken = sequenceToken;
+            this.StreamIdentity = streamIdentity;
+            this.SequenceToken = sequenceToken;
         }
         /// <summary>
         /// Identity of the stream
         /// </summary>
-        public IStreamIdentity StreamIdentity { get; }
+        public ArraySegment<byte> StreamIdentity { get; }
 
         /// <summary>
         /// Position in the stream
         /// </summary>
-        public StreamSequenceToken SequenceToken { get; }
+        public ArraySegment<byte> SequenceToken { get; }
     }
 }

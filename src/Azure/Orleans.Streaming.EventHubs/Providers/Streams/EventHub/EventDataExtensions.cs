@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Azure.EventHubs;
@@ -38,6 +38,14 @@ namespace Orleans.ServiceBus.Providers
             }
             return null;
         }
+
+        /// <summary>
+        /// Gets sequence token from the EventData
+        /// </summary>
+        /// <param name="eventData"></param>
+        /// <returns></returns>
+        public static ArraySegment<byte> GetSequenceToken(this EventData eventData)
+            => new ArraySegment<byte>(BitConverter.GetBytes(eventData.SystemProperties.SequenceNumber));
 
         /// <summary>
         /// Serializes event data properties

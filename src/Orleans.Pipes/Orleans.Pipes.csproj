@@ -4,6 +4,7 @@
     <Title>Microsoft Orleans pipes support</Title>
     <Description>Core pipe library of Microsoft Orleans.</Description>
     <PackageTags>$(PackageTags) Pipes</PackageTags>
+    <TargetFrameworks>$(MultiTargetFrameworks)</TargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
